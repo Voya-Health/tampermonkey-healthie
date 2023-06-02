@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Care Plan Userscript
+// @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
 // @version      0.1
-// @description  Test injecting care plan components into Healthie
+// @description  Injecting care plan components into Healthie
 // @author       Don
 // @match        https://securestaging.gethealthie.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
