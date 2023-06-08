@@ -13,7 +13,7 @@
 
 let previousUrl = "";
 const healthieAPIKey = "";
-//test git update
+
 //observe changes to the DOM, check for URL changes
 const observer = new MutationObserver(function (mutations) {
     if (location.href !== previousUrl) {
