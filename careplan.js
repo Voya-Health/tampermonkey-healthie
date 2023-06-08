@@ -22,12 +22,30 @@ const observer = new MutationObserver(function (mutations) {
         //Care plans URL
         if(location.href.includes("/all_plans")){
             //Function that will check when care plan tab has loaded
-            wait();
+            waitCarePlan();
+        }
+
+        if(location.href.includes("/users")){
+            //Function that will check when care plan tab has loaded
+            waitGoalTab();
         }
     }
 });
 
-function wait() {
+function waitGoalTab() {
+    //check to see if the care plan tab contents has loaded
+    if (document.querySelector('[data-testid="goals-tab-btn"]')) {
+        unsafeWindow.console.log(`tampermonkey found goals tab`, );
+        document.querySelector('[data-testid="goals-tab-btn"]').parentElement.remove()
+    } else {
+        //wait for content load
+        unsafeWindow.console.log(`tampermonkey waiting goals tab`);
+        window.setTimeout(waitGoalTab, 200);
+    }
+
+}
+
+function waitCarePlan() {
     //check to see if the care plan tab contents has loaded
     if (document.getElementsByClassName('cp-tab-contents')[0]) {
         unsafeWindow.console.log(`tampermonkey removing`);
@@ -176,7 +194,7 @@ function wait() {
     } else {
         //wait for content load
         unsafeWindow.console.log(`tampermonkey waiting`);
-        window.setTimeout(wait, 500);
+        window.setTimeout(waitCarePlan, 200);
     }
 
 }
