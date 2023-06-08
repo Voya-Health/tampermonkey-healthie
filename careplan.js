@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Healthie Care Plan Integration
+// @name         Healthie Care Plan Integration (dev version)
 // @namespace    http://tampermonkey.net/
 // @version      0.1
 // @description  Injecting care plan components into Healthie
@@ -51,8 +51,7 @@ function wait() {
         const parent = document.getElementsByClassName('column is-12 is-12-mobile')[0]
         parent.appendChild(iFrameNode);
 
-        //remove styling of healthie tab element
-        document.getElementsByClassName('column is-12 is-12-mobile')[0].style = ""
+        styleMods();
 
         //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
         //confirming publishing of care plan will trigger window.parent.postMessage within Misha
@@ -179,6 +178,11 @@ function wait() {
         window.setTimeout(wait, 500);
     }
 
+}
+
+function styleMods() {
+    //remove styling of healthie tab element
+    document.getElementsByClassName('column is-12 is-12-mobile')[0].style = "";
 }
 
 //config for observer
