@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.2
 // @description  Injecting care plan components into Healthie
 // @author       Don
 // @match        https://securestaging.gethealthie.com/*
