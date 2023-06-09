@@ -237,6 +237,16 @@ function waitSettingsAPIpage() {
       inputButtonWrapper.style.justifyContent = "space-between";
       inputButtonWrapper.style.width = "100%";
 
+      newInput = document.createElement("input");
+      newInput.setAttribute("type", "text");
+      newInput.setAttribute("placeholder", "Enter your API key here");
+      newInput.classList.add("api-key-input");
+      newInput.style.height = "38px";
+      newInput.style.width = "100%";
+      newInput.style.maxWidth = "292px";
+      newInput.style.padding = "0 14px";
+      newInput.style.borderRadius = "4px";
+      newInput.style.border = "1px solid #828282";
 
       newButton = document.createElement("button");
       newButton.setAttribute("type", "button");
