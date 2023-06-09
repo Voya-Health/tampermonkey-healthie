@@ -14,7 +14,7 @@
 /* globals contentful */
 
 let previousUrl = "";
-const healthieAPIKey = "";
+const healthieAPIKey = GM_getValue("healthieApiKey", "");
 
 //observe changes to the DOM, check for URL changes
 const observer = new MutationObserver(function (mutations) {
@@ -219,7 +219,7 @@ function waitSettingsAPIpage() {
       newWrapper.style.marginTop = "2rem";
       newWrapper.style.paddingBottom = "2rem";
       newWrapper.style.borderBottom = "1px solid #e0e0e0";
-      newWrapper.style.paddingRight = "28px";
+      newWrapper.style.marginRight = "28px";
 
       let newHeader = document.createElement("div");
       newHeader.classList.add("api-keys-header");
