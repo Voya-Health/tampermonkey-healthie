@@ -262,6 +262,22 @@ function waitSettingsAPIpage() {
       newButton.style.borderRadius = "3px";
       newButton.style.cursor = "pointer";
 
+      // Append the new elements to the existing container
+      let mainContainer = document.querySelector(".main-settings__container");
+      mainContainer.appendChild(newWrapper);
+
+      // Append the new elements to the new wrapper
+      newWrapper.appendChild(newHeader);
+      newWrapper.appendChild(inputButtonWrapper);
+      inputButtonWrapper.appendChild(newInput);
+      inputButtonWrapper.appendChild(newButton);
+    } else {
+      newButton = existingWrapper.querySelector("button");
+      newInput = existingWrapper.querySelector("input");
+    }
+
+    let storedApiKey = GM_getValue("healthieApiKey", ""); // Retrieve the stored API key using GM_getValue
+    newInput.value = storedApiKey; // Set the initial value of the input
 
     // Add onclick handler to the "Link Api key" button
     newButton.onclick = function () {
