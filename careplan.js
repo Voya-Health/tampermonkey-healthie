@@ -207,64 +207,60 @@ function waitSettingsAPIpage() {
   //check to see if the care plan tab contents has loaded
   if (document.querySelector(".api_keys")) {
     unsafeWindow.console.log(`tampermonkey found api keys section`);
-    // Create the new elements
-    var newWrapper = document.createElement("div");
-    newWrapper.classList.add("api-keys-wrapper", "ApiKeys_apiKeysWrapper__125W1");
-    newWrapper.style.marginTop = "2rem";
-    newWrapper.style.paddingBottom = "2rem";
-    newWrapper.style.borderBottom = "1px solid #e0e0e0";
+    // Check if the api-keys-wrapper already exists
+    let existingWrapper = document.querySelector(".api-keys-wrapper.vori");
+    let newButton;
+    let newInput;
 
-    var newHeader = document.createElement("div");
-    newHeader.classList.add("api-keys-header", "ApiKeys_apiKeysHeader__aND9c");
-    newHeader.textContent = "Connect to Vori Health";
+    if (!existingWrapper) {
+      // Create the new elements
+      let newWrapper = document.createElement("div");
+      newWrapper.classList.add("api-keys-wrapper", "vori");
+      newWrapper.style.marginTop = "2rem";
+      newWrapper.style.paddingBottom = "2rem";
+      newWrapper.style.borderBottom = "1px solid #e0e0e0";
+      newWrapper.style.paddingRight = "28px";
 
-    var inputButtonWrapper = document.createElement("div");
-    inputButtonWrapper.style.display = "flex";
-    inputButtonWrapper.style.justifyContent = "space-between";
-    inputButtonWrapper.style.width = "100%";
+      let newHeader = document.createElement("div");
+      newHeader.classList.add("api-keys-header");
+      newHeader.textContent = "Connect to Vori Health";
+      newHeader.style.height = "44px";
+      newHeader.style.color = "#16284a";
+      newHeader.style.fontFamily = '"Avenir",Helvetica,"Arial",sans-serif';
+      newHeader.style.fontWeight = "800";
+      newHeader.style.fontSize = "28px";
+      newHeader.style.lineHeight = "34px";
+      newHeader.style.letterSpacing = "-.02em";
 
-    var newInput = document.createElement("input");
-    newInput.setAttribute("type", "text");
-    newInput.setAttribute("placeholder", "Enter your API key here");
-    newInput.classList.add("api-key-input");
-    newInput.style.height = "38px";
-    newInput.style.width = "100%";
-    newInput.style.maxWidth = "292px";
-    newInput.style.padding = "0 14px";
-    newInput.style.borderRadius = "4px";
-    newInput.style.border = "1px solid #828282";
+      let inputButtonWrapper = document.createElement("div");
+      inputButtonWrapper.style.display = "flex";
+      inputButtonWrapper.style.justifyContent = "space-between";
+      inputButtonWrapper.style.width = "100%";
 
-    var newButton = document.createElement("button");
-    newButton.setAttribute("type", "button");
-    newButton.textContent = "Link Api key";
-    newButton.style.backgroundColor = "#4a90e2";
-    newButton.style.color = "#fff";
-    newButton.style.border = "1px solid #4a90e2";
-    newButton.style.padding = "8px 10px";
-    newButton.style.fontFamily = '"Avenir",Helvetica,"Arial",sans-serif';
-    newButton.style.fontSize = "14px";
-    newButton.style.lineHeight = "20px";
-    newButton.style.width = "200px";
-    newButton.style.borderRadius = "3px";
 
-    // Append the new elements to the existing container
-    var mainContainer = document.querySelector(".main-settings__container");
-    mainContainer.appendChild(newWrapper);
+      newButton = document.createElement("button");
+      newButton.setAttribute("type", "button");
+      newButton.textContent = "Link Api key";
+      newButton.style.backgroundColor = "#4a90e2";
+      newButton.style.color = "#fff";
+      newButton.style.border = "1px solid #4a90e2";
+      newButton.style.padding = "8px 10px";
+      newButton.style.fontFamily = '"Avenir",Helvetica,"Arial",sans-serif';
+      newButton.style.fontSize = "14px";
+      newButton.style.lineHeight = "20px";
+      newButton.style.width = "200px";
+      newButton.style.borderRadius = "3px";
+      newButton.style.cursor = "pointer";
 
-    // Append the new elements to the new wrapper
-    newWrapper.appendChild(newHeader);
-    newWrapper.appendChild(inputButtonWrapper);
-    inputButtonWrapper.appendChild(newInput);
-    inputButtonWrapper.appendChild(newButton);
 
     // Add onclick handler to the "Link Api key" button
     newButton.onclick = function () {
       var apiKey = newInput.value.trim(); // Trim whitespace from the input value
       if (apiKey === "") {
-        alert("Please enter your API key");
+        alert("Please enter a valid API key!");
       } else {
         GM_setValue("healthieApiKey", apiKey);
-        alert("API key saved!");
+        alert("API key saved successfully!");
       }
     };
   } else {
