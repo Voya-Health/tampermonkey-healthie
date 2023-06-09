@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      0.21
 // @description  Injecting care plan components into Healthie
-// @author       Don
+// @author       Don, Tonye
 // @match        https://securestaging.gethealthie.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
 // @sandbox      JavaScript
