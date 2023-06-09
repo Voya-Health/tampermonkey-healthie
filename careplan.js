@@ -7,6 +7,8 @@
 // @match        https://securestaging.gethealthie.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
 // @sandbox      JavaScript
+// @grant        GM_setValue
+// @grant        GM_getValue
 // ==/UserScript==
 
 /* globals contentful */
