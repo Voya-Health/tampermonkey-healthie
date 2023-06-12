@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.21
+// @version      0.22
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://securestaging.gethealthie.com/*
@@ -28,7 +28,7 @@ const observer = new MutationObserver(function (mutations) {
     }
 
     if (location.href.includes("/users")) {
-      //Function that will check when care plan tab has loaded
+      //Function that will check when goal tab has loaded
       waitGoalTab();
     }
 
@@ -310,7 +310,7 @@ function goalMutation(payload) {
       Authorization: auth,
       "content-type": "application/json",
     },
-    body: payload,
+    body: payload
   })
     .then((res) => res.json())
     .then((result) => unsafeWindow.console.log("tampermonkey", result));
