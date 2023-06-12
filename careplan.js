@@ -4,7 +4,7 @@
 // @version      0.22
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
-// @match        https://securestaging.gethealthie.com/*
+// @match        https://*.gethealthie.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
 // @sandbox      JavaScript
 // @grant        GM_setValue
@@ -15,6 +15,7 @@
 
 let previousUrl = "";
 const healthieAPIKey = GM_getValue("healthieApiKey", "");
+const isStagingEnv = location.href.includes("securestaging") ? true : false
 
 //observe changes to the DOM, check for URL changes
 const observer = new MutationObserver(function (mutations) {
@@ -60,13 +61,15 @@ function waitCarePlan() {
 
     //Create Div
     var iFrameNode = document.createElement("div");
+    //Check for Healthie environment
+    let iFrameURL = isStagingEnv ? "dev.misha.vori.health" : "misha.vorihealth.com"
 
     //Define inner HTML for created div
     iFrameNode.innerHTML =
       '<iframe id="MishaFrame"' +
       'title="Misha iFrame"' +
       'style="height: 100vh; width: 100%"' +
-      'src="https://dev.misha.vori.health/email%7C632b22aa626051ee6441e397/careplan"' +
+      'src="https://' + iFrameURL + '/email%7C632b22aa626051ee6441e397/careplan"' +
       ">" +
       "</iframe>";
     iFrameNode.setAttribute("class", "cp-tab-contents");
@@ -303,7 +306,8 @@ observer.observe(document, config);
 const auth = `Basic ${healthieAPIKey}`;
 
 function goalMutation(payload) {
-  fetch("https://staging-api.gethealthie.com/graphql", {
+  let api_env = isStagingEnv ? "staging-api" : "api"
+  fetch("https://" + api_env +".gethealthie.com/graphql", {
     method: "POST",
     headers: {
       AuthorizationSource: "API",
