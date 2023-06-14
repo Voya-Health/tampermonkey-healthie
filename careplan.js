@@ -36,6 +36,7 @@ const observer = new MutationObserver(function (mutations) {
     if (location.href.includes("/settings/api_keys")) {
       //Function to handle api keys
       waitSettingsAPIpage();
+      showInstructions();
     }
 
     isAPIconnected();
@@ -257,7 +258,7 @@ function waitSettingsAPIpage() {
 
       newButton = document.createElement("button");
       newButton.setAttribute("type", "button");
-      newButton.textContent = "Link Api key";
+      newButton.textContent = "Link API key";
       newButton.style.backgroundColor = "#4a90e2";
       newButton.style.color = "#fff";
       newButton.style.border = "1px solid #4a90e2";
@@ -306,29 +307,6 @@ function waitSettingsAPIpage() {
 function isAPIconnected() {
   //check to see if the header has loaded
   if (document.querySelector(".header")) {
-    const header = document.querySelector(".header");
-    const newDiv = document.createElement("div");
-    newDiv.style.display = "block";
-    newDiv.style.position = "relative";
-    newDiv.style.background = "#e3e532";
-    newDiv.style.top = "60px";
-    newDiv.style.minHeight = "42px";
-    newDiv.style.textAlign = "center";
-    newDiv.style.padding = "10px";
-
-    const link = document.createElement("a");
-    link.textContent = "You have not connected your Healthie Account to Vori Health. Set it up here!";
-    link.href = "/settings/api_keys";
-    link.style.color = "#333";
-    link.style.fontSize = "15px";
-    link.style.letterSpacing = "0.3px";
-    link.style.textDecoration = "none";
-
-    function addHoverEffect() {
-      link.style.textDecoration = "underline";
-    }
-
-    function removeHoverEffect() {
     let voriHeaderExists = document.querySelector(".vori-api-message");
     if (!voriHeaderExists) {
       const header = document.querySelector(".header");
@@ -349,23 +327,17 @@ function isAPIconnected() {
       link.style.fontSize = "15px";
       link.style.letterSpacing = "0.3px";
       link.style.textDecoration = "none";
-    }
 
-    newDiv.appendChild(link);
+      function addHoverEffect() {
+        link.style.textDecoration = "underline";
+      }
 
-    const healthieApiKey = GM_getValue("healthieApiKey", "");
+      function removeHoverEffect() {
+        link.style.textDecoration = "none";
+      }
 
-    if (healthieApiKey === "") {
-      newDiv.style.display = "block";
-      link.addEventListener("mouseover", addHoverEffect);
-      link.addEventListener("mouseout", removeHoverEffect);
-    } else {
-      newDiv.style.display = "none";
-      link.removeEventListener("mouseover", addHoverEffect);
-      link.removeEventListener("mouseout", removeHoverEffect);
-    }
+      newDiv.appendChild(link);
 
-    header.insertAdjacentElement("afterend", newDiv);
       if (healthieAPIKey === "") {
         newDiv.style.display = "block";
         link.addEventListener("mouseover", addHoverEffect);
@@ -382,6 +354,38 @@ function isAPIconnected() {
     //wait for content load
     unsafeWindow.console.log(`tampermonkey waiting for header`);
     window.setTimeout(isAPIconnected, 200);
+  }
+}
+
+function showInstructions() {
+  if (document.querySelector(".api-keys-wrapper") && document.querySelector(".api-keys-wrapper p")) {
+    const apiKeyParagraph = document.querySelector(".api-keys-wrapper p");
+    let voriHeaderExists = document.querySelector(".vori-instruction-message");
+
+    if (healthieAPIKey === "") {
+      const instructions = document.createElement("p");
+      instructions.innerHTML =
+        "<b>Vori Health Instructions</b><br />" +
+        '1. Click the button below that says <i>"Add API Key"</i><br />' +
+        '2. Enter a memorable name in the <i>API Key Name</i> field then click on "Create API Key"<br />' +
+        "3. The API Key should now be listed below. Copy the text under the <i>Key</i> column.<br />" +
+        '4. Now under the "Connect to Vori Health" section, paste the key in the box that says <i>Enter your API Key here</i>, and then select the "Link Api key" button.<br />' +
+        '5. You should see a message saying "API key saved successfully"<br />';
+      instructions.classList.add("vori-instruction-message");
+      instructions.style.display = "block";
+      instructions.style.position = "relative";
+      instructions.style.background = "rgb(227 229 50 / 35%)";
+      instructions.style.color = "#16284a";
+      instructions.style.minHeight = "42px";
+      instructions.style.padding = "10px";
+      instructions.style.marginTop = "14px";
+
+      apiKeyParagraph.insertAdjacentElement("afterend", instructions);
+    }
+  } else {
+    //wait for content load
+    unsafeWindow.console.log(`tampermonkey waiting to show instructions`);
+    window.setTimeout(showInstructions, 200);
   }
 }
 
