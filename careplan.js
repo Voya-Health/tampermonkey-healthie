@@ -58,7 +58,7 @@ function waitGoalTab() {
 function waitCarePlan() {
   //check to see if the care plan tab contents has loaded
   if (document.getElementsByClassName("cp-tab-contents")[0]) {
-    // handle edgeccase: clicking on careplan tab multiple times
+    // handle edge case: clicking on careplan tab multiple times
     let careplanTabBtn = document.querySelector('a[data-testid="careplans-tab-btn"]');
     careplanTabBtn.addEventListener("click", handleCarePlanTabClick);
 
