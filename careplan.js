@@ -63,8 +63,11 @@ function waitCarePlan() {
     careplanTabBtn.addEventListener("click", handleCarePlanTabClick);
 
     function handleCarePlanTabClick() {
+      if (location.href.includes("all_plans")) {
+        if (healthieAPIKey !== "") {
           let tabContent = document.getElementsByClassName("cp-tab-contents");
           tabContent && tabContent[0].remove();
+        }
         waitCarePlan();
       }
     }
