@@ -306,22 +306,46 @@ function waitSettingsAPIpage() {
 function isAPIconnected() {
   //check to see if the header has loaded
   if (document.querySelector(".header")) {
-    var header = document.querySelector(".header");
-    var newDiv = document.createElement("div"); // Create the new div element
+    const header = document.querySelector(".header");
+    const newDiv = document.createElement("div");
+    newDiv.style.display = "block";
+    newDiv.style.position = "relative";
+    newDiv.style.background = "#e3e532";
+    newDiv.style.top = "60px";
+    newDiv.style.minHeight = "42px";
+    newDiv.style.textAlign = "center";
+    newDiv.style.padding = "10px";
 
-    var link = document.createElement("a");
-    link.textContent = "Connect your Healthie Account to Vori Health. Set it up here!";
+    const link = document.createElement("a");
+    link.textContent = "You have not connected your Healthie Account to Vori Health. Set it up here!";
     link.href = "/settings/api_keys";
+    link.style.color = "#333";
+    link.style.fontSize = "15px";
+    link.style.letterSpacing = "0.3px";
+    link.style.textDecoration = "none";
+
+    function addHoverEffect() {
+      link.style.textDecoration = "underline";
+    }
+
+    function removeHoverEffect() {
+      link.style.textDecoration = "none";
+    }
 
     newDiv.appendChild(link);
 
-    var healthieApiKey = GM_getValue("healthieApiKey", "");
+    const healthieApiKey = GM_getValue("healthieApiKey", "");
 
     if (healthieApiKey === "") {
       newDiv.style.display = "block";
+      link.addEventListener("mouseover", addHoverEffect);
+      link.addEventListener("mouseout", removeHoverEffect);
     } else {
       newDiv.style.display = "none";
+      link.removeEventListener("mouseover", addHoverEffect);
+      link.removeEventListener("mouseout", removeHoverEffect);
     }
+
     header.insertAdjacentElement("afterend", newDiv);
   } else {
     //wait for content load
