@@ -295,6 +295,8 @@ function waitSettingsAPIpage() {
       } else {
         GM_setValue("healthieApiKey", apiKey);
         alert("API key saved successfully!");
+        window.setTimeout(null, 2000);
+        window.location.reload();
       }
     };
   } else {
