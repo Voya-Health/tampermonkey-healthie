@@ -58,6 +58,17 @@ function waitGoalTab() {
 function waitCarePlan() {
   //check to see if the care plan tab contents has loaded
   if (document.getElementsByClassName("cp-tab-contents")[0]) {
+    // handle edgeccase: clicking on careplan tab multiple times
+    let careplanTabBtn = document.querySelector('a[data-testid="careplans-tab-btn"]');
+    careplanTabBtn.addEventListener("click", handleCarePlanTabClick);
+
+    function handleCarePlanTabClick() {
+          let tabContent = document.getElementsByClassName("cp-tab-contents");
+          tabContent && tabContent[0].remove();
+        waitCarePlan();
+      }
+    }
+
     unsafeWindow.console.log(`tampermonkey removing`);
     //Locate and remove existing care plan tab content
     document.getElementsByClassName("cp-tab-contents")[0].remove();
@@ -95,11 +106,9 @@ function waitCarePlan() {
         iframeMsgDiv.appendChild(iframeMsgLink);
 
         if (healthieAPIKey === "") {
-          iframeMsgDiv.style.display = "block";
           iframeMsgLink.addEventListener("mouseover", addHoverEffect);
           iframeMsgLink.addEventListener("mouseout", removeHoverEffect);
         } else {
-          iframeMsgDiv.style.display = "none";
           iframeMsgLink.removeEventListener("mouseover", addHoverEffect);
           iframeMsgLink.removeEventListener("mouseout", removeHoverEffect);
         }
