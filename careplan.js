@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.23
+// @version      0.24
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -15,7 +15,7 @@
 
 let previousUrl = "";
 const healthieAPIKey = GM_getValue("healthieApiKey", "");
-const isStagingEnv = location.href.includes("securestaging") ? true : false
+const isStagingEnv = location.href.includes("securestaging") ? true : false;
 
 //observe changes to the DOM, check for URL changes
 const observer = new MutationObserver(function (mutations) {
@@ -37,6 +37,8 @@ const observer = new MutationObserver(function (mutations) {
       //Function to handle api keys
       waitSettingsAPIpage();
     }
+
+    isAPIconnected();
   }
 });
 
@@ -62,14 +64,16 @@ function waitCarePlan() {
     //Create Div
     var iFrameNode = document.createElement("div");
     //Check for Healthie environment
-    let iFrameURL = isStagingEnv ? "dev.misha.vori.health" : "misha.vorihealth.com"
+    let iFrameURL = isStagingEnv ? "dev.misha.vori.health" : "misha.vorihealth.com";
 
     //Define inner HTML for created div
     iFrameNode.innerHTML =
       '<iframe id="MishaFrame"' +
       'title="Misha iFrame"' +
       'style="height: 100vh; width: 100%"' +
-      'src="https://' + iFrameURL + '/email%7C632b22aa626051ee6441e397/careplan"' +
+      'src="https://' +
+      iFrameURL +
+      '/email%7C632b22aa626051ee6441e397/careplan"' +
       ">" +
       "</iframe>";
     iFrameNode.setAttribute("class", "cp-tab-contents");
@@ -299,6 +303,33 @@ function waitSettingsAPIpage() {
   }
 }
 
+function isAPIconnected() {
+  //check to see if the header has loaded
+  if (document.querySelector(".header")) {
+    var header = document.querySelector(".header");
+    var newDiv = document.createElement("div"); // Create the new div element
+
+    var link = document.createElement("a");
+    link.textContent = "Connect your Healthie Account to Vori Health. Set it up here!";
+    link.href = "/settings/api_keys";
+
+    newDiv.appendChild(link);
+
+    var healthieApiKey = GM_getValue("healthieApiKey", "");
+
+    if (healthieApiKey === "") {
+      newDiv.style.display = "block";
+    } else {
+      newDiv.style.display = "none";
+    }
+    header.insertAdjacentElement("afterend", newDiv);
+  } else {
+    //wait for content load
+    unsafeWindow.console.log(`tampermonkey waiting for header`);
+    window.setTimeout(isAPIconnected, 200);
+  }
+}
+
 //config for observer
 const config = { subtree: true, childList: true };
 observer.observe(document, config);
@@ -306,15 +337,15 @@ observer.observe(document, config);
 const auth = `Basic ${healthieAPIKey}`;
 
 function goalMutation(payload) {
-  let api_env = isStagingEnv ? "staging-api" : "api"
-  fetch("https://" + api_env +".gethealthie.com/graphql", {
+  let api_env = isStagingEnv ? "staging-api" : "api";
+  fetch("https://" + api_env + ".gethealthie.com/graphql", {
     method: "POST",
     headers: {
       AuthorizationSource: "API",
       Authorization: auth,
       "content-type": "application/json",
     },
-    body: payload
+    body: payload,
   })
     .then((res) => res.json())
     .then((result) => unsafeWindow.console.log("tampermonkey", result));
