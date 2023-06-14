@@ -61,51 +61,87 @@ function waitCarePlan() {
     unsafeWindow.console.log(`tampermonkey removing`);
     //Locate and remove existing care plan tab content
     document.getElementsByClassName("cp-tab-contents")[0].remove();
-
-    //Create Div
-    var iFrameNode = document.createElement("div");
-    //Check for Healthie environment
-    let iFrameURL = isStagingEnv ? "dev.misha.vori.health" : "misha.vorihealth.com";
-
-    //Define inner HTML for created div
-    iFrameNode.innerHTML =
-      '<iframe id="MishaFrame"' +
-      'title="Misha iFrame"' +
-      'style="height: 100vh; width: 100%"' +
-      'src="https://' +
-      iFrameURL +
-      '/email%7C632b22aa626051ee6441e397/careplan"' +
-      ">" +
-      "</iframe>";
-    iFrameNode.setAttribute("class", "cp-tab-contents");
-
-    //set iframe as child of healthie care plan tab element
     const parent = document.getElementsByClassName("column is-12 is-12-mobile")[0];
-    parent.appendChild(iFrameNode);
 
-    //remove styling of healthie tab element
-    document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
+    if (healthieAPIKey === "") {
+      let iframeMsgExists = document.querySelector(".vori-iframe-message");
+      if (!iframeMsgExists) {
+        const iframeMsgDiv = document.createElement("div");
 
-    //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
-    //confirming publishing of care plan will trigger window.parent.postMessage within Misha
-    window.onmessage = function (event) {
-      //check event to see if is care plan message
-      if (event.data.tmInput !== undefined) {
-        const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
-        const carePlan = event.data.tmInput;
-        unsafeWindow.console.log(
-          `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
-        );
-        const goal = carePlan.goal.title;
-        unsafeWindow.console.log("tampermokey goal title ", goal);
+        const link = document.createElement("a");
+        link.textContent =
+          "You cannot view Care Plan's until you connect your Healthie Account to Vori Health. Set it up here!";
+        link.href = "/settings/api_keys";
+        link.style.color = "#333";
+        link.style.letterSpacing = "0.3px";
+        link.style.textDecoration = "none";
 
-        const milestones = carePlan.milestones;
-        //create goal for each milestone
-        milestones.forEach((element) => {
-          unsafeWindow.console.log("tampermonkey milestone inserted", element);
-          const milestoneTitle = element.title;
-          if (element.isVisible) {
-            const query = `mutation {
+        function addHoverEffect() {
+          link.style.textDecoration = "underline";
+        }
+
+        function removeHoverEffect() {
+          link.style.textDecoration = "none";
+        }
+
+        iframeMsgDiv.appendChild(link);
+
+        if (healthieAPIKey === "") {
+          iframeMsgDiv.style.display = "block";
+          link.addEventListener("mouseover", addHoverEffect);
+          link.addEventListener("mouseout", removeHoverEffect);
+        } else {
+          iframeMsgDiv.style.display = "none";
+          link.removeEventListener("mouseover", addHoverEffect);
+          link.removeEventListener("mouseout", removeHoverEffect);
+        }
+
+        parent && parent.appendChild(iframeMsgDiv);
+      }
+    } else {
+      //Create Div
+      var iFrameNode = document.createElement("div");
+      //Check for Healthie environment
+      let iFrameURL = isStagingEnv ? "dev.misha.vori.health" : "misha.vorihealth.com";
+
+      //Define inner HTML for created div
+      iFrameNode.innerHTML =
+        '<iframe id="MishaFrame"' +
+        'title="Misha iFrame"' +
+        'style="height: 100vh; width: 100%"' +
+        'src="https://' +
+        iFrameURL +
+        '/email%7C632b22aa626051ee6441e397/careplan"' +
+        ">" +
+        "</iframe>";
+      iFrameNode.setAttribute("class", "cp-tab-contents");
+
+      //set iframe as child of healthie care plan tab element
+      parent.appendChild(iFrameNode);
+
+      //remove styling of healthie tab element
+      document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
+
+      //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
+      //confirming publishing of care plan will trigger window.parent.postMessage within Misha
+      window.onmessage = function (event) {
+        //check event to see if is care plan message
+        if (event.data.tmInput !== undefined) {
+          const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+          const carePlan = event.data.tmInput;
+          unsafeWindow.console.log(
+            `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
+          );
+          const goal = carePlan.goal.title;
+          unsafeWindow.console.log("tampermokey goal title ", goal);
+
+          const milestones = carePlan.milestones;
+          //create goal for each milestone
+          milestones.forEach((element) => {
+            unsafeWindow.console.log("tampermonkey milestone inserted", element);
+            const milestoneTitle = element.title;
+            if (element.isVisible) {
+              const query = `mutation {
                           createGoal(input: {
                             name: "${milestoneTitle}",
                             user_id: "${patientNumber}",
@@ -121,13 +157,13 @@ function waitCarePlan() {
                           }
                         }
                         `;
-            const payload = JSON.stringify({ query });
-            goalMutation(payload);
-          }
-        });
+              const payload = JSON.stringify({ query });
+              goalMutation(payload);
+            }
+          });
 
-        //create goal for what matters to me
-        const query = `mutation {
+          //create goal for what matters to me
+          const query = `mutation {
                   createGoal(input: {
                     name: "${goal}",
                     user_id: "${patientNumber}",
@@ -143,22 +179,22 @@ function waitCarePlan() {
                   }
                 }
                 `;
-        const payload = JSON.stringify({ query });
-        goalMutation(payload);
+          const payload = JSON.stringify({ query });
+          goalMutation(payload);
 
-        const tasks = carePlan.tasks.tasks;
-        unsafeWindow.console.log("tampermonkey tasks are ", tasks);
-        //create goal for each task
-        tasks.forEach((element) => {
-          unsafeWindow.console.log("tampermonkey task is ", element);
-          if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
-            //motion guide task
-            unsafeWindow.console.log("tampermonkey motion guide assigned");
-            //create goal for each assigned exercise
-            element.items[0].exercises.forEach((element) => {
-              unsafeWindow.console.log("tampermonkey", element);
-              const name = element.contentfulEntityId + " - " + element.side;
-              const query = `mutation {
+          const tasks = carePlan.tasks.tasks;
+          unsafeWindow.console.log("tampermonkey tasks are ", tasks);
+          //create goal for each task
+          tasks.forEach((element) => {
+            unsafeWindow.console.log("tampermonkey task is ", element);
+            if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
+              //motion guide task
+              unsafeWindow.console.log("tampermonkey motion guide assigned");
+              //create goal for each assigned exercise
+              element.items[0].exercises.forEach((element) => {
+                unsafeWindow.console.log("tampermonkey", element);
+                const name = element.contentfulEntityId + " - " + element.side;
+                const query = `mutation {
                           createGoal(input: {
                             name: "${name}",
                             user_id: "${patientNumber}",
@@ -174,14 +210,14 @@ function waitCarePlan() {
                           }
                         }
                         `;
-              const payload = JSON.stringify({ query });
-              goalMutation(payload);
-            });
-          } else {
-            if (element.isVisible) {
-              //regular task
-              unsafeWindow.console.log("tampermonkey regular task assigned");
-              const query = `mutation {
+                const payload = JSON.stringify({ query });
+                goalMutation(payload);
+              });
+            } else {
+              if (element.isVisible) {
+                //regular task
+                unsafeWindow.console.log("tampermonkey regular task assigned");
+                const query = `mutation {
                           createGoal(input: {
                             name: "${element.title}",
                             user_id: "${patientNumber}",
@@ -197,13 +233,14 @@ function waitCarePlan() {
                           }
                         }
                         `;
-              const payload = JSON.stringify({ query });
-              goalMutation(payload);
+                const payload = JSON.stringify({ query });
+                goalMutation(payload);
+              }
             }
-          }
-        });
-      }
-    };
+          });
+        }
+      };
+    }
   } else {
     //wait for content load
     unsafeWindow.console.log(`tampermonkey waiting`);
