@@ -67,12 +67,20 @@ function waitCarePlan() {
       let iframeMsgExists = document.querySelector(".vori-iframe-message");
       if (!iframeMsgExists) {
         const iframeMsgDiv = document.createElement("div");
+        iframeMsgDiv.classList.add("vori-iframe-message");
+        iframeMsgDiv.style.display = "block";
+        iframeMsgDiv.style.position = "relative";
+        iframeMsgDiv.style.background = "rgb(227 229 50 / 21%)";
+        iframeMsgDiv.style.margin = "1.8rem";
+        iframeMsgDiv.style.textAlign = "center";
+        iframeMsgDiv.style.padding = "7rem 7vw";
 
         const link = document.createElement("a");
         link.textContent =
           "You cannot view Care Plan's until you connect your Healthie Account to Vori Health. Set it up here!";
         link.href = "/settings/api_keys";
         link.style.color = "#333";
+        link.style.fontSize = "18px";
         link.style.letterSpacing = "0.3px";
         link.style.textDecoration = "none";
 
