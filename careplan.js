@@ -75,33 +75,33 @@ function waitCarePlan() {
         iframeMsgDiv.style.textAlign = "center";
         iframeMsgDiv.style.padding = "7rem 7vw";
 
-        const link = document.createElement("a");
-        link.textContent =
+        const iframeMsgLink = document.createElement("a");
+        iframeMsgLink.textContent =
           "You cannot view Care Plan's until you connect your Healthie Account to Vori Health. Set it up here!";
-        link.href = "/settings/api_keys";
-        link.style.color = "#333";
-        link.style.fontSize = "18px";
-        link.style.letterSpacing = "0.3px";
-        link.style.textDecoration = "none";
+        iframeMsgLink.href = "/settings/api_keys";
+        iframeMsgLink.style.color = "#333";
+        iframeMsgLink.style.fontSize = "18px";
+        iframeMsgLink.style.letterSpacing = "0.3px";
+        iframeMsgLink.style.textDecoration = "none";
 
         function addHoverEffect() {
-          link.style.textDecoration = "underline";
+          iframeMsgLink.style.textDecoration = "underline";
         }
 
         function removeHoverEffect() {
-          link.style.textDecoration = "none";
+          iframeMsgLink.style.textDecoration = "none";
         }
 
-        iframeMsgDiv.appendChild(link);
+        iframeMsgDiv.appendChild(iframeMsgLink);
 
         if (healthieAPIKey === "") {
           iframeMsgDiv.style.display = "block";
-          link.addEventListener("mouseover", addHoverEffect);
-          link.addEventListener("mouseout", removeHoverEffect);
+          iframeMsgLink.addEventListener("mouseover", addHoverEffect);
+          iframeMsgLink.addEventListener("mouseout", removeHoverEffect);
         } else {
           iframeMsgDiv.style.display = "none";
-          link.removeEventListener("mouseover", addHoverEffect);
-          link.removeEventListener("mouseout", removeHoverEffect);
+          iframeMsgLink.removeEventListener("mouseover", addHoverEffect);
+          iframeMsgLink.removeEventListener("mouseout", removeHoverEffect);
         }
 
         parent && parent.appendChild(iframeMsgDiv);
@@ -357,45 +357,45 @@ function isAPIconnected() {
     let voriHeaderExists = document.querySelector(".vori-api-message");
     if (!voriHeaderExists) {
       const header = document.querySelector(".header");
-      const newDiv = document.createElement("div");
-      newDiv.classList.add("vori-api-message");
-      newDiv.style.display = "block";
-      newDiv.style.position = "relative";
-      newDiv.style.background = "#e3e532";
-      newDiv.style.top = "60px";
-      newDiv.style.minHeight = "42px";
-      newDiv.style.textAlign = "center";
-      newDiv.style.padding = "10px";
+      const apiMsgDiv = document.createElement("div");
+      apiMsgDiv.classList.add("vori-api-message");
+      apiMsgDiv.style.display = "block";
+      apiMsgDiv.style.position = "relative";
+      apiMsgDiv.style.background = "#e3e532";
+      apiMsgDiv.style.top = "60px";
+      apiMsgDiv.style.minHeight = "42px";
+      apiMsgDiv.style.textAlign = "center";
+      apiMsgDiv.style.padding = "10px";
 
-      const link = document.createElement("a");
-      link.textContent = "You have not connected your Healthie Account to Vori Health. Set it up here!";
-      link.href = "/settings/api_keys";
-      link.style.color = "#333";
-      link.style.fontSize = "15px";
-      link.style.letterSpacing = "0.3px";
-      link.style.textDecoration = "none";
+      const apiMsgLink = document.createElement("a");
+      apiMsgLink.textContent = "You have not connected your Healthie Account to Vori Health. Set it up here!";
+      apiMsgLink.href = "/settings/api_keys";
+      apiMsgLink.style.color = "#333";
+      apiMsgLink.style.fontSize = "15px";
+      apiMsgLink.style.letterSpacing = "0.3px";
+      apiMsgLink.style.textDecoration = "none";
 
       function addHoverEffect() {
-        link.style.textDecoration = "underline";
+        apiMsgLink.style.textDecoration = "underline";
       }
 
       function removeHoverEffect() {
-        link.style.textDecoration = "none";
+        apiMsgLink.style.textDecoration = "none";
       }
 
-      newDiv.appendChild(link);
+      apiMsgDiv.appendChild(apiMsgLink);
 
       if (healthieAPIKey === "") {
-        newDiv.style.display = "block";
-        link.addEventListener("mouseover", addHoverEffect);
-        link.addEventListener("mouseout", removeHoverEffect);
+        apiMsgDiv.style.display = "block";
+        apiMsgLink.addEventListener("mouseover", addHoverEffect);
+        apiMsgLink.addEventListener("mouseout", removeHoverEffect);
       } else {
-        newDiv.style.display = "none";
-        link.removeEventListener("mouseover", addHoverEffect);
-        link.removeEventListener("mouseout", removeHoverEffect);
+        apiMsgDiv.style.display = "none";
+        apiMsgLink.removeEventListener("mouseover", addHoverEffect);
+        apiMsgLink.removeEventListener("mouseout", removeHoverEffect);
       }
 
-      header.insertAdjacentElement("afterend", newDiv);
+      header.insertAdjacentElement("afterend", apiMsgDiv);
     }
   } else {
     //wait for content load
@@ -407,7 +407,6 @@ function isAPIconnected() {
 function showInstructions() {
   if (document.querySelector(".api-keys-wrapper") && document.querySelector(".api-keys-wrapper p")) {
     const apiKeyParagraph = document.querySelector(".api-keys-wrapper p");
-    let voriHeaderExists = document.querySelector(".vori-instruction-message");
 
     if (healthieAPIKey === "") {
       const instructions = document.createElement("p");
