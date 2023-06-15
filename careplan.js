@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.24
+// @version      0.25
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -58,54 +58,110 @@ function waitGoalTab() {
 function waitCarePlan() {
   //check to see if the care plan tab contents has loaded
   if (document.getElementsByClassName("cp-tab-contents")[0]) {
+    // handle edge case: clicking on careplan tab multiple times
+    let careplanTabBtn = document.querySelector('a[data-testid="careplans-tab-btn"]');
+    careplanTabBtn.addEventListener("click", handleCarePlanTabClick);
+
+    function handleCarePlanTabClick() {
+      if (location.href.includes("all_plans")) {
+        if (healthieAPIKey !== "") {
+          let tabContent = document.getElementsByClassName("cp-tab-contents");
+          tabContent && tabContent[0].remove();
+        }
+        waitCarePlan();
+      }
+    }
+
     unsafeWindow.console.log(`tampermonkey removing`);
     //Locate and remove existing care plan tab content
     document.getElementsByClassName("cp-tab-contents")[0].remove();
-
-    //Create Div
-    var iFrameNode = document.createElement("div");
-    //Check for Healthie environment
-    let iFrameURL = isStagingEnv ? "dev.misha.vori.health" : "misha.vorihealth.com";
-
-    //Define inner HTML for created div
-    iFrameNode.innerHTML =
-      '<iframe id="MishaFrame"' +
-      'title="Misha iFrame"' +
-      'style="height: 100vh; width: 100%"' +
-      'src="https://' +
-      iFrameURL +
-      '/email%7C632b22aa626051ee6441e397/careplan"' +
-      ">" +
-      "</iframe>";
-    iFrameNode.setAttribute("class", "cp-tab-contents");
-
-    //set iframe as child of healthie care plan tab element
     const parent = document.getElementsByClassName("column is-12 is-12-mobile")[0];
-    parent.appendChild(iFrameNode);
 
-    //remove styling of healthie tab element
-    document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
+    if (healthieAPIKey === "") {
+      let iframeMsgExists = document.querySelector(".vori-iframe-message");
+      if (!iframeMsgExists) {
+        const iframeMsgDiv = document.createElement("div");
+        iframeMsgDiv.classList.add("vori-iframe-message");
+        iframeMsgDiv.style.display = "block";
+        iframeMsgDiv.style.position = "relative";
+        iframeMsgDiv.style.background = "rgb(227 229 50 / 21%)";
+        iframeMsgDiv.style.margin = "1.8rem";
+        iframeMsgDiv.style.textAlign = "center";
+        iframeMsgDiv.style.padding = "7rem 7vw";
 
-    //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
-    //confirming publishing of care plan will trigger window.parent.postMessage within Misha
-    window.onmessage = function (event) {
-      //check event to see if is care plan message
-      if (event.data.tmInput !== undefined) {
-        const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
-        const carePlan = event.data.tmInput;
-        unsafeWindow.console.log(
-          `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
-        );
-        const goal = carePlan.goal.title;
-        unsafeWindow.console.log("tampermokey goal title ", goal);
+        const iframeMsgLink = document.createElement("a");
+        iframeMsgLink.textContent =
+          "You cannot view Care Plan's until you connect your Healthie Account to Vori Health. Set it up here!";
+        iframeMsgLink.href = "/settings/api_keys";
+        iframeMsgLink.style.color = "#333";
+        iframeMsgLink.style.fontSize = "18px";
+        iframeMsgLink.style.letterSpacing = "0.3px";
+        iframeMsgLink.style.textDecoration = "none";
 
-        const milestones = carePlan.milestones;
-        //create goal for each milestone
-        milestones.forEach((element) => {
-          unsafeWindow.console.log("tampermonkey milestone inserted", element);
-          const milestoneTitle = element.title;
-          if (element.isVisible) {
-            const query = `mutation {
+        function addHoverEffect() {
+          iframeMsgLink.style.textDecoration = "underline";
+        }
+
+        function removeHoverEffect() {
+          iframeMsgLink.style.textDecoration = "none";
+        }
+
+        iframeMsgDiv.appendChild(iframeMsgLink);
+
+        if (healthieAPIKey === "") {
+          iframeMsgLink.addEventListener("mouseover", addHoverEffect);
+          iframeMsgLink.addEventListener("mouseout", removeHoverEffect);
+        } else {
+          iframeMsgLink.removeEventListener("mouseover", addHoverEffect);
+          iframeMsgLink.removeEventListener("mouseout", removeHoverEffect);
+        }
+
+        parent && parent.appendChild(iframeMsgDiv);
+      }
+    } else {
+      //Create Div
+      var iFrameNode = document.createElement("div");
+      //Check for Healthie environment
+      let iFrameURL = isStagingEnv ? "dev.misha.vori.health" : "misha.vorihealth.com";
+
+      //Define inner HTML for created div
+      iFrameNode.innerHTML =
+        '<iframe id="MishaFrame"' +
+        'title="Misha iFrame"' +
+        'style="height: 100vh; width: 100%"' +
+        'src="https://' +
+        iFrameURL +
+        '/email%7C632b22aa626051ee6441e397/careplan"' +
+        ">" +
+        "</iframe>";
+      iFrameNode.setAttribute("class", "cp-tab-contents");
+
+      //set iframe as child of healthie care plan tab element
+      parent.appendChild(iFrameNode);
+
+      //remove styling of healthie tab element
+      document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
+
+      //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
+      //confirming publishing of care plan will trigger window.parent.postMessage within Misha
+      window.onmessage = function (event) {
+        //check event to see if is care plan message
+        if (event.data.tmInput !== undefined) {
+          const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+          const carePlan = event.data.tmInput;
+          unsafeWindow.console.log(
+            `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
+          );
+          const goal = carePlan.goal.title;
+          unsafeWindow.console.log("tampermokey goal title ", goal);
+
+          const milestones = carePlan.milestones;
+          //create goal for each milestone
+          milestones.forEach((element) => {
+            unsafeWindow.console.log("tampermonkey milestone inserted", element);
+            const milestoneTitle = element.title;
+            if (element.isVisible) {
+              const query = `mutation {
                           createGoal(input: {
                             name: "${milestoneTitle}",
                             user_id: "${patientNumber}",
@@ -121,13 +177,13 @@ function waitCarePlan() {
                           }
                         }
                         `;
-            const payload = JSON.stringify({ query });
-            goalMutation(payload);
-          }
-        });
+              const payload = JSON.stringify({ query });
+              goalMutation(payload);
+            }
+          });
 
-        //create goal for what matters to me
-        const query = `mutation {
+          //create goal for what matters to me
+          const query = `mutation {
                   createGoal(input: {
                     name: "${goal}",
                     user_id: "${patientNumber}",
@@ -143,22 +199,22 @@ function waitCarePlan() {
                   }
                 }
                 `;
-        const payload = JSON.stringify({ query });
-        goalMutation(payload);
+          const payload = JSON.stringify({ query });
+          goalMutation(payload);
 
-        const tasks = carePlan.tasks.tasks;
-        unsafeWindow.console.log("tampermonkey tasks are ", tasks);
-        //create goal for each task
-        tasks.forEach((element) => {
-          unsafeWindow.console.log("tampermonkey task is ", element);
-          if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
-            //motion guide task
-            unsafeWindow.console.log("tampermonkey motion guide assigned");
-            //create goal for each assigned exercise
-            element.items[0].exercises.forEach((element) => {
-              unsafeWindow.console.log("tampermonkey", element);
-              const name = element.contentfulEntityId + " - " + element.side;
-              const query = `mutation {
+          const tasks = carePlan.tasks.tasks;
+          unsafeWindow.console.log("tampermonkey tasks are ", tasks);
+          //create goal for each task
+          tasks.forEach((element) => {
+            unsafeWindow.console.log("tampermonkey task is ", element);
+            if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
+              //motion guide task
+              unsafeWindow.console.log("tampermonkey motion guide assigned");
+              //create goal for each assigned exercise
+              element.items[0].exercises.forEach((element) => {
+                unsafeWindow.console.log("tampermonkey", element);
+                const name = element.contentfulEntityId + " - " + element.side;
+                const query = `mutation {
                           createGoal(input: {
                             name: "${name}",
                             user_id: "${patientNumber}",
@@ -174,14 +230,14 @@ function waitCarePlan() {
                           }
                         }
                         `;
-              const payload = JSON.stringify({ query });
-              goalMutation(payload);
-            });
-          } else {
-            if (element.isVisible) {
-              //regular task
-              unsafeWindow.console.log("tampermonkey regular task assigned");
-              const query = `mutation {
+                const payload = JSON.stringify({ query });
+                goalMutation(payload);
+              });
+            } else {
+              if (element.isVisible) {
+                //regular task
+                unsafeWindow.console.log("tampermonkey regular task assigned");
+                const query = `mutation {
                           createGoal(input: {
                             name: "${element.title}",
                             user_id: "${patientNumber}",
@@ -197,13 +253,14 @@ function waitCarePlan() {
                           }
                         }
                         `;
-              const payload = JSON.stringify({ query });
-              goalMutation(payload);
+                const payload = JSON.stringify({ query });
+                goalMutation(payload);
+              }
             }
-          }
-        });
-      }
-    };
+          });
+        }
+      };
+    }
   } else {
     //wait for content load
     unsafeWindow.console.log(`tampermonkey waiting`);
@@ -312,45 +369,45 @@ function isAPIconnected() {
     let voriHeaderExists = document.querySelector(".vori-api-message");
     if (!voriHeaderExists) {
       const header = document.querySelector(".header");
-      const newDiv = document.createElement("div");
-      newDiv.classList.add("vori-api-message");
-      newDiv.style.display = "block";
-      newDiv.style.position = "relative";
-      newDiv.style.background = "#e3e532";
-      newDiv.style.top = "60px";
-      newDiv.style.minHeight = "42px";
-      newDiv.style.textAlign = "center";
-      newDiv.style.padding = "10px";
+      const apiMsgDiv = document.createElement("div");
+      apiMsgDiv.classList.add("vori-api-message");
+      apiMsgDiv.style.display = "block";
+      apiMsgDiv.style.position = "relative";
+      apiMsgDiv.style.background = "#e3e532";
+      apiMsgDiv.style.top = "60px";
+      apiMsgDiv.style.minHeight = "42px";
+      apiMsgDiv.style.textAlign = "center";
+      apiMsgDiv.style.padding = "10px";
 
-      const link = document.createElement("a");
-      link.textContent = "You have not connected your Healthie Account to Vori Health. Set it up here!";
-      link.href = "/settings/api_keys";
-      link.style.color = "#333";
-      link.style.fontSize = "15px";
-      link.style.letterSpacing = "0.3px";
-      link.style.textDecoration = "none";
+      const apiMsgLink = document.createElement("a");
+      apiMsgLink.textContent = "You have not connected your Healthie Account to Vori Health. Set it up here!";
+      apiMsgLink.href = "/settings/api_keys";
+      apiMsgLink.style.color = "#333";
+      apiMsgLink.style.fontSize = "15px";
+      apiMsgLink.style.letterSpacing = "0.3px";
+      apiMsgLink.style.textDecoration = "none";
 
       function addHoverEffect() {
-        link.style.textDecoration = "underline";
+        apiMsgLink.style.textDecoration = "underline";
       }
 
       function removeHoverEffect() {
-        link.style.textDecoration = "none";
+        apiMsgLink.style.textDecoration = "none";
       }
 
-      newDiv.appendChild(link);
+      apiMsgDiv.appendChild(apiMsgLink);
 
       if (healthieAPIKey === "") {
-        newDiv.style.display = "block";
-        link.addEventListener("mouseover", addHoverEffect);
-        link.addEventListener("mouseout", removeHoverEffect);
+        apiMsgDiv.style.display = "block";
+        apiMsgLink.addEventListener("mouseover", addHoverEffect);
+        apiMsgLink.addEventListener("mouseout", removeHoverEffect);
       } else {
-        newDiv.style.display = "none";
-        link.removeEventListener("mouseover", addHoverEffect);
-        link.removeEventListener("mouseout", removeHoverEffect);
+        apiMsgDiv.style.display = "none";
+        apiMsgLink.removeEventListener("mouseover", addHoverEffect);
+        apiMsgLink.removeEventListener("mouseout", removeHoverEffect);
       }
 
-      header.insertAdjacentElement("afterend", newDiv);
+      header.insertAdjacentElement("afterend", apiMsgDiv);
     }
   } else {
     //wait for content load
@@ -362,7 +419,6 @@ function isAPIconnected() {
 function showInstructions() {
   if (document.querySelector(".api-keys-wrapper") && document.querySelector(".api-keys-wrapper p")) {
     const apiKeyParagraph = document.querySelector(".api-keys-wrapper p");
-    let voriHeaderExists = document.querySelector(".vori-instruction-message");
 
     if (healthieAPIKey === "") {
       const instructions = document.createElement("p");
