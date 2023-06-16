@@ -142,7 +142,7 @@ function waitCarePlan() {
       //remove styling of healthie tab element
       document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
 
-          const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+      const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
 
       // let's get all user goals before they're modified
       const getGoalQuery = `query {
