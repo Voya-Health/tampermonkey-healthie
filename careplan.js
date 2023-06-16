@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.25
+// @version      0.26
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -14,7 +14,7 @@
 /* globals contentful */
 
 let previousUrl = "";
-const healthieAPIKey = GM_getValue("healthieApiKey", "");
+let healthieAPIKey = GM_getValue("healthieApiKey", "");
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 
 //observe changes to the DOM, check for URL changes
@@ -342,18 +342,44 @@ function waitSettingsAPIpage() {
     }
 
     let storedApiKey = GM_getValue("healthieApiKey", ""); // Retrieve the stored API key using GM_getValue
-    newInput.value = storedApiKey; // Set the initial value of the input
+
+    if (storedApiKey === "") {
+      newInput.value = storedApiKey; // Set the initial value of the input
+    } else {
+      newInput.value = "***************"; // show mask indicating that a valid key is stored
+    }
 
     // Add onclick handler to the "Link Api key" button
     newButton.onclick = function () {
-      var apiKey = newInput.value.trim(); // Trim whitespace from the input value
+      let apiKey = newInput.value.trim(); // Trim whitespace from the input value
       if (apiKey === "") {
         alert("Please enter a valid API key!");
       } else {
-        GM_setValue("healthieApiKey", apiKey);
-        alert("API key saved successfully!");
-        window.setTimeout(null, 2000);
-        window.location.reload();
+        const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+        healthieAPIKey = apiKey;
+        auth = `Basic ${healthieAPIKey}`;
+
+        // let's check that we can get goals successfully
+        const getGoalQuery = `query {
+                              goals() {
+                                id
+                                name
+                              }
+                            }
+                            `;
+        const getGoalPayload = JSON.stringify({ query: getGoalQuery });
+        goalMutation(getGoalPayload).then((response) => {
+          unsafeWindow.console.log(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
+
+          if (response.errors) {
+            alert("That is not a valid API key. Please verify the key and try again.");
+          } else {
+            GM_setValue("healthieApiKey", apiKey);
+            alert("API key saved successfully!");
+            window.setTimeout(null, 2000);
+            window.location.reload();
+          }
+        });
       }
     };
   } else {
@@ -454,8 +480,9 @@ observer.observe(document, config);
 const auth = `Basic ${healthieAPIKey}`;
 
 function goalMutation(payload) {
+  let response = null;
   let api_env = isStagingEnv ? "staging-api" : "api";
-  fetch("https://" + api_env + ".gethealthie.com/graphql", {
+  response = fetch("https://" + api_env + ".gethealthie.com/graphql", {
     method: "POST",
     headers: {
       AuthorizationSource: "API",
@@ -465,5 +492,10 @@ function goalMutation(payload) {
     body: payload,
   })
     .then((res) => res.json())
-    .then((result) => unsafeWindow.console.log("tampermonkey", result));
+    .then((result) => {
+      unsafeWindow.console.log("tampermonkey", result);
+      return result;
+    });
+
+  return response;
 }
