@@ -342,11 +342,16 @@ function waitSettingsAPIpage() {
     }
 
     let storedApiKey = GM_getValue("healthieApiKey", ""); // Retrieve the stored API key using GM_getValue
-    newInput.value = storedApiKey; // Set the initial value of the input
+
+    if (storedApiKey === "") {
+      newInput.value = storedApiKey; // Set the initial value of the input
+    } else {
+      newInput.value = "***************"; // show mask indicating that a valid key is stored
+    }
 
     // Add onclick handler to the "Link Api key" button
     newButton.onclick = function () {
-      var apiKey = newInput.value.trim(); // Trim whitespace from the input value
+      let apiKey = newInput.value.trim(); // Trim whitespace from the input value
       if (apiKey === "") {
         alert("Please enter a valid API key!");
       } else {
@@ -354,7 +359,7 @@ function waitSettingsAPIpage() {
         healthieAPIKey = apiKey;
         auth = `Basic ${healthieAPIKey}`;
 
-        // let's get all user goals before they're modified
+        // let's check that we can get goals successfully
         const getGoalQuery = `query {
                               goals() {
                                 id
