@@ -14,7 +14,7 @@
 /* globals contentful */
 
 let previousUrl = "";
-const healthieAPIKey = GM_getValue("healthieApiKey", "");
+let healthieAPIKey = GM_getValue("healthieApiKey", "");
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 
 //observe changes to the DOM, check for URL changes
@@ -351,6 +351,8 @@ function waitSettingsAPIpage() {
         alert("Please enter a valid API key!");
       } else {
         const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+        healthieAPIKey = apiKey;
+        auth = `Basic ${healthieAPIKey}`;
 
         // let's get all user goals before they're modified
         const getGoalQuery = `query {
