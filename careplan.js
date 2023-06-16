@@ -142,26 +142,36 @@ function waitCarePlan() {
       //remove styling of healthie tab element
       document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
 
-      //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
-      //confirming publishing of care plan will trigger window.parent.postMessage within Misha
-      window.onmessage = function (event) {
-        //check event to see if is care plan message
-        if (event.data.tmInput !== undefined) {
           const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
-          const carePlan = event.data.tmInput;
-          unsafeWindow.console.log(
-            `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
-          );
-          const goal = carePlan.goal.title;
-          unsafeWindow.console.log("tampermokey goal title ", goal);
 
-          const milestones = carePlan.milestones;
-          //create goal for each milestone
-          milestones.forEach((element) => {
-            unsafeWindow.console.log("tampermonkey milestone inserted", element);
-            const milestoneTitle = element.title;
-            if (element.isVisible) {
-              const query = `mutation {
+      // let's get all user goals before they're modified
+      const getGoalQuery = `query {
+                          goals(user_id: "${patientNumber}") {
+                            id
+                            name
+                          }
+                        }
+                        `;
+      const getGoalPayload = JSON.stringify({ query: getGoalQuery });
+      goalMutation(getGoalPayload).then((response) => {
+        const allGoals = response.data.goals;
+
+        //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
+        //confirming publishing of care plan will trigger window.parent.postMessage within Misha
+        window.onmessage = function (event) {
+          //check event to see if is care plan message
+          if (event.data.tmInput !== undefined) {
+            const carePlan = event.data.tmInput;
+            const goal = carePlan.goal.title;
+            unsafeWindow.console.log("tampermokey goal title ", goal);
+
+            const milestones = carePlan.milestones;
+            //create goal for each milestone
+            milestones.forEach((element) => {
+              unsafeWindow.console.log("tampermonkey milestone inserted", element);
+              const milestoneTitle = element.title;
+              if (element.isVisible) {
+                const query = `mutation {
                           createGoal(input: {
                             name: "${milestoneTitle}",
                             user_id: "${patientNumber}",
@@ -177,13 +187,33 @@ function waitCarePlan() {
                           }
                         }
                         `;
-              const payload = JSON.stringify({ query });
-              goalMutation(payload);
-            }
-          });
+                const payload = JSON.stringify({ query });
+                goalMutation(payload);
+              } else if (!element.isVisible) {
+                // if !element.isVisible let's update any goal with a matching id, update the due date to yesterday's date in format Month, Day, Year e.g Jun 12, 2021
+                const yesterday = new Date(new Date().setDate(new Date().getDate() - 1));
 
-          //create goal for what matters to me
-          const query = `mutation {
+                unsafeWindow.console.log("tampermonkey all user goals inside event are ", allGoals);
+
+                let goalId = "";
+                // find goal with matching name and get id
+                allGoals.forEach((element) => {
+                  if (element.name === milestoneTitle) {
+                    goalId = element.id;
+                  }
+                });
+
+                if (goalId === "") {
+                  unsafeWindow.console.log("tampermonkey goal id not found");
+                  return;
+                } else {
+                  unsafeWindow.console.log("tampermonkey goal found: " + goalId);
+                }
+              }
+            });
+
+            //create goal for what matters to me
+            const query = `mutation {
                   createGoal(input: {
                     name: "${goal}",
                     user_id: "${patientNumber}",
@@ -199,22 +229,22 @@ function waitCarePlan() {
                   }
                 }
                 `;
-          const payload = JSON.stringify({ query });
-          goalMutation(payload);
+            const payload = JSON.stringify({ query });
+            goalMutation(payload);
 
-          const tasks = carePlan.tasks.tasks;
-          unsafeWindow.console.log("tampermonkey tasks are ", tasks);
-          //create goal for each task
-          tasks.forEach((element) => {
-            unsafeWindow.console.log("tampermonkey task is ", element);
-            if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
-              //motion guide task
-              unsafeWindow.console.log("tampermonkey motion guide assigned");
-              //create goal for each assigned exercise
-              element.items[0].exercises.forEach((element) => {
-                unsafeWindow.console.log("tampermonkey", element);
-                const name = element.contentfulEntityId + " - " + element.side;
-                const query = `mutation {
+            const tasks = carePlan.tasks.tasks;
+            unsafeWindow.console.log("tampermonkey tasks are ", tasks);
+            //create goal for each task
+            tasks.forEach((element) => {
+              unsafeWindow.console.log("tampermonkey task is ", element);
+              if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
+                //motion guide task
+                unsafeWindow.console.log("tampermonkey motion guide assigned");
+                //create goal for each assigned exercise
+                element.items[0].exercises.forEach((element) => {
+                  unsafeWindow.console.log("tampermonkey", element);
+                  const name = element.contentfulEntityId + " - " + element.side;
+                  const query = `mutation {
                           createGoal(input: {
                             name: "${name}",
                             user_id: "${patientNumber}",
@@ -230,14 +260,14 @@ function waitCarePlan() {
                           }
                         }
                         `;
-                const payload = JSON.stringify({ query });
-                goalMutation(payload);
-              });
-            } else {
-              if (element.isVisible) {
-                //regular task
-                unsafeWindow.console.log("tampermonkey regular task assigned");
-                const query = `mutation {
+                  const payload = JSON.stringify({ query });
+                  goalMutation(payload);
+                });
+              } else {
+                if (element.isVisible) {
+                  //regular task
+                  unsafeWindow.console.log("tampermonkey regular task assigned");
+                  const query = `mutation {
                           createGoal(input: {
                             name: "${element.title}",
                             user_id: "${patientNumber}",
@@ -253,13 +283,14 @@ function waitCarePlan() {
                           }
                         }
                         `;
-                const payload = JSON.stringify({ query });
-                goalMutation(payload);
+                  const payload = JSON.stringify({ query });
+                  goalMutation(payload);
+                }
               }
-            }
-          });
-        }
-      };
+            });
+          }
+        };
+      });
     }
   } else {
     //wait for content load
