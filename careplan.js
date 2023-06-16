@@ -362,16 +362,15 @@ function waitSettingsAPIpage() {
                             `;
         const getGoalPayload = JSON.stringify({ query: getGoalQuery });
         goalMutation(getGoalPayload).then((response) => {
-          const allGoals = response.data.goals;
+          unsafeWindow.console.log(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
 
-          // if goals exist, we can save the key
-          if (allGoals.length > 0) {
+          if (response.errors) {
+            alert("That is not a valid API key. Please verify the key and try again.");
+          } else {
             GM_setValue("healthieApiKey", apiKey);
             alert("API key saved successfully!");
             window.setTimeout(null, 2000);
             window.location.reload();
-          } else {
-            alert("That is not a valid API key. Please verify the key and try again.");
           }
         });
       }
