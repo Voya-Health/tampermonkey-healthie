@@ -474,8 +474,9 @@ observer.observe(document, config);
 const auth = `Basic ${healthieAPIKey}`;
 
 function goalMutation(payload) {
+  let response = null;
   let api_env = isStagingEnv ? "staging-api" : "api";
-  fetch("https://" + api_env + ".gethealthie.com/graphql", {
+  response = fetch("https://" + api_env + ".gethealthie.com/graphql", {
     method: "POST",
     headers: {
       AuthorizationSource: "API",
@@ -485,5 +486,10 @@ function goalMutation(payload) {
     body: payload,
   })
     .then((res) => res.json())
-    .then((result) => unsafeWindow.console.log("tampermonkey", result));
+    .then((result) => {
+      unsafeWindow.console.log("tampermonkey", result);
+      return result;
+    });
+
+  return response;
 }
