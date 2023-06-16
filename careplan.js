@@ -162,6 +162,9 @@ function waitCarePlan() {
           //check event to see if is care plan message
           if (event.data.tmInput !== undefined) {
             const carePlan = event.data.tmInput;
+            unsafeWindow.console.log(
+              `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
+            );
             const goal = carePlan.goal.title;
             unsafeWindow.console.log("tampermokey goal title ", goal);
 
