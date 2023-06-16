@@ -209,6 +209,27 @@ function waitCarePlan() {
                 } else {
                   unsafeWindow.console.log("tampermonkey goal found: " + goalId);
                 }
+
+                // update goal with matching id
+                const updateGoalQuery = `mutation {
+                  updateGoal(input: {
+                    id: "${goalId}",
+                    due_date: "${yesterday}"
+                  }) {
+                    goal {
+                      id
+                    }
+                    messages {
+                      field
+                      message
+                    }
+                  }
+                }`;
+
+                const payload = JSON.stringify({ updateGoalQuery });
+                goalMutation(payload).then((response) =>
+                  unsafeWindow.console.log("tampermonkey goal updated. response:" + response)
+                );
               }
             });
 
