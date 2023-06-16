@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.25
+// @version      0.26
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -350,10 +350,30 @@ function waitSettingsAPIpage() {
       if (apiKey === "") {
         alert("Please enter a valid API key!");
       } else {
-        GM_setValue("healthieApiKey", apiKey);
-        alert("API key saved successfully!");
-        window.setTimeout(null, 2000);
-        window.location.reload();
+        const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+
+        // let's get all user goals before they're modified
+        const getGoalQuery = `query {
+                              goals() {
+                                id
+                                name
+                              }
+                            }
+                            `;
+        const getGoalPayload = JSON.stringify({ query: getGoalQuery });
+        goalMutation(getGoalPayload).then((response) => {
+          const allGoals = response.data.goals;
+
+          // if goals exist, we can save the key
+          if (allGoals.length > 0) {
+            GM_setValue("healthieApiKey", apiKey);
+            alert("API key saved successfully!");
+            window.setTimeout(null, 2000);
+            window.location.reload();
+          } else {
+            alert("That is not a valid API key. Please verify the key and try again.");
+          }
+        });
       }
     };
   } else {
