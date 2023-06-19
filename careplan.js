@@ -157,8 +157,15 @@ function waitCarePlan() {
         // delete all goals
         allGoals.forEach((goal) => {
           const deleteGoalQuery = `mutation {
-              deleteGoal(id: "${goal.id}") {
-                id
+              deleteGoal(input: {id: "${goal.id}"}) {
+                goal {
+                  id
+                }
+            
+                messages {
+                  field
+                  message
+                }
               }
             }
             `;
