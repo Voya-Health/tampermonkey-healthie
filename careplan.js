@@ -142,12 +142,38 @@ function waitCarePlan() {
       //remove styling of healthie tab element
       document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
 
+      const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+      // let's get all user goals before they're modified
+      const getGoalQuery = `query {
+              goals(user_id: "${patientNumber}", per_page: 100) {
+                id
+                name
+              }
+            }
+            `;
+      const getGoalPayload = JSON.stringify({ query: getGoalQuery });
+      goalMutation(getGoalPayload).then((response) => {
+        const allGoals = response.data.goals;
+        // delete all goals
+        allGoals.forEach((goal) => {
+          const deleteGoalQuery = `mutation {
+              deleteGoal(id: "${goal.id}") {
+                id
+              }
+            }
+            `;
+          const deleteGoalPayload = JSON.stringify({ query: deleteGoalQuery });
+          goalMutation(deleteGoalPayload).then((response) => {
+            unsafeWindow.console.log("tampermonkey deleted goal", response);
+          });
+        });
+      });
+
       //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
       //confirming publishing of care plan will trigger window.parent.postMessage within Misha
       window.onmessage = function (event) {
         //check event to see if is care plan message
         if (event.data.tmInput !== undefined) {
-          const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
           const carePlan = event.data.tmInput;
           unsafeWindow.console.log(
             `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
