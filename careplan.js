@@ -143,25 +143,33 @@ function waitCarePlan() {
       document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
 
       const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
-      // let's get all user goals before they're modified
-      const getGoalQuery = `query {
+
+      //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
+      //confirming publishing of care plan will trigger window.parent.postMessage within Misha
+      window.onmessage = function (event) {
+        //check event to see if is care plan message
+        if (event.data.tmInput !== undefined) {
+          // let's get all user goals and delete them before adding new ones
+          const getGoalQuery = `query {
               goals(user_id: "${patientNumber}", per_page: 100) {
-                id
+                id,
                 name
               }
             }
             `;
-      const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-      goalMutation(getGoalPayload).then((response) => {
-        const allGoals = response.data.goals;
-        // delete all goals
-        allGoals.forEach((goal) => {
-          const deleteGoalQuery = `mutation {
+          const getGoalPayload = JSON.stringify({ query: getGoalQuery });
+          goalMutation(getGoalPayload).then((response) => {
+            const allGoals = response.data.goals;
+            unsafeWindow.console.log("tampermonkey all goals", response);
+
+            // delete all goals
+            allGoals.forEach((goal) => {
+              const deleteGoalQuery = `mutation {
               deleteGoal(input: {id: "${goal.id}"}) {
                 goal {
                   id
                 }
-            
+
                 messages {
                   field
                   message
@@ -169,18 +177,13 @@ function waitCarePlan() {
               }
             }
             `;
-          const deleteGoalPayload = JSON.stringify({ query: deleteGoalQuery });
-          goalMutation(deleteGoalPayload).then((response) => {
-            unsafeWindow.console.log("tampermonkey deleted goal", response);
+              const deleteGoalPayload = JSON.stringify({ query: deleteGoalQuery });
+              goalMutation(deleteGoalPayload).then((response) => {
+                unsafeWindow.console.log("tampermonkey deleted goal", response);
+              });
+            });
           });
-        });
-      });
 
-      //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
-      //confirming publishing of care plan will trigger window.parent.postMessage within Misha
-      window.onmessage = function (event) {
-        //check event to see if is care plan message
-        if (event.data.tmInput !== undefined) {
           const carePlan = event.data.tmInput;
           unsafeWindow.console.log(
             `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
