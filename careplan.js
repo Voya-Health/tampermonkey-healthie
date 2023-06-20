@@ -182,117 +182,117 @@ function waitCarePlan() {
                 unsafeWindow.console.log("tampermonkey deleted goal", response);
               });
             });
-          });
 
-          const carePlan = event.data.tmInput;
-          unsafeWindow.console.log(
-            `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
-          );
-          const goal = carePlan.goal.title;
-          unsafeWindow.console.log("tampermokey goal title ", goal);
+            const carePlan = event.data.tmInput;
+            unsafeWindow.console.log(
+              `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
+            );
+            const goal = carePlan.goal.title;
+            unsafeWindow.console.log("tampermokey goal title ", goal);
 
-          const milestones = carePlan.milestones;
-          //create goal for each milestone
-          milestones.forEach((element) => {
-            unsafeWindow.console.log("tampermonkey milestone inserted", element);
-            const milestoneTitle = element.title;
-            if (element.isVisible) {
-              const query = `mutation {
-                          createGoal(input: {
-                            name: "${milestoneTitle}",
-                            user_id: "${patientNumber}",
-                            repeat: "Once"
-                          }) {
-                            goal {
-                              id
-                            }
-                            messages {
-                              field
-                              message
-                            }
-                          }
-                        }
-                        `;
-              const payload = JSON.stringify({ query });
-              goalMutation(payload);
-            }
-          });
-
-          //create goal for what matters to me
-          const query = `mutation {
-                  createGoal(input: {
-                    name: "${goal}",
-                    user_id: "${patientNumber}",
-                    repeat: "Once"
-                  }) {
-                    goal {
-                      id
-                    }
-                    messages {
-                      field
-                      message
-                    }
-                  }
-                }
-                `;
-          const payload = JSON.stringify({ query });
-          goalMutation(payload);
-
-          const tasks = carePlan.tasks.tasks;
-          unsafeWindow.console.log("tampermonkey tasks are ", tasks);
-          //create goal for each task
-          tasks.forEach((element) => {
-            unsafeWindow.console.log("tampermonkey task is ", element);
-            if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
-              //motion guide task
-              unsafeWindow.console.log("tampermonkey motion guide assigned");
-              //create goal for each assigned exercise
-              element.items[0].exercises.forEach((element) => {
-                unsafeWindow.console.log("tampermonkey", element);
-                const name = element.contentfulEntityId + " - " + element.side;
-                const query = `mutation {
-                          createGoal(input: {
-                            name: "${name}",
-                            user_id: "${patientNumber}",
-                            repeat: "Daily"
-                          }) {
-                            goal {
-                              id
-                            }
-                            messages {
-                              field
-                              message
-                            }
-                          }
-                        }
-                        `;
-                const payload = JSON.stringify({ query });
-                goalMutation(payload);
-              });
-            } else {
+            const milestones = carePlan.milestones;
+            //create goal for each milestone
+            milestones.forEach((element) => {
+              unsafeWindow.console.log("tampermonkey milestone inserted", element);
+              const milestoneTitle = element.title;
               if (element.isVisible) {
-                //regular task
-                unsafeWindow.console.log("tampermonkey regular task assigned");
                 const query = `mutation {
-                          createGoal(input: {
-                            name: "${element.title}",
-                            user_id: "${patientNumber}",
-                            repeat: "Daily"
-                          }) {
-                            goal {
-                              id
-                            }
-                            messages {
-                              field
-                              message
+                            createGoal(input: {
+                              name: "${milestoneTitle}",
+                              user_id: "${patientNumber}",
+                              repeat: "Once"
+                            }) {
+                              goal {
+                                id
+                              }
+                              messages {
+                                field
+                                message
+                              }
                             }
                           }
-                        }
-                        `;
+                          `;
                 const payload = JSON.stringify({ query });
                 goalMutation(payload);
               }
-            }
+            });
+
+            //create goal for what matters to me
+            const query = `mutation {
+                    createGoal(input: {
+                      name: "${goal}",
+                      user_id: "${patientNumber}",
+                      repeat: "Once"
+                    }) {
+                      goal {
+                        id
+                      }
+                      messages {
+                        field
+                        message
+                      }
+                    }
+                  }
+                  `;
+            const payload = JSON.stringify({ query });
+            goalMutation(payload);
+
+            const tasks = carePlan.tasks.tasks;
+            unsafeWindow.console.log("tampermonkey tasks are ", tasks);
+            //create goal for each task
+            tasks.forEach((element) => {
+              unsafeWindow.console.log("tampermonkey task is ", element);
+              if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
+                //motion guide task
+                unsafeWindow.console.log("tampermonkey motion guide assigned");
+                //create goal for each assigned exercise
+                element.items[0].exercises.forEach((element) => {
+                  unsafeWindow.console.log("tampermonkey", element);
+                  const name = element.contentfulEntityId + " - " + element.side;
+                  const query = `mutation {
+                            createGoal(input: {
+                              name: "${name}",
+                              user_id: "${patientNumber}",
+                              repeat: "Daily"
+                            }) {
+                              goal {
+                                id
+                              }
+                              messages {
+                                field
+                                message
+                              }
+                            }
+                          }
+                          `;
+                  const payload = JSON.stringify({ query });
+                  goalMutation(payload);
+                });
+              } else {
+                if (element.isVisible) {
+                  //regular task
+                  unsafeWindow.console.log("tampermonkey regular task assigned");
+                  const query = `mutation {
+                            createGoal(input: {
+                              name: "${element.title}",
+                              user_id: "${patientNumber}",
+                              repeat: "Daily"
+                            }) {
+                              goal {
+                                id
+                              }
+                              messages {
+                                field
+                                message
+                              }
+                            }
+                          }
+                          `;
+                  const payload = JSON.stringify({ query });
+                  goalMutation(payload);
+                }
+              }
+            });
           });
         }
       };
