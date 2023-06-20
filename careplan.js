@@ -77,6 +77,7 @@ function waitCarePlan() {
     //Locate and remove existing care plan tab content
     document.getElementsByClassName("cp-tab-contents")[0].remove();
     const parent = document.getElementsByClassName("column is-12 is-12-mobile")[0];
+    const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
 
     if (healthieAPIKey === "") {
       let iframeMsgExists = document.querySelector(".vori-iframe-message");
@@ -119,6 +120,19 @@ function waitCarePlan() {
 
         parent && parent.appendChild(iframeMsgDiv);
       }
+    } else if (healthieAPIKey !== "") {
+      // let's get the user data
+      const getUserQuery = `query {
+        user(id: "${patientNumber}") {
+          id
+          additional_record_identifier
+        }
+      }`;
+
+      const getUserPayload = JSON.stringify({ query: getUserQuery });
+      goalMutation(getUserPayload).then((response) => {
+        unsafeWindow.console.log(`tampermonkey get user response`, response);
+      });
     } else {
       //Create Div
       var iFrameNode = document.createElement("div");
@@ -142,8 +156,6 @@ function waitCarePlan() {
 
       //remove styling of healthie tab element
       document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
-
-      const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
 
       //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
       //confirming publishing of care plan will trigger window.parent.postMessage within Misha
