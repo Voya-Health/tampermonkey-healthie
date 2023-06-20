@@ -140,27 +140,13 @@ function waitCarePlan() {
         if (mishaID === "" || mishaID === null) {
           let iframeMsgExists = document.querySelector(".vori-iframe-message");
           if (!iframeMsgExists) {
-            iframeMsgLink.textContent =
-              "This Patient's account has not been linked. Please contact Vori Health tech team to set it up!";
-            iframeMsgLink.href = "";
-
-            function addHoverEffect() {
-              iframeMsgLink.style.textDecoration = "underline";
-            }
-
-            function removeHoverEffect() {
-              iframeMsgLink.style.textDecoration = "none";
-            }
-
-            iframeMsgDiv.appendChild(iframeMsgLink);
-
-            if (healthieAPIKey === "") {
-              iframeMsgLink.addEventListener("mouseover", addHoverEffect);
-              iframeMsgLink.addEventListener("mouseout", removeHoverEffect);
-            } else {
-              iframeMsgLink.removeEventListener("mouseover", addHoverEffect);
-              iframeMsgLink.removeEventListener("mouseout", removeHoverEffect);
-            }
+            iframeMsgDiv.style.whiteSpace = "pre-line";
+            iframeMsgDiv.style.color = "#333";
+            iframeMsgDiv.style.fontSize = "18px";
+            iframeMsgDiv.style.letterSpacing = "0.3px";
+            iframeMsgDiv.style.lineHeight = "1.5";
+            iframeMsgDiv.textContent =
+              "This patient's account has not been linked. \r\n Please contact Vori Health tech team to set it up!";
 
             parent && parent.appendChild(iframeMsgDiv);
           }
@@ -214,7 +200,7 @@ function waitCarePlan() {
                     goal {
                       id
                     }
-    
+
                     messages {
                       field
                       message
