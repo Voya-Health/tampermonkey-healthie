@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.27
+// @version      0.28
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -15,6 +15,7 @@
 
 let previousUrl = "";
 let healthieAPIKey = GM_getValue("healthieApiKey", "");
+let auth = `Basic ${healthieAPIKey}`;
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 
 //observe changes to the DOM, check for URL changes
@@ -512,8 +513,6 @@ function showInstructions() {
 //config for observer
 const config = { subtree: true, childList: true };
 observer.observe(document, config);
-
-const auth = `Basic ${healthieAPIKey}`;
 
 function goalMutation(payload) {
   let response = null;
