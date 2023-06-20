@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.28
+// @version      0.29
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -77,27 +77,30 @@ function waitCarePlan() {
     //Locate and remove existing care plan tab content
     document.getElementsByClassName("cp-tab-contents")[0].remove();
     const parent = document.getElementsByClassName("column is-12 is-12-mobile")[0];
+    const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+
+    //setup message divs and links
+    const iframeMsgDiv = document.createElement("div");
+    iframeMsgDiv.classList.add("vori-iframe-message");
+    iframeMsgDiv.style.display = "block";
+    iframeMsgDiv.style.position = "relative";
+    iframeMsgDiv.style.background = "rgb(227 229 50 / 21%)";
+    iframeMsgDiv.style.margin = "1.8rem";
+    iframeMsgDiv.style.textAlign = "center";
+    iframeMsgDiv.style.padding = "7rem 7vw";
+
+    const iframeMsgLink = document.createElement("a");
+    iframeMsgLink.style.color = "#333";
+    iframeMsgLink.style.fontSize = "18px";
+    iframeMsgLink.style.letterSpacing = "0.3px";
+    iframeMsgLink.style.textDecoration = "none";
 
     if (healthieAPIKey === "") {
       let iframeMsgExists = document.querySelector(".vori-iframe-message");
       if (!iframeMsgExists) {
-        const iframeMsgDiv = document.createElement("div");
-        iframeMsgDiv.classList.add("vori-iframe-message");
-        iframeMsgDiv.style.display = "block";
-        iframeMsgDiv.style.position = "relative";
-        iframeMsgDiv.style.background = "rgb(227 229 50 / 21%)";
-        iframeMsgDiv.style.margin = "1.8rem";
-        iframeMsgDiv.style.textAlign = "center";
-        iframeMsgDiv.style.padding = "7rem 7vw";
-
-        const iframeMsgLink = document.createElement("a");
         iframeMsgLink.textContent =
           "You cannot view Care Plan's until you connect your Healthie Account to Vori Health. Set it up here!";
         iframeMsgLink.href = "/settings/api_keys";
-        iframeMsgLink.style.color = "#333";
-        iframeMsgLink.style.fontSize = "18px";
-        iframeMsgLink.style.letterSpacing = "0.3px";
-        iframeMsgLink.style.textDecoration = "none";
 
         function addHoverEffect() {
           iframeMsgLink.style.textDecoration = "underline";
@@ -119,184 +122,213 @@ function waitCarePlan() {
 
         parent && parent.appendChild(iframeMsgDiv);
       }
-    } else {
-      //Create Div
-      var iFrameNode = document.createElement("div");
-      //Check for Healthie environment
-      let iFrameURL = isStagingEnv ? "dev.misha.vori.health" : "misha.vorihealth.com";
+    } else if (healthieAPIKey !== "") {
+      // let's get the user data
+      const getUserQuery = `query {
+        user(id: "${patientNumber}") {
+          id
+          additional_record_identifier
+        }
+      }`;
 
-      //Define inner HTML for created div
-      iFrameNode.innerHTML =
-        '<iframe id="MishaFrame"' +
-        'title="Misha iFrame"' +
-        'style="height: 100vh; width: 100%"' +
-        'src="https://' +
-        iFrameURL +
-        '/email%7C632b22aa626051ee6441e397/careplan"' +
-        ">" +
-        "</iframe>";
-      iFrameNode.setAttribute("class", "cp-tab-contents");
+      const getUserPayload = JSON.stringify({ query: getUserQuery });
+      goalMutation(getUserPayload).then((response) => {
+        unsafeWindow.console.log(`tampermonkey get user response`, response);
+        const mishaID = response.data.user.additional_record_identifier;
+        unsafeWindow.console.log(`tampermonkey mishaID`, mishaID);
 
-      //set iframe as child of healthie care plan tab element
-      parent.appendChild(iFrameNode);
+        if (mishaID === "" || mishaID === null) {
+          let iframeMsgExists = document.querySelector(".vori-iframe-message");
+          if (!iframeMsgExists) {
+            iframeMsgDiv.style.whiteSpace = "pre-line";
+            iframeMsgDiv.style.color = "#333";
+            iframeMsgDiv.style.fontSize = "18px";
+            iframeMsgDiv.style.letterSpacing = "0.3px";
+            iframeMsgDiv.style.lineHeight = "1.5";
+            iframeMsgDiv.textContent =
+              "This patient's account has not been linked. \r\n Please contact Vori Health tech team to set it up!";
 
-      //remove styling of healthie tab element
-      document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
+            parent && parent.appendChild(iframeMsgDiv);
+          }
+        } else {
+          //Create Div
+          var iFrameNode = document.createElement("div");
+          //Check for Healthie environment
+          let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
 
-      const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+          //Define inner HTML for created div
+          iFrameNode.innerHTML =
+            '<iframe id="MishaFrame"' +
+            'title="Misha iFrame"' +
+            'style="height: 100vh; width: 100%"' +
+            'src="https://' +
+            iFrameURL +
+            mishaID +
+            '/careplan"' +
+            ">" +
+            "</iframe>";
+          iFrameNode.setAttribute("class", "cp-tab-contents");
 
-      //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
-      //confirming publishing of care plan will trigger window.parent.postMessage within Misha
-      window.onmessage = function (event) {
-        //check event to see if is care plan message
-        if (event.data.tmInput !== undefined) {
-          // let's get all user goals and delete them before adding new ones
-          const getGoalQuery = `query {
-              goals(user_id: "${patientNumber}", per_page: 100) {
-                id,
-                name
-              }
-            }
-            `;
-          const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-          goalMutation(getGoalPayload).then((response) => {
-            const allGoals = response.data.goals;
-            unsafeWindow.console.log("tampermonkey all goals", response);
+          //set iframe as child of healthie care plan tab element
+          parent.appendChild(iFrameNode);
 
-            // delete all goals
-            allGoals.forEach((goal) => {
-              const deleteGoalQuery = `mutation {
-              deleteGoal(input: {id: "${goal.id}"}) {
-                goal {
-                  id
+          //remove styling of healthie tab element
+          document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
+
+          //due to XSS constraints listen for post message from Misha when care plan is submitted to update Healthie
+          //confirming publishing of care plan will trigger window.parent.postMessage within Misha
+          window.onmessage = function (event) {
+            //check event to see if is care plan message
+            if (event.data.tmInput !== undefined) {
+              // let's get all user goals and delete them before adding new ones
+              const getGoalQuery = `query {
+                  goals(user_id: "${patientNumber}", per_page: 100) {
+                    id,
+                    name
+                  }
                 }
+                `;
+              const getGoalPayload = JSON.stringify({ query: getGoalQuery });
+              goalMutation(getGoalPayload).then((response) => {
+                const allGoals = response.data.goals;
+                unsafeWindow.console.log("tampermonkey all goals", response);
 
-                messages {
-                  field
-                  message
-                }
-              }
-            }
-            `;
-              const deleteGoalPayload = JSON.stringify({ query: deleteGoalQuery });
-              goalMutation(deleteGoalPayload).then((response) => {
-                unsafeWindow.console.log("tampermonkey deleted goal", response);
-              });
-            });
+                // delete all goals
+                allGoals.forEach((goal) => {
+                  const deleteGoalQuery = `mutation {
+                  deleteGoal(input: {id: "${goal.id}"}) {
+                    goal {
+                      id
+                    }
 
-            const carePlan = event.data.tmInput;
-            unsafeWindow.console.log(
-              `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
-            );
-            const goal = carePlan.goal.title;
-            unsafeWindow.console.log("tampermokey goal title ", goal);
-
-            const milestones = carePlan.milestones;
-            //create goal for each milestone
-            milestones.forEach((element) => {
-              unsafeWindow.console.log("tampermonkey milestone inserted", element);
-              const milestoneTitle = element.title;
-              if (element.isVisible) {
-                const query = `mutation {
-                            createGoal(input: {
-                              name: "${milestoneTitle}",
-                              user_id: "${patientNumber}",
-                              repeat: "Once"
-                            }) {
-                              goal {
-                                id
-                              }
-                              messages {
-                                field
-                                message
-                              }
-                            }
-                          }
-                          `;
-                const payload = JSON.stringify({ query });
-                goalMutation(payload);
-              }
-            });
-
-            //create goal for what matters to me
-            const query = `mutation {
-                    createGoal(input: {
-                      name: "${goal}",
-                      user_id: "${patientNumber}",
-                      repeat: "Once"
-                    }) {
-                      goal {
-                        id
-                      }
-                      messages {
-                        field
-                        message
-                      }
+                    messages {
+                      field
+                      message
                     }
                   }
-                  `;
-            const payload = JSON.stringify({ query });
-            goalMutation(payload);
-
-            const tasks = carePlan.tasks.tasks;
-            unsafeWindow.console.log("tampermonkey tasks are ", tasks);
-            //create goal for each task
-            tasks.forEach((element) => {
-              unsafeWindow.console.log("tampermonkey task is ", element);
-              if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
-                //motion guide task
-                unsafeWindow.console.log("tampermonkey motion guide assigned");
-                //create goal for each assigned exercise
-                element.items[0].exercises.forEach((element) => {
-                  unsafeWindow.console.log("tampermonkey", element);
-                  const name = element.contentfulEntityId + " - " + element.side;
-                  const query = `mutation {
-                            createGoal(input: {
-                              name: "${name}",
-                              user_id: "${patientNumber}",
-                              repeat: "Daily"
-                            }) {
-                              goal {
-                                id
-                              }
-                              messages {
-                                field
-                                message
-                              }
-                            }
-                          }
-                          `;
-                  const payload = JSON.stringify({ query });
-                  goalMutation(payload);
-                });
-              } else {
-                if (element.isVisible) {
-                  //regular task
-                  unsafeWindow.console.log("tampermonkey regular task assigned");
-                  const query = `mutation {
-                            createGoal(input: {
-                              name: "${element.title}",
-                              user_id: "${patientNumber}",
-                              repeat: "Daily"
-                            }) {
-                              goal {
-                                id
-                              }
-                              messages {
-                                field
-                                message
-                              }
-                            }
-                          }
-                          `;
-                  const payload = JSON.stringify({ query });
-                  goalMutation(payload);
                 }
-              }
-            });
-          });
+                `;
+                  const deleteGoalPayload = JSON.stringify({ query: deleteGoalQuery });
+                  goalMutation(deleteGoalPayload).then((response) => {
+                    unsafeWindow.console.log("tampermonkey deleted goal", response);
+                  });
+                });
+
+                const carePlan = event.data.tmInput;
+                unsafeWindow.console.log(
+                  `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
+                );
+                const goal = carePlan.goal.title;
+                unsafeWindow.console.log("tampermokey goal title ", goal);
+
+                const milestones = carePlan.milestones;
+                //create goal for each milestone
+                milestones.forEach((element) => {
+                  unsafeWindow.console.log("tampermonkey milestone inserted", element);
+                  const milestoneTitle = element.title;
+                  if (element.isVisible) {
+                    const query = `mutation {
+                                createGoal(input: {
+                                  name: "${milestoneTitle}",
+                                  user_id: "${patientNumber}",
+                                  repeat: "Once"
+                                }) {
+                                  goal {
+                                    id
+                                  }
+                                  messages {
+                                    field
+                                    message
+                                  }
+                                }
+                              }
+                              `;
+                    const payload = JSON.stringify({ query });
+                    goalMutation(payload);
+                  }
+                });
+
+                //create goal for what matters to me
+                const query = `mutation {
+                        createGoal(input: {
+                          name: "${goal}",
+                          user_id: "${patientNumber}",
+                          repeat: "Once"
+                        }) {
+                          goal {
+                            id
+                          }
+                          messages {
+                            field
+                            message
+                          }
+                        }
+                      }
+                      `;
+                const payload = JSON.stringify({ query });
+                goalMutation(payload);
+
+                const tasks = carePlan.tasks.tasks;
+                unsafeWindow.console.log("tampermonkey tasks are ", tasks);
+                //create goal for each task
+                tasks.forEach((element) => {
+                  unsafeWindow.console.log("tampermonkey task is ", element);
+                  if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
+                    //motion guide task
+                    unsafeWindow.console.log("tampermonkey motion guide assigned");
+                    //create goal for each assigned exercise
+                    element.items[0].exercises.forEach((element) => {
+                      unsafeWindow.console.log("tampermonkey", element);
+                      const name = element.contentfulEntityId + " - " + element.side;
+                      const query = `mutation {
+                                createGoal(input: {
+                                  name: "${name}",
+                                  user_id: "${patientNumber}",
+                                  repeat: "Daily"
+                                }) {
+                                  goal {
+                                    id
+                                  }
+                                  messages {
+                                    field
+                                    message
+                                  }
+                                }
+                              }
+                              `;
+                      const payload = JSON.stringify({ query });
+                      goalMutation(payload);
+                    });
+                  } else {
+                    if (element.isVisible) {
+                      //regular task
+                      unsafeWindow.console.log("tampermonkey regular task assigned");
+                      const query = `mutation {
+                                createGoal(input: {
+                                  name: "${element.title}",
+                                  user_id: "${patientNumber}",
+                                  repeat: "Daily"
+                                }) {
+                                  goal {
+                                    id
+                                  }
+                                  messages {
+                                    field
+                                    message
+                                  }
+                                }
+                              }
+                              `;
+                      const payload = JSON.stringify({ query });
+                      goalMutation(payload);
+                    }
+                  }
+                });
+              });
+            }
+          };
         }
-      };
+      });
     }
   } else {
     //wait for content load
