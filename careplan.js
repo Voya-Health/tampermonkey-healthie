@@ -79,26 +79,28 @@ function waitCarePlan() {
     const parent = document.getElementsByClassName("column is-12 is-12-mobile")[0];
     const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
 
+    //setup message divs and links
+    const iframeMsgDiv = document.createElement("div");
+    iframeMsgDiv.classList.add("vori-iframe-message");
+    iframeMsgDiv.style.display = "block";
+    iframeMsgDiv.style.position = "relative";
+    iframeMsgDiv.style.background = "rgb(227 229 50 / 21%)";
+    iframeMsgDiv.style.margin = "1.8rem";
+    iframeMsgDiv.style.textAlign = "center";
+    iframeMsgDiv.style.padding = "7rem 7vw";
+
+    const iframeMsgLink = document.createElement("a");
+    iframeMsgLink.style.color = "#333";
+    iframeMsgLink.style.fontSize = "18px";
+    iframeMsgLink.style.letterSpacing = "0.3px";
+    iframeMsgLink.style.textDecoration = "none";
+
     if (healthieAPIKey === "") {
       let iframeMsgExists = document.querySelector(".vori-iframe-message");
       if (!iframeMsgExists) {
-        const iframeMsgDiv = document.createElement("div");
-        iframeMsgDiv.classList.add("vori-iframe-message");
-        iframeMsgDiv.style.display = "block";
-        iframeMsgDiv.style.position = "relative";
-        iframeMsgDiv.style.background = "rgb(227 229 50 / 21%)";
-        iframeMsgDiv.style.margin = "1.8rem";
-        iframeMsgDiv.style.textAlign = "center";
-        iframeMsgDiv.style.padding = "7rem 7vw";
-
-        const iframeMsgLink = document.createElement("a");
         iframeMsgLink.textContent =
           "You cannot view Care Plan's until you connect your Healthie Account to Vori Health. Set it up here!";
         iframeMsgLink.href = "/settings/api_keys";
-        iframeMsgLink.style.color = "#333";
-        iframeMsgLink.style.fontSize = "18px";
-        iframeMsgLink.style.letterSpacing = "0.3px";
-        iframeMsgLink.style.textDecoration = "none";
 
         function addHoverEffect() {
           iframeMsgLink.style.textDecoration = "underline";
@@ -132,6 +134,13 @@ function waitCarePlan() {
       const getUserPayload = JSON.stringify({ query: getUserQuery });
       goalMutation(getUserPayload).then((response) => {
         unsafeWindow.console.log(`tampermonkey get user response`, response);
+        const mishaID = response.data.user.additional_record_identifier;
+
+        if (mishaID === "") {
+          iframeMsgLink.textContent =
+            "This Patient's account has not been linked. Please contact Vori Health tech team to set it up!";
+          iframeMsgLink.href = "";
+        }
       });
     } else {
       //Create Div
