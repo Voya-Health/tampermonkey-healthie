@@ -77,6 +77,17 @@ function waitCarePlan() {
     //Locate and remove existing care plan tab content
     document.getElementsByClassName("cp-tab-contents")[0].remove();
     const parent = document.getElementsByClassName("column is-12 is-12-mobile")[0];
+
+    // let's add a div with the text "Loading Careplan..."
+    const loadingDiv = document.createElement("div");
+    loadingDiv.classList.add("vori-loading-message");
+    loadingDiv.textContent = "Loading Careplan...";
+    loadingDiv.style.textAlign = "center";
+    const loadingDivExists = document.querySelector(".vori-loading-message");
+    if (!loadingDivExists) {
+      parent && parent.appendChild(loadingDiv);
+    }
+
     const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
 
     //setup message divs and links
