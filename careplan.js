@@ -83,6 +83,8 @@ function waitCarePlan() {
     loadingDiv.classList.add("vori-loading-message");
     loadingDiv.textContent = "Loading Careplan...";
     loadingDiv.style.textAlign = "center";
+    loadingDiv.style.margin = "1.8rem";
+    loadingDiv.style.fontSize = "18px";
     const loadingDivExists = document.querySelector(".vori-loading-message");
     if (!loadingDivExists) {
       parent && parent.appendChild(loadingDiv);
