@@ -131,6 +131,7 @@ function waitCarePlan() {
           iframeMsgLink.removeEventListener("mouseout", removeHoverEffect);
         }
 
+        parent && parent.removeChild(loadingDiv);
         parent && parent.appendChild(iframeMsgDiv);
       }
     } else if (healthieAPIKey !== "") {
@@ -159,6 +160,7 @@ function waitCarePlan() {
             iframeMsgDiv.textContent =
               "This patient's account has not been linked. \r\n Please contact Vori Health tech team to set it up!";
 
+            parent && parent.removeChild(loadingDiv);
             parent && parent.appendChild(iframeMsgDiv);
           }
         } else {
@@ -180,8 +182,8 @@ function waitCarePlan() {
             "</iframe>";
           iFrameNode.setAttribute("class", "cp-tab-contents");
 
-          //set iframe as child of healthie care plan tab element
-          parent.appendChild(iFrameNode);
+          parent && parent.removeChild(loadingDiv);
+          parent && parent.appendChild(iFrameNode);
 
           //remove styling of healthie tab element
           document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
