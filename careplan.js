@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.29
+// @version      0.30
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -77,6 +77,19 @@ function waitCarePlan() {
     //Locate and remove existing care plan tab content
     document.getElementsByClassName("cp-tab-contents")[0].remove();
     const parent = document.getElementsByClassName("column is-12 is-12-mobile")[0];
+
+    // let's add a div with the text "Loading Careplan..."
+    const loadingDiv = document.createElement("div");
+    loadingDiv.classList.add("vori-loading-message");
+    loadingDiv.textContent = "Loading Careplan...";
+    loadingDiv.style.textAlign = "center";
+    loadingDiv.style.margin = "1.8rem";
+    loadingDiv.style.fontSize = "18px";
+    const loadingDivExists = document.querySelector(".vori-loading-message");
+    if (!loadingDivExists) {
+      parent && parent.appendChild(loadingDiv);
+    }
+
     const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
 
     //setup message divs and links
@@ -120,6 +133,7 @@ function waitCarePlan() {
           iframeMsgLink.removeEventListener("mouseout", removeHoverEffect);
         }
 
+        parent && parent.removeChild(loadingDiv);
         parent && parent.appendChild(iframeMsgDiv);
       }
     } else if (healthieAPIKey !== "") {
@@ -148,6 +162,7 @@ function waitCarePlan() {
             iframeMsgDiv.textContent =
               "This patient's account has not been linked. \r\n Please contact Vori Health tech team to set it up!";
 
+            parent && parent.removeChild(loadingDiv);
             parent && parent.appendChild(iframeMsgDiv);
           }
         } else {
@@ -169,8 +184,8 @@ function waitCarePlan() {
             "</iframe>";
           iFrameNode.setAttribute("class", "cp-tab-contents");
 
-          //set iframe as child of healthie care plan tab element
-          parent.appendChild(iFrameNode);
+          parent && parent.removeChild(loadingDiv);
+          parent && parent.appendChild(iFrameNode);
 
           //remove styling of healthie tab element
           document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
