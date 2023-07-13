@@ -101,6 +101,14 @@ function waitAppointmentsProfile() {
     // get the parent with class .column.is-6 and change the width to 100%
     let parent = document.querySelector(".insurance-authorization-section").closest(".column.is-6");
     parent.style.width = "100%";
+    parent.style.maxHeight = "max(50vh, 400px)";
+    parent.style.overflow = "scroll";
+
+    // also adjust width of packages section
+    let packagesParent = document.querySelector(
+      ".insurance-authorization-section.cp-section.with-dropdown-menus-for-packgs"
+    );
+    packagesParent.style.width = "100%";
 
     // adjust style of grandparent
     let grandParent = parent.closest(".columns");
