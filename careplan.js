@@ -7,12 +7,11 @@
 // @match        https://*.gethealthie.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
 // @sandbox      JavaScript
-// @require      https://code.jquery.com/jquery-3.7.0.min.js
 // @grant        GM_setValue
 // @grant        GM_getValue
 // ==/UserScript==
 
-/* globals contentful, jquery, $ */
+/* globals contentful */
 
 let previousUrl = "";
 let healthieAPIKey = GM_getValue("healthieApiKey", "");
