@@ -51,6 +51,24 @@ const observer = new MutationObserver(function (mutations) {
   }
 });
 
+function initJQuery() {
+  let $ = unsafeWindow.jQuery;
+  if ($ && $ !== undefined && typeof $ === "function") {
+    unsafeWindow.console.log(`tampermonkey jquery already loaded`);
+    return $;
+  } else {
+    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    let script = document.createElement("script");
+    script.src = "https://code.jquery.com/jquery-3.7.0.min.js";
+    script.type = "text/javascript";
+    script.onload = function () {
+      unsafeWindow.console.log(`tampermonkey jquery loaded successfully`);
+    };
+    document.getElementsByTagName("head")[0].appendChild(script);
+    window.setTimeout(initJQuery, 200);
+  }
+}
+
 function waitAppointmentsHome() {
   //check to see if the appointment view contents has loaded
   let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
@@ -661,6 +679,8 @@ function showInstructions() {
     window.setTimeout(showInstructions, 200);
   }
 }
+
+initJQuery();
 
 //config for observer
 const config = { subtree: true, childList: true };
