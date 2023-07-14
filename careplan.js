@@ -108,66 +108,72 @@ function waitAppointmentsHome() {
 
 function waitAppointmentsProfile() {
   const $ = initJQuery();
-  // check to see if the appointment view contents have loaded
-  let appointmentWindow = $(".insurance-authorization-section").filter(function () {
-    return $(this).find("h1.level-item:contains('Appointments')").length > 0;
-  })[0];
-  if (appointmentWindow) {
-    unsafeWindow.console.log(`tampermonkey found appointment view on user profile`);
-    $(appointmentWindow).css({ margin: "0", padding: "3px" });
-    // get the parent with class .column.is-6 and change the width to 100%
-    let parent = $(appointmentWindow).closest(".column.is-6");
-    parent
-      .css({
-        width: "98%",
-        minHeight: "420px",
-        maxHeight: "max(60vh, 560px)",
-        overflow: "scroll",
-        marginTop: "2rem",
-        padding: "0",
-      })
-      .closest(".columns") // also adjust style of grandparent
-      .css({
-        display: "flex",
-        flexDirection: "column",
-      });
-
-    // also adjust width of packages section
-    $(".insurance-authorization-section.cp-section.with-dropdown-menus-for-packgs")
-      .closest(".column.is-6")
-      .css("width", "100%");
-
-    // remove all children of appointments section
-    while (appointmentWindow.childNodes.length > 0) {
-      let childClassName = appointmentWindow.lastChild.className;
-      unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
-      appointmentWindow.removeChild(appointmentWindow.lastChild);
-    }
-
-    // Create Div
-    var iFrameNode = $("<div>").css({ padding: "0 11px" });
-
-    // Check for Healthie environment
-    let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
-
-    // Define inner HTML for created div
-    // Update in the future to a dedicated component
-    // https://dev.misha.vori.health/app/schedule
-    iFrameNode.html(
-      '<iframe id="MishaFrame" ' +
-        'title="Misha iFrame" ' +
-        'style="height: 100vh; width: 100%" ' +
-        'src="https://' +
-        iFrameURL +
-        'app/schedule"' + // TODO: update to appointments route
-        ">" +
-        "</iframe>"
-    );
-    $(appointmentWindow).append(iFrameNode);
-  } else {
-    // wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting appointment view on user profile`);
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
     window.setTimeout(waitAppointmentsProfile, 200);
+    return;
+  } else {
+    // check to see if the appointment view contents have loaded
+    let appointmentWindow = $(".insurance-authorization-section").filter(function () {
+      return $(this).find("h1.level-item:contains('Appointments')").length > 0;
+    })[0];
+    if (appointmentWindow) {
+      unsafeWindow.console.log(`tampermonkey found appointment view on user profile`);
+      $(appointmentWindow).css({ margin: "0", padding: "3px" });
+      // get the parent with class .column.is-6 and change the width to 100%
+      let parent = $(appointmentWindow).closest(".column.is-6");
+      parent
+        .css({
+          width: "98%",
+          minHeight: "420px",
+          maxHeight: "max(60vh, 560px)",
+          overflow: "scroll",
+          marginTop: "2rem",
+          padding: "0",
+        })
+        .closest(".columns") // also adjust style of grandparent
+        .css({
+          display: "flex",
+          flexDirection: "column",
+        });
+
+      // also adjust width of packages section
+      $(".insurance-authorization-section.cp-section.with-dropdown-menus-for-packgs")
+        .closest(".column.is-6")
+        .css("width", "100%");
+
+      // remove all children of appointments section
+      while (appointmentWindow.childNodes.length > 0) {
+        let childClassName = appointmentWindow.lastChild.className;
+        unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
+        appointmentWindow.removeChild(appointmentWindow.lastChild);
+      }
+
+      // Create Div
+      var iFrameNode = $("<div>").css({ padding: "0 11px" });
+
+      // Check for Healthie environment
+      let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
+
+      // Define inner HTML for created div
+      // Update in the future to a dedicated component
+      // https://dev.misha.vori.health/app/schedule
+      iFrameNode.html(
+        '<iframe id="MishaFrame" ' +
+          'title="Misha iFrame" ' +
+          'style="height: 100vh; width: 100%" ' +
+          'src="https://' +
+          iFrameURL +
+          'app/schedule"' + // TODO: update to appointments route
+          ">" +
+          "</iframe>"
+      );
+      $(appointmentWindow).append(iFrameNode);
+    } else {
+      // wait for content load
+      unsafeWindow.console.log(`tampermonkey waiting appointment view on user profile`);
+      window.setTimeout(waitAppointmentsProfile, 200);
+    }
   }
 }
 
