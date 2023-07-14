@@ -121,6 +121,12 @@ function waitAppointmentsProfile() {
     parent.style.minHeight = "420px";
     parent.style.maxHeight = "max(60vh, 560px)";
     parent.style.overflow = "scroll";
+    let parent = $(appointmentWindow).closest(".column.is-6");
+    parent
+      .css({
+        width: "98%",
+        minHeight: "420px",
+        marginTop: "2rem",
 
     // also adjust width of packages section
     let packagesParent = document
@@ -149,6 +155,7 @@ function waitAppointmentsProfile() {
     // Update in the future to a dedicated component
     // https://dev.misha.vori.health/app/schedule
     iFrameNode.innerHTML =
+    iFrameNode.html(
       '<iframe id="MishaFrame" ' +
       'title="Misha iFrame" ' +
       'style="height: 100vh; width: 100%" ' +
@@ -158,6 +165,7 @@ function waitAppointmentsProfile() {
       ">" +
       "</iframe>";
     appointmentWindowObj.appendChild(iFrameNode);
+    $(appointmentWindow).append(iFrameNode);
   } else {
     // wait for content load
     unsafeWindow.console.log(`tampermonkey waiting appointment view on user profile`);
