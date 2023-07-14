@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.32
+// @version      0.33
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -178,6 +178,80 @@ function waitAppointmentsProfile() {
       // wait for content load
       unsafeWindow.console.log(`tampermonkey waiting appointment view on user profile`);
       window.setTimeout(waitAppointmentsProfile, 200);
+    }
+  }
+}
+
+function waitAddAppointmentsBtn() {
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
+    window.setTimeout(waitAppointmentsProfile, 200);
+    return;
+  } else {
+    let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
+    if (addAppointmentBtn) {
+      // let's clone it to remove the onclick listener
+      let clonedBtn = $(addAppointmentBtn).clone();
+      $(addAppointmentBtn).replaceWith(clonedBtn);
+      // Add click event listener to show the overlay and dialog
+      clonedBtn.on("click", function () {
+        // Create overlay element
+        let overlay = $("<div>").addClass("overlay").css({
+          position: "fixed",
+          inset: "0",
+          zIndex: "999",
+          background: "#000000d9",
+          display: "flex",
+          flexDirection: "column",
+          placeContent: "center",
+          alignItems: "center",
+          justifyContent: "center",
+        });
+
+        // Add click event listener to close overlay when clicked
+        overlay.on("click", function () {
+          $(this).remove();
+        });
+
+        // Create dialog body element with iframe
+        let dialogBody = $("<div>").addClass("dialog-body").css({
+          background: "#fff",
+          maxWidth: "max(600px, 60vw)",
+          width: "100vw",
+          height: "80vh",
+          height: "80dvh",
+          overflowY: "scroll",
+        });
+
+        // Check for Healthie environment
+        let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
+
+        // Create iframe element
+        let iframe = $("<iframe>")
+          .attr({
+            id: "MishaFrame",
+            title: "Misha iFrame",
+            src: "https://" + iFrameURL + "app/schedule", // TODO: update to appointments route
+          })
+          .css({
+            height: "100vh",
+            width: "100%",
+          });
+
+        // Append iframe to dialog body
+        dialogBody.append(iframe);
+
+        // Append dialog body to overlay
+        overlay.append(dialogBody);
+
+        // Append overlay to the document body
+        $("body").append(overlay);
+      });
+    } else {
+      // wait for content load
+      unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
+      window.setTimeout(waitAddAppointmentsBtn, 200);
     }
   }
 }
