@@ -214,6 +214,22 @@ function waitAddAppointmentsBtn() {
           $(this).remove();
         });
 
+        // Create close button element
+        let closeButton = $("<span>").addClass("close-button").html("&times;").css({
+          position: "absolute",
+          right: "1rem",
+          top: "1rem",
+          color: "#fff",
+          fontSize: "2.5rem",
+          cursor: "pointer",
+        });
+        closeButton.on("click", function () {
+          overlay.remove();
+        });
+
+        // Append close button to overlay
+        overlay.append(closeButton);
+
         // Create dialog body element with iframe
         let dialogBody = $("<div>").addClass("dialog-body").css({
           background: "#fff",
