@@ -41,6 +41,11 @@ const observer = new MutationObserver(function (mutations) {
       showInstructions();
     }
 
+    if (location.href.includes("/appointments") || location.href.includes("/organization")) {
+      //Function to handle clicking the Add appointments button
+      waitAddAppointmentsBtn();
+    }
+
     const baseURL = location.href.split(".").splice(1).join(".");
     unsafeWindow.console.log("tampermonkey splice is ", baseURL);
     if (baseURL == "gethealthie.com/overview" || baseURL == "gethealthie.com/") {
