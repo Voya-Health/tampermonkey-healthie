@@ -51,6 +51,24 @@ const observer = new MutationObserver(function (mutations) {
   }
 });
 
+function initJQuery() {
+  let $ = unsafeWindow.jQuery;
+  if ($ && $ !== undefined && typeof $ === "function") {
+    unsafeWindow.console.log(`tampermonkey jquery already loaded`);
+    return $;
+  } else {
+    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    let script = document.createElement("script");
+    script.src = "https://code.jquery.com/jquery-3.7.0.min.js";
+    script.type = "text/javascript";
+    script.onload = function () {
+      unsafeWindow.console.log(`tampermonkey jquery loaded successfully`);
+    };
+    document.getElementsByTagName("head")[0].appendChild(script);
+    window.setTimeout(initJQuery, 200);
+  }
+}
+
 function waitAppointmentsHome() {
   //check to see if the appointment view contents has loaded
   let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
@@ -89,61 +107,73 @@ function waitAppointmentsHome() {
 }
 
 function waitAppointmentsProfile() {
-  // check to see if the appointment view contents have loaded
-  let appointmentWindow = document.querySelector(".insurance-authorization-section");
-  if (appointmentWindow) {
-    unsafeWindow.console.log(`tampermonkey found appointment view on user profile`, appointmentWindow.length);
-    // if appointment window is found and is an array, get the first element else use the element
-    let appointmentWindowObj =
-      appointmentWindow.length > 0 && appointmentWindow[0] ? appointmentWindow[0] : appointmentWindow;
-
-    // get the parent with class .column.is-6 and change the width to 100%
-    let parent = document.querySelector(".insurance-authorization-section").closest(".column.is-6");
-    parent.style.width = "100%";
-    parent.style.minHeight = "420px";
-    parent.style.maxHeight = "max(60vh, 560px)";
-    parent.style.overflow = "scroll";
-
-    // also adjust width of packages section
-    let packagesParent = document
-      .querySelector(".insurance-authorization-section.cp-section.with-dropdown-menus-for-packgs")
-      .closest(".column.is-6");
-    packagesParent.style.width = "100%";
-
-    // adjust style of grandparent
-    let grandParent = parent.closest(".columns");
-    grandParent.style.display = "flex";
-    grandParent.style.flexDirection = "column";
-
-    // remove all children of appointmentWindowObj
-    while (appointmentWindowObj.childNodes.length > 0) {
-      let childClassName = appointmentWindowObj.lastChild.className;
-      unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
-      appointmentWindowObj.removeChild(appointmentWindowObj.lastChild);
-    }
-
-    // Create Div
-    var iFrameNode = document.createElement("div");
-    // Check for Healthie environment
-    let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
-
-    // Define inner HTML for created div
-    // Update in the future to a dedicated component
-    // https://dev.misha.vori.health/app/schedule
-    iFrameNode.innerHTML =
-      '<iframe id="MishaFrame" ' +
-      'title="Misha iFrame" ' +
-      'style="height: 100vh; width: 100%" ' +
-      'src="https://' +
-      iFrameURL +
-      'app/schedule"' + // TODO: update to appointments route
-      ">" +
-      "</iframe>";
-    appointmentWindowObj.appendChild(iFrameNode);
-  } else {
-    // wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting appointment view on user profile`);
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
     window.setTimeout(waitAppointmentsProfile, 200);
+    return;
+  } else {
+    // check to see if the appointment view contents have loaded
+    let appointmentWindow = $(".insurance-authorization-section").filter(function () {
+      return $(this).find("h1.level-item:contains('Appointments')").length > 0;
+    })[0];
+    if (appointmentWindow) {
+      unsafeWindow.console.log(`tampermonkey found appointment view on user profile`);
+      $(appointmentWindow).css({ margin: "0", padding: "3px" });
+      // get the parent with class .column.is-6 and change the width to 100%
+      let parent = $(appointmentWindow).closest(".column.is-6");
+      parent
+        .css({
+          width: "98%",
+          minHeight: "420px",
+          maxHeight: "max(60vh, 560px)",
+          overflow: "scroll",
+          marginTop: "2rem",
+          padding: "0",
+        })
+        .closest(".columns") // also adjust style of grandparent
+        .css({
+          display: "flex",
+          flexDirection: "column",
+        });
+
+      // also adjust width of packages section
+      $(".insurance-authorization-section.cp-section.with-dropdown-menus-for-packgs")
+        .closest(".column.is-6")
+        .css("width", "100%");
+
+      // remove all children of appointments section
+      while (appointmentWindow.childNodes.length > 0) {
+        let childClassName = appointmentWindow.lastChild.className;
+        unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
+        appointmentWindow.removeChild(appointmentWindow.lastChild);
+      }
+
+      // Create Div
+      var iFrameNode = $("<div>").css({ padding: "0 11px" });
+
+      // Check for Healthie environment
+      let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
+
+      // Define inner HTML for created div
+      // Update in the future to a dedicated component
+      // https://dev.misha.vori.health/app/schedule
+      iFrameNode.html(
+        '<iframe id="MishaFrame" ' +
+          'title="Misha iFrame" ' +
+          'style="height: 100vh; width: 100%" ' +
+          'src="https://' +
+          iFrameURL +
+          'app/schedule"' + // TODO: update to appointments route
+          ">" +
+          "</iframe>"
+      );
+      $(appointmentWindow).append(iFrameNode);
+    } else {
+      // wait for content load
+      unsafeWindow.console.log(`tampermonkey waiting appointment view on user profile`);
+      window.setTimeout(waitAppointmentsProfile, 200);
+    }
   }
 }
 
@@ -661,6 +691,8 @@ function showInstructions() {
     window.setTimeout(showInstructions, 200);
   }
 }
+
+initJQuery();
 
 //config for observer
 const config = { subtree: true, childList: true };
