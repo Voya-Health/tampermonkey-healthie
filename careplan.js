@@ -101,7 +101,7 @@ function waitAppointmentsProfile() {
     let parent = document.querySelector(".insurance-authorization-section").closest(".column.is-6");
     parent.style.width = "100%";
     parent.style.minHeight = "420px";
-    parent.style.maxHeight = "max(560vh, 560px)";
+    parent.style.maxHeight = "max(60vh, 560px)";
     parent.style.overflow = "scroll";
 
     // also adjust width of packages section
