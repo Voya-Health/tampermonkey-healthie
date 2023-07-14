@@ -248,7 +248,7 @@ function waitAddAppointmentsBtn() {
           .attr({
             id: "MishaFrame",
             title: "Misha iFrame",
-            src: "https://" + iFrameURL + "app/schedule", // TODO: update to appointments route
+            src: "https://" + iFrameURL + "app/schedule", // TODO: update to add appointments route
           })
           .css({
             height: "100vh",
