@@ -208,8 +208,6 @@ function waitAddAppointmentsBtn() {
           alignItems: "center",
           justifyContent: "center",
         });
-
-        // Add click event listener to close overlay when clicked
         overlay.on("click", function () {
           $(this).remove();
         });
@@ -226,8 +224,6 @@ function waitAddAppointmentsBtn() {
         closeButton.on("click", function () {
           overlay.remove();
         });
-
-        // Append close button to overlay
         overlay.append(closeButton);
 
         // Create dialog body element with iframe
@@ -255,14 +251,9 @@ function waitAddAppointmentsBtn() {
             width: "100%",
           });
 
-        // Append iframe to dialog body
-        dialogBody.append(iframe);
-
-        // Append dialog body to overlay
-        overlay.append(dialogBody);
-
-        // Append overlay to the document body
-        $("body").append(overlay);
+        dialogBody.append(iframe); // Append iframe to dialog body        
+        overlay.append(dialogBody); // Append dialog body to overlay        
+        $("body").append(overlay); // Append overlay to the document body
       });
     } else {
       // wait for content load
