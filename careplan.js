@@ -199,7 +199,6 @@ function showOverlay($) {
   });
   overlay.on("click", function () {
     $(this).remove();
-    window.location.reload(); // reload page to ensure the cloned element is up to date
   });
 
   // Create close button element
@@ -213,7 +212,6 @@ function showOverlay($) {
   });
   closeButton.on("click", function () {
     overlay.remove();
-    window.location.reload(); // reload page to ensure the cloned element is up to date
   });
   overlay.append(closeButton);
 
