@@ -42,10 +42,9 @@ const observer = new MutationObserver(function (mutations) {
     }
 
     if (location.href.includes("/appointments") || location.href.includes("/organization")) {
-      //Function to handle clicking the Add appointments button
-      waitAddAppointmentsBtn();
-      //Function to handle clicking on empty appointment slots
-      waitEmptyAppointmentSlots();
+      waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
+      waitCalendar(); //Function to handle clicking on empty appointment slots
+      waitCalendarHeaderBtns(); //Function to handle clicking on calendar header buttons
     }
 
     const baseURL = location.href.split(".").splice(1).join(".");
@@ -252,12 +251,11 @@ function initCalendar() {
     window.setTimeout(initCalendar, 200);
     return;
   } else {
-    let calendar = $(".rbc-time-content");
+    let calendar = $(".rbc-time-content") || $(".rbc-month-view");
     let calendarEvents = $(".rbc-event.calendar-event.with-label-spacing");
-    // check if calendar and events are loaded and if calendarEvents has children
+
     if (calendar && calendarEvents && calendarEvents.children().length > 0) {
       let clonedCalendar = calendar.clone();
-      // replace with cloned calendar and console log success
       $(calendar).replaceWith(clonedCalendar);
       unsafeWindow.console.log(`tampermonkey cloned calendar`);
       calendar.on("click", function () {
@@ -273,11 +271,34 @@ function initCalendar() {
   }
 }
 
-function waitEmptyAppointmentSlots() {
+function waitCalendarHeaderBtns() {
   const $ = initJQuery();
   if (!$) {
     unsafeWindow.console.log(`tampermonkey jquery not loaded`);
-    window.setTimeout(waitEmptyAppointmentSlots, 200);
+    window.setTimeout(waitCalendarHeaderBtns, 200);
+    return;
+  } else {
+    let calendarHeaderBtns = $(".rbc-btn-group").find("button");
+    if (calendarHeaderBtns.length > 0) {
+      // if button clicked on has the text 'day', and ".rbc-time-content" exists on the page, then init calendar
+      calendarHeaderBtns.on("click", function () {
+        let calendar = $(".rbc-time-content") || $(".rbc-month-view");
+        if (calendar) {
+          initCalendar();
+        }
+      });
+    } else {
+      unsafeWindow.console.log(`tampermonkey waiting calendar header buttons`);
+      window.setTimeout(waitCalendarHeaderBtns, 200);
+    }
+  }
+}
+
+function waitCalendar() {
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
+    window.setTimeout(waitCalendar, 200);
     return;
   } else {
     initCalendar();
