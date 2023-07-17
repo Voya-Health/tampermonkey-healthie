@@ -44,6 +44,8 @@ const observer = new MutationObserver(function (mutations) {
     if (location.href.includes("/appointments") || location.href.includes("/organization")) {
       //Function to handle clicking the Add appointments button
       waitAddAppointmentsBtn();
+      //Function to handle clicking on empty appointment slots
+      waitEmptyAppointmentSlots();
     }
 
     const baseURL = location.href.split(".").splice(1).join(".");
@@ -182,6 +184,96 @@ function waitAppointmentsProfile() {
   }
 }
 
+function showOverlay($) {
+  // Create overlay element
+  let overlay = $("<div>").addClass("overlay").css({
+    position: "fixed",
+    inset: "0",
+    zIndex: "999",
+    background: "#000000d9",
+    display: "flex",
+    flexDirection: "column",
+    placeContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
+  });
+  overlay.on("click", function () {
+    $(this).remove();
+    window.location.reload(); // reload page to ensure the cloned element is up to date
+  });
+
+  // Create close button element
+  let closeButton = $("<span>").addClass("close-button").html("&times;").css({
+    position: "absolute",
+    right: "1rem",
+    top: "1rem",
+    color: "#fff",
+    fontSize: "2.5rem",
+    cursor: "pointer",
+  });
+  closeButton.on("click", function () {
+    overlay.remove();
+    window.location.reload(); // reload page to ensure the cloned element is up to date
+  });
+  overlay.append(closeButton);
+
+  // Create dialog body element with iframe
+  let dialogBody = $("<div>").addClass("dialog-body").css({
+    background: "#fff",
+    maxWidth: "max(600px, 60vw)",
+    width: "100vw",
+    height: "80vh",
+    height: "80dvh",
+    overflowY: "scroll",
+  });
+
+  // Check for Healthie environment
+  let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
+
+  // Create iframe element
+  let iframe = $("<iframe>")
+    .attr({
+      id: "MishaFrame",
+      title: "Misha iFrame",
+      src: "https://" + iFrameURL + "app/schedule", // TODO: update to add appointments route
+    })
+    .css({
+      height: "100vh",
+      width: "100%",
+    });
+
+  dialogBody.append(iframe); // Append iframe to dialog body
+  overlay.append(dialogBody); // Append dialog body to overlay
+  $("body").append(overlay); // Append overlay to body
+}
+
+function initCalendar($) {
+  let calendar = $(".rbc-time-content");
+  if (calendar) {
+    let clonedCalendar = calendar.clone();
+    $(calendar).replaceWith(clonedCalendar);
+
+    // Add click event listener to prevent default behavior
+    calendar.on("click", function () {
+      showOverlay($);
+    });
+  } else {
+    unsafeWindow.console.log(`tampermonkey waiting calendar`);
+    window.setTimeout(initCalendar, 200);
+  }
+}
+
+function waitEmptyAppointmentSlots() {
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
+    window.setTimeout(waitEmptyAppointmentSlots, 200);
+    return;
+  } else {
+    initCalendar($);
+  }
+}
+
 function waitAddAppointmentsBtn() {
   const $ = initJQuery();
   if (!$) {
@@ -191,69 +283,11 @@ function waitAddAppointmentsBtn() {
   } else {
     let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
     if (addAppointmentBtn) {
-      // let's clone it to remove the onclick listener
       let clonedBtn = $(addAppointmentBtn).clone();
       $(addAppointmentBtn).replaceWith(clonedBtn);
       // Add click event listener to show the overlay and dialog
       clonedBtn.on("click", function () {
-        // Create overlay element
-        let overlay = $("<div>").addClass("overlay").css({
-          position: "fixed",
-          inset: "0",
-          zIndex: "999",
-          background: "#000000d9",
-          display: "flex",
-          flexDirection: "column",
-          placeContent: "center",
-          alignItems: "center",
-          justifyContent: "center",
-        });
-        overlay.on("click", function () {
-          $(this).remove();
-        });
-
-        // Create close button element
-        let closeButton = $("<span>").addClass("close-button").html("&times;").css({
-          position: "absolute",
-          right: "1rem",
-          top: "1rem",
-          color: "#fff",
-          fontSize: "2.5rem",
-          cursor: "pointer",
-        });
-        closeButton.on("click", function () {
-          overlay.remove();
-        });
-        overlay.append(closeButton);
-
-        // Create dialog body element with iframe
-        let dialogBody = $("<div>").addClass("dialog-body").css({
-          background: "#fff",
-          maxWidth: "max(600px, 60vw)",
-          width: "100vw",
-          height: "80vh",
-          height: "80dvh",
-          overflowY: "scroll",
-        });
-
-        // Check for Healthie environment
-        let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
-
-        // Create iframe element
-        let iframe = $("<iframe>")
-          .attr({
-            id: "MishaFrame",
-            title: "Misha iFrame",
-            src: "https://" + iFrameURL + "app/schedule", // TODO: update to add appointments route
-          })
-          .css({
-            height: "100vh",
-            width: "100%",
-          });
-
-        dialogBody.append(iframe); // Append iframe to dialog body        
-        overlay.append(dialogBody); // Append dialog body to overlay        
-        $("body").append(overlay); // Append overlay to the document body
+        showOverlay($);
       });
     } else {
       // wait for content load
