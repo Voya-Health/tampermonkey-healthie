@@ -245,19 +245,31 @@ function showOverlay($) {
   $("body").append(overlay); // Append overlay to body
 }
 
-function initCalendar($) {
-  let calendar = $(".rbc-time-content");
-  if (calendar) {
-    let clonedCalendar = calendar.clone();
-    $(calendar).replaceWith(clonedCalendar);
-
-    // Add click event listener to prevent default behavior
-    calendar.on("click", function () {
-      showOverlay($);
-    });
-  } else {
-    unsafeWindow.console.log(`tampermonkey waiting calendar`);
+function initCalendar() {
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
     window.setTimeout(initCalendar, 200);
+    return;
+  } else {
+    let calendar = $(".rbc-time-content");
+    let calendarEvents = $(".rbc-event.calendar-event.with-label-spacing");
+    // check if calendar and events are loaded and if calendarEvents has children
+    if (calendar && calendarEvents && calendarEvents.children().length > 0) {
+      let clonedCalendar = calendar.clone();
+      // replace with cloned calendar and console log success
+      $(calendar).replaceWith(clonedCalendar);
+      unsafeWindow.console.log(`tampermonkey cloned calendar`);
+      calendar.on("click", function () {
+        showOverlay($);
+      });
+      calendarEvents.on("click", function () {
+        showOverlay($);
+      });
+    } else {
+      unsafeWindow.console.log(`tampermonkey waiting calendar and events`);
+      window.setTimeout(initCalendar, 200);
+    }
   }
 }
 
@@ -268,7 +280,7 @@ function waitEmptyAppointmentSlots() {
     window.setTimeout(waitEmptyAppointmentSlots, 200);
     return;
   } else {
-    initCalendar($);
+    initCalendar();
   }
 }
 
