@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Healthie Care Plan Integration
+// @name         Healthie Care Plan Integration (DEV)
 // @namespace    http://tampermonkey.net/
 // @version      0.33
 // @description  Injecting care plan components into Healthie
@@ -185,7 +185,7 @@ function waitAppointmentsProfile() {
 
 function showOverlay($) {
   // Create overlay element
-  let overlay = $("<div>").addClass("overlay").css({
+  let overlay = $("<div>").addClass("overlay-dialog").css({
     position: "fixed",
     inset: "0",
     zIndex: "999",
@@ -241,8 +241,10 @@ function showOverlay($) {
 
   dialogBody.append(iframe); // Append iframe to dialog body
   overlay.append(dialogBody); // Append dialog body to overlay
-  $("body").append(overlay); // Append overlay to body
-  unsafeWindow.console.log(`tampermonkey displayed overlay`);
+  if (!$(".body").find(".overlay-dialog").length > 0) {
+    $("body").append(overlay); // Append overlay to body
+    unsafeWindow.console.log(`tampermonkey displayed overlay`);
+  }
 }
 
 function initCalendar() {
@@ -252,8 +254,15 @@ function initCalendar() {
     window.setTimeout(initCalendar, 200);
     return;
   } else {
-    const calendarLoading = $(".day-view.is-loading") || $(".week-view.is-loading") || $(".month-view.is-loading");
+    unsafeWindow.console.log(`tampermonkey initializing calendar`);
+    // hide the side bar modal with css
+    $("head").append('<style type="text/css"> .aside-tab-wrapper { display: none !important; z-index: -1; } </style>');
 
+    // first init add button to make sure event gets overwritten
+    initAddButton($);
+
+    // move on to calendar
+    const calendarLoading = $(".day-view.is-loading") || $(".week-view.is-loading") || $(".month-view.is-loading");
     if (calendarLoading.length > 0) {
       unsafeWindow.console.log(`tampermonkey waiting for calendar to load`);
       window.setTimeout(initCalendar, 200);
@@ -275,19 +284,22 @@ function initCalendar() {
       }
 
       // first overlay a transparent div on top of the calendar to prevent clicking on calendar
-      let overlay = $("<div>").addClass("overlay").css({
+      let overlay = $("<div>").addClass("overlay-vori").css({
         position: "absolute",
-        inset: "0",
+        inset: "0px",
         zIndex: "999",
-        background: "#00000000",
-        userSelect: "none",
+        background: "ffffff00",
+        backdropFilter: "blur(3px)",
         pointerEvents: "none",
       });
-      $(calendar).append(overlay);
+      if (!calendar.find(".overlay-vori").length > 0) {
+        $(calendar).append(overlay);
+        unsafeWindow.console.log(`tampermonkey added overlay to calendar`);
+      }
 
       // wait for calendar to load, then wait one more second before adding click event listeners
       window.setTimeout(function () {
-        if (calendar && calendarEvents && calendarEvents.children().length > 0) {
+        if (calendar && calendarEvents) {
           let clonedCalendar = calendar.clone();
           $(calendar).replaceWith(clonedCalendar);
           unsafeWindow.console.log(`tampermonkey cloned calendar`);
@@ -300,20 +312,18 @@ function initCalendar() {
             showOverlay($);
           });
 
-          // add click event listener to calendar events
+          // add event listeners
           calendarEvents.on("click", function () {
             showOverlay($);
           });
-
-          // add click event listener to calendar header buttons
           calendarHeaderBtns.on("click", function () {
-            window.setTimeout(initCalendar, 200);
+            window.setTimeout(initCalendar, 1000);
           });
         } else {
           unsafeWindow.console.log(`tampermonkey waiting for calendar and events`);
           window.setTimeout(initCalendar, 200);
         }
-      });
+      }, 1000);
     }
   }
 }
