@@ -264,6 +264,12 @@ function initCalendar() {
       calendarEvents.on("click", function () {
         showOverlay($);
       });
+    const calendarLoading = $(".day-view.is-loading") || $(".week-view.is-loading") || $(".month-view.is-loading");
+
+    if (calendarLoading.length > 0) {
+      unsafeWindow.console.log(`tampermonkey waiting for calendar to load`);
+      window.setTimeout(waitCalendarHeaderBtns, 200);
+      return;
     } else {
       unsafeWindow.console.log(`tampermonkey waiting calendar and events`);
       window.setTimeout(initCalendar, 200);
