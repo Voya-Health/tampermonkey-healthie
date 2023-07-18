@@ -285,16 +285,20 @@ function waitCalendarHeaderBtns() {
     return;
   } else {
     let calendarHeaderBtns = $(".rbc-btn-group").find("button");
+    let calendarParent = $(".main-calendar-container");
     if (calendarHeaderBtns.length > 0) {
-      // if button clicked on has the text 'day', and ".rbc-time-content" exists on the page, then init calendar
+      initCalendar();
+
       calendarHeaderBtns.on("click", function () {
-        let calendar = $(".rbc-time-content") || $(".rbc-month-view");
-        if (calendar) {
-          initCalendar();
-        }
+        unsafeWindow.console.log(`tampermonkey calendar header button clicked`);
+        initCalendar();
+      });
+      calendarParent.on("click", function () {
+        unsafeWindow.console.log(`tampermonkey calendar parent clicked`);
+        initCalendar();
       });
     } else {
-      unsafeWindow.console.log(`tampermonkey waiting calendar header buttons`);
+      unsafeWindow.console.log(`tampermonkey waiting for calendar header buttons`);
       window.setTimeout(waitCalendarHeaderBtns, 200);
     }
   }
