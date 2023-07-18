@@ -291,11 +291,14 @@ function initCalendar() {
           let clonedCalendar = calendar.clone();
           $(calendar).replaceWith(clonedCalendar);
           unsafeWindow.console.log(`tampermonkey cloned calendar`);
+          $(".overlay-vori").remove(); // remove overlay
+
           $(".rbc-time-slot").on("click", function () {
             showOverlay($);
           });
-          // remove overlay
-          overlay.remove();
+          $(".rbc-day-bg").on("click", function () {
+            showOverlay($);
+          });
 
           // add click event listener to calendar events
           calendarEvents.on("click", function () {
