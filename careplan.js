@@ -277,6 +277,9 @@ function initCalendar() {
   }
 }
 
+function initAddButton($) {
+  let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
+  if (addAppointmentBtn) {
     let clonedBtn = $(addAppointmentBtn).clone();
     $(addAppointmentBtn).replaceWith(clonedBtn);
     // Add click event listener to show the overlay and dialog
