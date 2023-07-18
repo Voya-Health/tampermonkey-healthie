@@ -277,6 +277,19 @@ function initCalendar() {
   }
 }
 
+    let clonedBtn = $(addAppointmentBtn).clone();
+    $(addAppointmentBtn).replaceWith(clonedBtn);
+    // Add click event listener to show the overlay and dialog
+    clonedBtn.on("click", function () {
+      showOverlay($);
+    });
+  } else {
+    // wait for content load
+    unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
+    window.setTimeout(waitAddAppointmentsBtn, 200);
+  }
+}
+
 function waitCalendarHeaderBtns() {
   const $ = initJQuery();
   if (!$) {
@@ -322,19 +335,7 @@ function waitAddAppointmentsBtn() {
     window.setTimeout(waitAppointmentsProfile, 200);
     return;
   } else {
-    let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
-    if (addAppointmentBtn) {
-      let clonedBtn = $(addAppointmentBtn).clone();
-      $(addAppointmentBtn).replaceWith(clonedBtn);
-      // Add click event listener to show the overlay and dialog
-      clonedBtn.on("click", function () {
-        showOverlay($);
-      });
-    } else {
-      // wait for content load
-      unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
-      window.setTimeout(waitAddAppointmentsBtn, 200);
-    }
+    initAddButton($);
   }
 }
 
