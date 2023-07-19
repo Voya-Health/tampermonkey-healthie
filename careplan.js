@@ -317,10 +317,21 @@ function initCalendar() {
             showOverlay($);
           });
           calendarHeaderBtns.on("click", function () {
-            window.setTimeout(initCalendar, 1000);
+            initCalendar();
           });
         } else {
           unsafeWindow.console.log(`tampermonkey waiting for calendar and events`);
+          window.setTimeout(initCalendar, 200);
+        }
+      }, 1000);
+
+      window.setTimeout(function () {
+        // verify that the calendar is cloned
+        if ($(".cloned-calendar").length > 0) {
+          unsafeWindow.console.log(`tampermonkey calendar cloned`);
+          $(".overlay-vori").remove();
+        } else {
+          unsafeWindow.console.log(`tampermonkey waiting for calendar to clone`);
           window.setTimeout(initCalendar, 200);
         }
       }, 1000);
