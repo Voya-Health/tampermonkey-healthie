@@ -241,9 +241,11 @@ function showOverlay($) {
 
   dialogBody.append(iframe); // Append iframe to dialog body
   overlay.append(dialogBody); // Append dialog body to overlay
-  if (!$(".body").find(".overlay-dialog").length > 0) {
+  const existingOverlay = $(".body").find(".overlay-dialog");
+
+  if (existingOverlay.length === 0) {
     $("body").append(overlay); // Append overlay to body
-    unsafeWindow.console.log(`tampermonkey displayed overlay`);
+    unsafeWindow.console.log(`Tampermonkey displayed overlay`);
   }
 }
 
@@ -256,7 +258,26 @@ function initCalendar() {
   } else {
     unsafeWindow.console.log(`tampermonkey initializing calendar`);
     // hide the side bar modal with css
-    $("head").append('<style type="text/css"> .aside-tab-wrapper { display: none !important; z-index: -1; } </style>');
+    // if ($("head").find(".aside-tab-wrapper").length === 0) {
+    //   $("head").append(
+    //     '<style type="text/css"> .aside-tab-wrapper { display: none !important; z-index: -1; } </style>'
+    //   );
+    // }
+
+    // first overlay a transparent div on top of the calendar until cloning is done
+    let overlay = $("<div>").addClass("overlay-vori").css({
+      position: "absolute",
+      display: "block",
+      inset: "0px",
+      zIndex: "9999999",
+      background: "ffffff00",
+      pointerEvents: "none",
+      userSelect: "none",
+    });
+    if (!$(".main-calendar-column").find(".overlay-vori").length > 0) {
+      $(".main-calendar-column").css({ position: "relative" }).append(overlay);
+      unsafeWindow.console.log(`tampermonkey added overlay to calendar`);
+    }
 
     // first init add button to make sure event gets overwritten
     initAddButton($);
@@ -283,58 +304,47 @@ function initCalendar() {
         unsafeWindow.console.log(`tampermonkey calendar is month view`, calendar);
       }
 
-      // first overlay a transparent div on top of the calendar to prevent clicking on calendar
-      let overlay = $("<div>").addClass("overlay-vori").css({
-        position: "absolute",
-        inset: "0px",
-        zIndex: "999",
-        background: "ffffff00",
-        backdropFilter: "blur(3px)",
-        pointerEvents: "none",
-      });
-      if (!calendar.find(".overlay-vori").length > 0) {
-        $(calendar).append(overlay);
-        unsafeWindow.console.log(`tampermonkey added overlay to calendar`);
+      if (calendar && calendarEvents && calendarEvents.children().length > 0) {
+        let clonedCalendar = calendar.clone(true);
+        clonedCalendar.addClass("cloned-calendar");
+        $(calendar).replaceWith(clonedCalendar);
+
+        $(".rbc-time-slot").on("click", function (e) {
+          e.stopPropagation();
+          showOverlay($);
+        });
+        $(".rbc-day-bg").on("click", function (e) {
+          e.stopPropagation();
+          showOverlay($);
+        });
+
+        // add event listeners
+        calendarEvents.on("click", function (e) {
+          e.stopPropagation();
+          if ($(this).hasClass("rbc-event.calendar-event.with-label-spacing")) {
+            unsafeWindow.console.log(`tampermonkey calendar event clicked`);
+            showOverlay($);
+          } else {
+            unsafeWindow.console.log(`tampermonkey empty calendar slot clicked`);
+            showOverlay($);
+          }
+        });
+        calendarHeaderBtns.on("click", function (e) {
+          e.stopPropagation();
+          initCalendar();
+        });
+      } else {
+        unsafeWindow.console.log(`tampermonkey waiting for calendar and events`);
+        window.setTimeout(initCalendar, 200);
       }
 
-      // wait for calendar to load, then wait one more second before adding click event listeners
-      window.setTimeout(function () {
-        if (calendar && calendarEvents) {
-          let clonedCalendar = calendar.clone();
-          $(calendar).replaceWith(clonedCalendar);
-          unsafeWindow.console.log(`tampermonkey cloned calendar`);
-          $(".overlay-vori").remove(); // remove overlay
-
-          $(".rbc-time-slot").on("click", function () {
-            showOverlay($);
-          });
-          $(".rbc-day-bg").on("click", function () {
-            showOverlay($);
-          });
-
-          // add event listeners
-          calendarEvents.on("click", function () {
-            showOverlay($);
-          });
-          calendarHeaderBtns.on("click", function () {
-            initCalendar();
-          });
-        } else {
-          unsafeWindow.console.log(`tampermonkey waiting for calendar and events`);
-          window.setTimeout(initCalendar, 200);
-        }
-      }, 1000);
-
-      window.setTimeout(function () {
-        // verify that the calendar is cloned
-        if ($(".cloned-calendar").length > 0) {
-          unsafeWindow.console.log(`tampermonkey calendar cloned`);
-          $(".overlay-vori").remove();
-        } else {
-          unsafeWindow.console.log(`tampermonkey waiting for calendar to clone`);
-          window.setTimeout(initCalendar, 200);
-        }
-      }, 1000);
+      if ($(".cloned-calendar")) {
+        unsafeWindow.console.log(`tampermonkey calendar cloned`);
+        // $(".overlay-vori").remove();
+      } else {
+        unsafeWindow.console.log(`tampermonkey waiting for calendar to clone`);
+        window.setTimeout(initCalendar, 200);
+      }
     }
   }
 }
@@ -344,8 +354,8 @@ function initAddButton($) {
   if (addAppointmentBtn) {
     let clonedBtn = $(addAppointmentBtn).clone();
     $(addAppointmentBtn).replaceWith(clonedBtn);
-    // Add click event listener to show the overlay and dialog
-    clonedBtn.on("click", function () {
+    clonedBtn.on("click", function (e) {
+      e.stopPropagation();
       showOverlay($);
     });
   } else {
@@ -356,30 +366,24 @@ function initAddButton($) {
 }
 
 function waitCalendarHeaderBtns() {
-  const $ = initJQuery();
-  if (!$) {
-    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
-    window.setTimeout(waitCalendarHeaderBtns, 200);
-    return;
-  } else {
-    let calendarHeaderBtns = $(".rbc-btn-group").find("button");
-    let calendarParent = $(".main-calendar-container");
-    if (calendarHeaderBtns.length > 0) {
-      initCalendar();
-
-      calendarHeaderBtns.on("click", function () {
-        unsafeWindow.console.log(`tampermonkey calendar header button clicked`);
-        initCalendar();
-      });
-      calendarParent.on("click", function () {
-        unsafeWindow.console.log(`tampermonkey calendar parent clicked`);
-        initCalendar();
-      });
-    } else {
-      unsafeWindow.console.log(`tampermonkey waiting for calendar header buttons`);
-      window.setTimeout(waitCalendarHeaderBtns, 200);
-    }
-  }
+  // const $ = initJQuery();
+  // if (!$) {
+  //   unsafeWindow.console.log(`tampermonkey jquery not loaded`);
+  //   window.setTimeout(waitCalendarHeaderBtns, 200);
+  //   return;
+  // } else {
+  //   let calendarHeaderBtns = $(".rbc-btn-group").find("button");
+  //   if (calendarHeaderBtns.length > 0) {
+  //     initCalendar();
+  //     calendarHeaderBtns.on("click", function () {
+  //       unsafeWindow.console.log(`tampermonkey calendar header button clicked`);
+  //       initCalendar();
+  //     });
+  //   } else {
+  //     unsafeWindow.console.log(`tampermonkey waiting for calendar header buttons`);
+  //     window.setTimeout(waitCalendarHeaderBtns, 200);
+  //   }
+  // }
 }
 
 function waitCalendar() {
