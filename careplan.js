@@ -260,6 +260,11 @@ function initCalendar() {
     return;
   } else {
     unsafeWindow.console.log(`Tampermonkey initializing calendar`);
+    // Check if calendar is loaded and cloned
+    if ($(".main-calendar-column").find(".cloned-calendar").length > 0) {
+      unsafeWindow.console.log(`Tampermonkey calendar already cloned`);
+      return;
+    }
 
     // Check if class .cloned-calendar exists and remove the string from the class name
     $(".cloned-calendar").removeClass("cloned-calendar");
