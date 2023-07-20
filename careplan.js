@@ -18,6 +18,7 @@ let healthieAPIKey = GM_getValue("healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 const iframeURLs = {
+  // TODO: update to standalone routes
   scheduling: "/app/schedule",
   careplan: "/app/careplan",
   goals: "/app/goals",
@@ -86,6 +87,28 @@ function initJQuery() {
     document.getElementsByTagName("head")[0].appendChild(script);
     window.setTimeout(initJQuery, 200);
   }
+}
+
+function generateIframe($, routeURL) {
+  let iFrame = $("<div>").css({ padding: "0 11px" });
+  // Check for Healthie environment
+  let mishaURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
+
+  // Define inner HTML for created div
+  // Update in the future to a dedicated component
+  // https://dev.misha.vori.health/app/schedule
+  iFrame.html(
+    '<iframe id="MishaFrame" ' +
+      'title="Misha iFrame" ' +
+      'style="height: 100vh; width: 100%" ' +
+      'src="https://' +
+      mishaURL +
+      routeURL +
+      '"' +
+      ">" +
+      "</iframe>"
+  );
+  return iFrame;
 }
 
 function waitAppointmentsHome() {
@@ -169,25 +192,8 @@ function waitAppointmentsProfile() {
       }
 
       // Create Div
-      var iFrameNode = $("<div>").css({ padding: "0 11px" });
-
-      // Check for Healthie environment
-      let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
-
-      // Define inner HTML for created div
-      // Update in the future to a dedicated component
-      // https://dev.misha.vori.health/app/schedule
-      iFrameNode.html(
-        '<iframe id="MishaFrame" ' +
-          'title="Misha iFrame" ' +
-          'style="height: 100vh; width: 100%" ' +
-          'src="https://' +
-          iFrameURL +
-          'app/schedule"' + // TODO: update to appointments route
-          ">" +
-          "</iframe>"
-      );
-      $(appointmentWindow).append(iFrameNode);
+      const iframe = generateIframe(iframeURLs.appointments);
+      $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
       unsafeWindow.console.log(`tampermonkey waiting appointment view on user profile`);
