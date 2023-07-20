@@ -360,25 +360,6 @@ function initAddButton($) {
   }
 }
 
-function waitCalendarHeaderBtns() {
-  // const $ = initJQuery();
-  // if (!$) {
-  //   unsafeWindow.console.log(`tampermonkey jquery not loaded`);
-  //   window.setTimeout(waitCalendarHeaderBtns, 200);
-  //   return;
-  // } else {
-  //   let calendarHeaderBtns = $(".rbc-btn-group").find("button");
-  //   if (calendarHeaderBtns.length > 0) {
-  //     initCalendar();
-  //     calendarHeaderBtns.on("click", function () {
-  //       unsafeWindow.console.log(`tampermonkey calendar header button clicked`);
-  //       initCalendar();
-  //     });
-  //   } else {
-  //     unsafeWindow.console.log(`tampermonkey waiting for calendar header buttons`);
-  //     window.setTimeout(waitCalendarHeaderBtns, 200);
-  //   }
-  // }
 }
 
 function waitCalendar() {
