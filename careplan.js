@@ -44,7 +44,6 @@ const observer = new MutationObserver(function (mutations) {
     if (location.href.includes("/appointments") || location.href.includes("/organization")) {
       waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
       waitCalendar(); //Function to handle clicking on empty appointment slots
-      waitCalendarHeaderBtns(); //Function to handle clicking on calendar header buttons
     }
 
     const baseURL = location.href.split(".").splice(1).join(".");
@@ -271,6 +270,7 @@ function initCalendar() {
       inset: "0px",
       zIndex: "9999999",
       background: "ffffff00",
+      backdropFilter: "blur(5px)",
       pointerEvents: "none",
       userSelect: "none",
     });
@@ -360,6 +360,47 @@ function initAddButton($) {
   }
 }
 
+function observeCalendarChanges(mutations, observer) {
+  const targetClasses = ["rbc-time-content", "rbc-month-view"];
+
+  for (const mutation of mutations) {
+    const { target, addedNodes, removedNodes } = mutation;
+
+    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
+    if (
+      (target && targetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => addedNode.classList.contains(className))
+        )) ||
+      (removedNodes &&
+        [...removedNodes].some(
+          (removedNode) =>
+            removedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => removedNode.classList.contains(className))
+        )) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => addedNode.querySelector(`.${className}`))
+        )) ||
+      (removedNodes &&
+        [...removedNodes].some(
+          (removedNode) =>
+            removedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => removedNode.querySelector(`.${className}`))
+        ))
+    ) {
+      // Disconnect the observer temporarily to prevent observing during the cloning process
+      observer.disconnect();
+      initCalendar();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break; // We executed initCalendar() once, no need to check further
+    }
+  }
 }
 
 let calendarInitialized = false;
