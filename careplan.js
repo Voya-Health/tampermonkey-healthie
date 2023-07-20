@@ -19,12 +19,12 @@ let auth = `Basic ${healthieAPIKey}`;
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 const routeURLs = {
   // TODO: update to standalone routes
-  scheduling: "/app/schedule",
-  careplan: "/app/schedule",
-  goals: "/app/schedule",
+  scheduling: "app/schedule",
+  careplan: "careplan",
+  goals: "app/schedule",
   appointments: {
-    create: "/app/schedule",
-    view: "/app/schedule",
+    create: "app/schedule",
+    view: "app/schedule",
   },
 };
 
