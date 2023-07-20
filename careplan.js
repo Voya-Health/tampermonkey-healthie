@@ -20,9 +20,12 @@ const isStagingEnv = location.href.includes("securestaging") ? true : false;
 const routeURLs = {
   // TODO: update to standalone routes
   scheduling: "/app/schedule",
-  careplan: "/app/careplan",
-  goals: "/app/goals",
-  appointments: "/app/appointments",
+  careplan: "/app/schedule",
+  goals: "/app/schedule",
+  appointments: {
+    create: "/app/schedule",
+    view: "/app/schedule",
+  },
 };
 
 //observe changes to the DOM, check for URL changes
@@ -358,9 +361,13 @@ function initCalendar() {
 
     if (calendar) {
       // Event listeners
-      $(".rbc-time-slot, .rbc-day-bg, .rbc-event.calendar-event.with-label-spacing").on("click", function (e) {
+      $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
         e.stopPropagation();
-        showOverlay($);
+        showOverlay(routeURLs.appointments.create);
+      });
+      $(".rbc-event.calendar-event").on("click", function (e) {
+        e.stopPropagation();
+        showOverlay(routeURLs.appointments.view);
       });
       $(".cloned-calendar") && unsafeWindow.console.log(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
@@ -376,19 +383,24 @@ function initCalendar() {
   }
 }
 
-function initAddButton($) {
-  let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
-  if (addAppointmentBtn) {
-    let clonedBtn = $(addAppointmentBtn).clone();
-    $(addAppointmentBtn).replaceWith(clonedBtn);
-    clonedBtn.on("click", function (e) {
-      e.stopPropagation();
-      showOverlay($);
-    });
+function initAddButton() {
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    window.setTimeout(showOverlay, 200);
+    return;
   } else {
-    // wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
-    window.setTimeout(waitAddAppointmentsBtn, 200);
+    let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
+    if (addAppointmentBtn) {
+      let clonedBtn = $(addAppointmentBtn).clone();
+      $(addAppointmentBtn).replaceWith(clonedBtn);
+      clonedBtn.on("click", function (e) {
+        e.stopPropagation();
+        showOverlay(routeURLs.appointments.create);
+      });
+    } else {
+      unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
+      window.setTimeout(waitAddAppointmentsBtn, 200);
+    }
   }
 }
 
