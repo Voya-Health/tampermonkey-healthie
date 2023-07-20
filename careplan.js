@@ -483,19 +483,26 @@ function waitGoalTab() {
 }
 
 function waitCarePlan() {
-  //check to see if the care plan tab contents has loaded
-  if (document.getElementsByClassName("cp-tab-contents")[0]) {
-    // handle edge case: clicking on careplan tab multiple times
-    let careplanTabBtn = document.querySelector('a[data-testid="careplans-tab-btn"]');
-    careplanTabBtn.addEventListener("click", handleCarePlanTabClick);
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    window.setTimeout(waitCarePlan, 200);
+    return;
+  } else {
+    //check to see if the care plan tab contents has loaded
+    const cpTabContents = $(".cp-tab-contents");
+    if (cpTabContents.length) {
+      // handle edge case: clicking on careplan tab multiple times
+      const careplanTabBtn = $('a[data-testid="careplans-tab-btn"]');
+      careplanTabBtn.on("click", handleCarePlanTabClick);
 
-    function handleCarePlanTabClick() {
-      if (location.href.includes("all_plans")) {
-        if (healthieAPIKey !== "") {
-          let tabContent = document.getElementsByClassName("cp-tab-contents");
-          tabContent && tabContent[0].remove();
+      function handleCarePlanTabClick() {
+        if (location.href.includes("all_plans")) {
+          if (healthieAPIKey !== "") {
+            cpTabContents && cpTabContents.empty();
+          }
+          waitCarePlan();
         }
-        waitCarePlan();
       }
     }
 
