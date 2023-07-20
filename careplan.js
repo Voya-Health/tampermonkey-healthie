@@ -17,7 +17,7 @@ let previousUrl = "";
 let healthieAPIKey = GM_getValue("healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
-const iframeURLs = {
+const routeURLs = {
   // TODO: update to standalone routes
   scheduling: "/app/schedule",
   careplan: "/app/careplan",
@@ -89,26 +89,35 @@ function initJQuery() {
   }
 }
 
-function generateIframe($, routeURL) {
-  let iFrame = $("<div>").css({ padding: "0 11px" });
-  // Check for Healthie environment
-  let mishaURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
+function generateIframe(routeURL) {
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    window.setTimeout(function () {
+      generateIframe(routeURL);
+    }, 200);
+    return;
+  } else {
+    let iFrame = $("<div>").css({ padding: "0 11px" });
+    // Check for Healthie environment
+    let mishaURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
 
-  // Define inner HTML for created div
-  // Update in the future to a dedicated component
-  // https://dev.misha.vori.health/app/schedule
-  iFrame.html(
-    '<iframe id="MishaFrame" ' +
-      'title="Misha iFrame" ' +
-      'style="height: 100vh; width: 100%" ' +
-      'src="https://' +
-      mishaURL +
-      routeURL +
-      '"' +
-      ">" +
-      "</iframe>"
-  );
-  return iFrame;
+    // Define inner HTML for created div
+    // Update in the future to a dedicated component
+    // https://dev.misha.vori.health/app/schedule
+    iFrame.html(
+      '<iframe id="MishaFrame" ' +
+        'title="Misha iFrame" ' +
+        'style="height: 100vh; width: 100%" ' +
+        'src="https://' +
+        mishaURL +
+        routeURL +
+        '"' +
+        ">" +
+        "</iframe>"
+    );
+    return iFrame;
+  }
 }
 
 function waitAppointmentsHome() {
@@ -192,7 +201,7 @@ function waitAppointmentsProfile() {
       }
 
       // Create Div
-      const iframe = generateIframe(iframeURLs.appointments);
+      const iframe = generateIframe(routeURLs.appointments);
       $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
