@@ -504,36 +504,23 @@ function waitCarePlan() {
           waitCarePlan();
         }
       }
-    }
 
-    unsafeWindow.console.log(`tampermonkey removing`);
-    //Locate and remove existing care plan tab content
-    document.getElementsByClassName("cp-tab-contents")[0].remove();
-    const parent = document.getElementsByClassName("column is-12 is-12-mobile")[0];
+      unsafeWindow.console.log(`tampermonkey removing`);
+      //Locate and remove existing care plan tab content  - remove each child of .cp-tab-contents
+      cpTabContents.empty();
 
-    // let's add a div with the text "Loading Careplan..."
-    const loadingDiv = document.createElement("div");
-    loadingDiv.classList.add("vori-loading-message");
-    loadingDiv.textContent = "Loading Careplan...";
-    loadingDiv.style.textAlign = "center";
-    loadingDiv.style.margin = "1.8rem";
-    loadingDiv.style.fontSize = "18px";
-    const loadingDivExists = document.querySelector(".vori-loading-message");
-    if (!loadingDivExists) {
-      parent && parent.appendChild(loadingDiv);
-    }
+      const parent = cpTabContents.eq(0);
 
-    const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
-
-    //setup message divs and links
-    const iframeMsgDiv = document.createElement("div");
-    iframeMsgDiv.classList.add("vori-iframe-message");
-    iframeMsgDiv.style.display = "block";
-    iframeMsgDiv.style.position = "relative";
-    iframeMsgDiv.style.background = "rgb(227 229 50 / 21%)";
-    iframeMsgDiv.style.margin = "1.8rem";
-    iframeMsgDiv.style.textAlign = "center";
-    iframeMsgDiv.style.padding = "7rem 7vw";
+      // let's add a div with the text "Loading Careplan..."
+      const loadingDiv = $("<div>").addClass("vori-loading-message").text("Loading Careplan...").css({
+        textAlign: "center",
+        margin: "1.8rem",
+        fontSize: "18px",
+      });
+      const loadingDivExists = $(".vori-loading-message");
+      if (!loadingDivExists.length) {
+        parent.append(loadingDiv);
+      }
 
     const iframeMsgLink = document.createElement("a");
     iframeMsgLink.style.color = "#333";
