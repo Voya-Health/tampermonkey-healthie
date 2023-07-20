@@ -284,7 +284,6 @@ function initCalendar() {
       pointerEvents: "none",
       userSelect: "none",
     });
-
     if (!$(".main-calendar-column").find(".overlay-vori").length > 0) {
       $(".main-calendar-column").css({ position: "relative" }).append(overlay);
       unsafeWindow.console.log(`Tampermonkey added overlay to calendar`);
@@ -305,28 +304,43 @@ function initCalendar() {
     let calendarEvents = $(".rbc-event.calendar-event.with-label-spacing");
     let calendarHeaderBtns = $(".rbc-btn-group");
     let activeBtn = calendarHeaderBtns.find(".rbc-active");
+    let activeTab = $(".calendar-tabs").find(".tab-item.active");
+    let calendarTab = activeTab && activeTab.text().toLowerCase().includes("calendar");
+    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
 
-    if (
-      activeBtn &&
-      (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week"))
-    ) {
+    if (calendarTab) {
+      if (
+        activeBtn &&
+        (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week"))
+      ) {
+        calendar = $(".rbc-time-content");
+        unsafeWindow.console.log(`Tampermonkey calendar is on day or week view`);
+      } else if (activeBtn && activeBtn.text().toLowerCase().includes("month")) {
+        calendar = $(".rbc-month-view");
+        unsafeWindow.console.log(`Tampermonkey calendar is on month view`);
+      }
+    }
+    if (availabilitiesTab) {
       calendar = $(".rbc-time-content");
-      unsafeWindow.console.log(`Tampermonkey calendar is on day or week view`);
-    } else {
-      calendar = $(".rbc-month-view");
-      unsafeWindow.console.log(`Tampermonkey calendar is on month view`);
+      unsafeWindow.console.log(`Tampermonkey calendar is on availability tab`);
     }
 
-    if (calendar && calendarEvents && calendarEvents.length > 0) {
-      if ($(".rbc-month-view").length > 0) {
-        let monthView = $(".rbc-month-view")[0].childNodes;
-        let children = Array.from(monthView);
-        children.forEach((child) => {
-          let clone = $(child).clone();
-          $(clone).addClass("cloned");
-          $(child).replaceWith(clone);
-        });
-      } else {
+    if (calendar) {
+      if (calendarTab) {
+        if ($(".rbc-month-view").length > 0) {
+          let monthView = $(".rbc-month-view")[0].childNodes;
+          let children = Array.from(monthView);
+          children.forEach((child) => {
+            let clone = $(child).clone();
+            $(clone).addClass("cloned");
+            $(child).replaceWith(clone);
+          });
+        } else {
+          let clonedCalendar = calendar.clone(true);
+          clonedCalendar.addClass("cloned-calendar");
+          calendar.replaceWith(clonedCalendar);
+        }
+      } else if (availabilitiesTab) {
         let clonedCalendar = calendar.clone(true);
         clonedCalendar.addClass("cloned-calendar");
         calendar.replaceWith(clonedCalendar);
