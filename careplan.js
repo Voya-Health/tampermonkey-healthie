@@ -255,7 +255,8 @@ function showOverlay($) {
   }
 }
 
-let maxAttempts = 100;
+let maxWaitForEvents = 200; // comically high number to prevent infinite loop
+let maxWaitForInit = 200; // comically high number to prevent infinite loop
 function initCalendar() {
   const $ = initJQuery();
   if (!$) {
@@ -264,6 +265,13 @@ function initCalendar() {
     return;
   } else {
     unsafeWindow.console.log(`Tampermonkey initializing calendar`);
+
+    maxWaitForInit--;
+    if (maxWaitForInit < 0) {
+      window.location.reload();
+      return;
+    }
+
     // Check if calendar is loaded and cloned
     if ($(".main-calendar-column").find(".cloned-calendar").length > 0) {
       unsafeWindow.console.log(`Tampermonkey calendar already cloned`);
@@ -355,8 +363,8 @@ function initCalendar() {
       $(".cloned-calendar") && unsafeWindow.console.log(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
     } else {
-      maxAttempts--;
-      if (maxAttempts === 0) {
+      maxWaitForEvents--;
+      if (maxWaitForEvents === 0) {
         window.location.reload();
       } else {
         unsafeWindow.console.log(`Tampermonkey waiting for calendar and events`);
