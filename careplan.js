@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.33
+// @version      0.34
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -41,6 +41,15 @@ const observer = new MutationObserver(function (mutations) {
       showInstructions();
     }
 
+    if (
+      location.href.includes("/appointments") ||
+      location.href.includes("/organization") ||
+      location.href.includes("/providers/")
+    ) {
+      waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
+      waitCalendar(); //Function to handle clicking on empty appointment slots
+    }
+
     const baseURL = location.href.split(".").splice(1).join(".");
     unsafeWindow.console.log("tampermonkey splice is ", baseURL);
     if (
@@ -62,7 +71,6 @@ const observer = new MutationObserver(function (mutations) {
 function initJQuery() {
   let $ = unsafeWindow.jQuery;
   if ($ && $ !== undefined && typeof $ === "function") {
-    unsafeWindow.console.log(`tampermonkey jquery already loaded`);
     return $;
   } else {
     unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
@@ -204,6 +212,270 @@ function waitAppointmentsProfile() {
       );
       window.setTimeout(waitAppointmentsProfile, 200);
     }
+  }
+}
+
+function showOverlay($) {
+  // Create overlay element
+  let overlay = $("<div>").addClass("overlay-dialog").css({
+    position: "fixed",
+    inset: "0",
+    zIndex: "999",
+    background: "#000000d9",
+    display: "flex",
+    flexDirection: "column",
+    placeContent: "center",
+    alignItems: "center",
+    justifyContent: "center",
+  });
+  $(overlay).on("click", function () {
+    if ($(".overlay-dialog")) {
+      $(".overlay-dialog").remove();
+    }
+  });
+
+  // Create close button element
+  let closeButton = $("<span>").addClass("close-button").html("&times;").css({
+    position: "absolute",
+    right: "1rem",
+    top: "1rem",
+    color: "#fff",
+    fontSize: "2.5rem",
+    cursor: "pointer",
+  });
+  $(closeButton).on("click", function () {
+    if ($(".overlay-dialog")) {
+      $(".overlay-dialog").remove();
+    }
+  });
+  overlay.append(closeButton);
+
+  // Create dialog body element with iframe
+  let dialogBody = $("<div>").addClass("dialog-body").css({
+    background: "#fff",
+    maxWidth: "max(600px, 60vw)",
+    width: "100vw",
+    height: "80vh",
+    height: "80dvh",
+    overflowY: "scroll",
+  });
+
+  // Check for Healthie environment
+  let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
+
+  // Create iframe element
+  let iframe = $("<iframe>")
+    .attr({
+      id: "MishaFrame",
+      title: "Misha iFrame",
+      src: "https://" + iFrameURL + "app/schedule", // TODO: update to add appointments route
+    })
+    .css({
+      height: "100vh",
+      width: "100%",
+    });
+
+  dialogBody.append(iframe); // Append iframe to dialog body
+  overlay.append(dialogBody); // Append dialog body to overlay
+  const existingOverlay = $(".body").find(".overlay-dialog");
+
+  if (existingOverlay.length === 0) {
+    $("body").append(overlay); // Append overlay to body
+    unsafeWindow.console.log(`Tampermonkey displayed overlay`);
+  }
+}
+
+let maxWaitForEvents = 200; // comically high number to prevent infinite loop
+let maxWaitForInit = 200; // comically high number to prevent infinite loop
+function initCalendar() {
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`Tampermonkey jQuery not loaded`);
+    window.setTimeout(initCalendar, 200);
+    return;
+  } else {
+    unsafeWindow.console.log(`Tampermonkey initializing calendar`);
+
+    maxWaitForInit--;
+    if (maxWaitForInit < 0) {
+      window.location.reload();
+      return;
+    }
+
+    // Check if calendar is loaded and cloned
+    if ($(".main-calendar-column").find(".cloned-calendar").length > 0) {
+      unsafeWindow.console.log(`Tampermonkey calendar already cloned`);
+      return;
+    }
+
+    // Check if class .cloned-calendar exists and remove the string from the class name
+    $(".cloned-calendar").removeClass("cloned-calendar");
+
+    // First overlay a transparent div on top of the calendar until cloning is done
+    const overlay = $("<div>").addClass("overlay-vori").css({
+      position: "absolute",
+      display: "block",
+      inset: "0px",
+      zIndex: "9999999",
+      background: "ffffff00",
+      backdropFilter: "blur(5px)",
+      pointerEvents: "none",
+      userSelect: "none",
+    });
+    if (!$(".main-calendar-column").find(".overlay-vori").length > 0) {
+      $(".main-calendar-column").css({ position: "relative" }).append(overlay);
+      unsafeWindow.console.log(`Tampermonkey added overlay to calendar`);
+    }
+
+    // First init add button to make sure event gets overwritten
+    initAddButton($);
+
+    // Move on to calendar
+    const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
+    if (calendarLoading.length > 0) {
+      unsafeWindow.console.log(`Tampermonkey waiting for calendar to load`);
+      window.setTimeout(initCalendar, 200);
+      return;
+    }
+
+    let calendar = null;
+    let calendarEvents = $(".rbc-event.calendar-event.with-label-spacing");
+    let calendarHeaderBtns = $(".rbc-btn-group");
+    let activeBtn = calendarHeaderBtns.find(".rbc-active");
+    let activeTab = $(".calendar-tabs").find(".tab-item.active");
+    let calendarTab = activeTab && activeTab.text().toLowerCase().includes("calendar");
+    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
+
+    if (calendarTab) {
+      if (
+        activeBtn &&
+        (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week"))
+      ) {
+        unsafeWindow.console.log(`Tampermonkey calendar is on day or week view`);
+        calendar = $(".rbc-time-content");
+        let clonedCalendar = calendar.clone(true);
+        clonedCalendar.addClass("cloned-calendar");
+        calendar.replaceWith(clonedCalendar);
+      } else if (activeBtn && activeBtn.text().toLowerCase().includes("month")) {
+        unsafeWindow.console.log(`Tampermonkey calendar is on month view`);
+        calendar = $(".rbc-month-view");
+        if ($(".rbc-month-view").length > 0) {
+          let monthView = $(".rbc-month-view")[0].childNodes;
+          let children = Array.from(monthView);
+          children.forEach((child) => {
+            let clone = $(child).clone();
+            $(clone).addClass("cloned");
+            $(child).replaceWith(clone);
+          });
+        }
+      }
+    } else if (availabilitiesTab) {
+      unsafeWindow.console.log(`Tampermonkey calendar is on availability tab`);
+      calendar = $(".rbc-time-content");
+      let clonedCalendar = calendar.clone(true);
+      clonedCalendar.addClass("cloned-calendar");
+      calendar.replaceWith(clonedCalendar);
+    }
+
+    if (calendar) {
+      // Event listeners
+      $(".rbc-time-slot, .rbc-day-bg, .rbc-event.calendar-event.with-label-spacing").on("click", function (e) {
+        e.stopPropagation();
+        showOverlay($);
+      });
+      $(".cloned-calendar") && unsafeWindow.console.log(`Tampermonkey calendar cloned`);
+      $(".overlay-vori").remove();
+    } else {
+      maxWaitForEvents--;
+      if (maxWaitForEvents === 0) {
+        window.location.reload();
+      } else {
+        unsafeWindow.console.log(`Tampermonkey waiting for calendar and events`);
+        window.setTimeout(initCalendar, 200);
+      }
+    }
+  }
+}
+
+function initAddButton($) {
+  let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
+  if (addAppointmentBtn) {
+    let clonedBtn = $(addAppointmentBtn).clone();
+    $(addAppointmentBtn).replaceWith(clonedBtn);
+    clonedBtn.on("click", function (e) {
+      e.stopPropagation();
+      showOverlay($);
+    });
+  } else {
+    // wait for content load
+    unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
+    window.setTimeout(waitAddAppointmentsBtn, 200);
+  }
+}
+
+function observeCalendarChanges(mutations, observer) {
+  const targetClasses = ["rbc-time-content", "rbc-month-view"];
+
+  for (const mutation of mutations) {
+    const { target, addedNodes, removedNodes } = mutation;
+
+    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
+    if (
+      (target && targetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => addedNode.classList.contains(className))
+        )) ||
+      (removedNodes &&
+        [...removedNodes].some(
+          (removedNode) =>
+            removedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => removedNode.classList.contains(className))
+        )) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => addedNode.querySelector(`.${className}`))
+        )) ||
+      (removedNodes &&
+        [...removedNodes].some(
+          (removedNode) =>
+            removedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => removedNode.querySelector(`.${className}`))
+        ))
+    ) {
+      // Disconnect the observer temporarily to prevent observing during the cloning process
+      observer.disconnect();
+      initCalendar();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break; // We executed initCalendar() once, no need to check further
+    }
+  }
+}
+
+let calendarInitialized = false;
+function waitCalendar() {
+  if (!calendarInitialized) {
+    initCalendar();
+    calendarInitialized = true;
+  }
+  const observer = new MutationObserver(observeCalendarChanges);
+  const targetNode = document.documentElement;
+  const config = { childList: true, subtree: true };
+  observer.observe(targetNode, config);
+}
+
+function waitAddAppointmentsBtn() {
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
+    window.setTimeout(waitAppointmentsProfile, 200);
+    return;
+  } else {
+    initAddButton($);
   }
 }
 
