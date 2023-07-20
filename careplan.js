@@ -41,7 +41,11 @@ const observer = new MutationObserver(function (mutations) {
       showInstructions();
     }
 
-    if (location.href.includes("/appointments") || location.href.includes("/organization")) {
+    if (
+      location.href.includes("/appointments") ||
+      location.href.includes("/organization") ||
+      location.href.includes("/providers/")
+    ) {
       waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
       waitCalendar(); //Function to handle clicking on empty appointment slots
     }
