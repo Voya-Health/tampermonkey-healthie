@@ -362,15 +362,16 @@ function initAddButton($) {
 
 }
 
+let calendarInitialized = false;
 function waitCalendar() {
-  const $ = initJQuery();
-  if (!$) {
-    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
-    window.setTimeout(waitCalendar, 200);
-    return;
-  } else {
+  if (!calendarInitialized) {
     initCalendar();
+    calendarInitialized = true;
   }
+  const observer = new MutationObserver(observeCalendarChanges);
+  const targetNode = document.documentElement;
+  const config = { childList: true, subtree: true };
+  observer.observe(targetNode, config);
 }
 
 function waitAddAppointmentsBtn() {
