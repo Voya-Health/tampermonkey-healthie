@@ -321,20 +321,14 @@ function initCalendar() {
         activeBtn &&
         (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week"))
       ) {
-        calendar = $(".rbc-time-content");
         unsafeWindow.console.log(`Tampermonkey calendar is on day or week view`);
+        calendar = $(".rbc-time-content");
+        let clonedCalendar = calendar.clone(true);
+        clonedCalendar.addClass("cloned-calendar");
+        calendar.replaceWith(clonedCalendar);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month")) {
-        calendar = $(".rbc-month-view");
         unsafeWindow.console.log(`Tampermonkey calendar is on month view`);
-      }
-    }
-    if (availabilitiesTab) {
-      calendar = $(".rbc-time-content");
-      unsafeWindow.console.log(`Tampermonkey calendar is on availability tab`);
-    }
-
-    if (calendar) {
-      if (calendarTab) {
+        calendar = $(".rbc-month-view");
         if ($(".rbc-month-view").length > 0) {
           let monthView = $(".rbc-month-view")[0].childNodes;
           let children = Array.from(monthView);
@@ -343,23 +337,22 @@ function initCalendar() {
             $(clone).addClass("cloned");
             $(child).replaceWith(clone);
           });
-        } else {
-          let clonedCalendar = calendar.clone(true);
-          clonedCalendar.addClass("cloned-calendar");
-          calendar.replaceWith(clonedCalendar);
         }
-      } else if (availabilitiesTab) {
-        let clonedCalendar = calendar.clone(true);
-        clonedCalendar.addClass("cloned-calendar");
-        calendar.replaceWith(clonedCalendar);
       }
+    } else if (availabilitiesTab) {
+      unsafeWindow.console.log(`Tampermonkey calendar is on availability tab`);
+      calendar = $(".rbc-time-content");
+      let clonedCalendar = calendar.clone(true);
+      clonedCalendar.addClass("cloned-calendar");
+      calendar.replaceWith(clonedCalendar);
+    }
 
+    if (calendar) {
       // Event listeners
       $(".rbc-time-slot, .rbc-day-bg, .rbc-event.calendar-event.with-label-spacing").on("click", function (e) {
         e.stopPropagation();
         showOverlay($);
       });
-
       $(".cloned-calendar") && unsafeWindow.console.log(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
     } else {
