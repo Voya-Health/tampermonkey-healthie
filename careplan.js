@@ -251,6 +251,7 @@ function showOverlay($) {
   }
 }
 
+let maxAttempts = 100;
 function initCalendar() {
   const $ = initJQuery();
   if (!$) {
@@ -328,11 +329,16 @@ function initCalendar() {
         showOverlay($);
       });
 
-      unsafeWindow.console.log(`Tampermonkey calendar cloned`);
+      $(".cloned-calendar") && unsafeWindow.console.log(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
     } else {
-      unsafeWindow.console.log(`Tampermonkey waiting for calendar and events`);
-      window.setTimeout(initCalendar, 200);
+      maxAttempts--;
+      if (maxAttempts === 0) {
+        window.location.reload();
+      } else {
+        unsafeWindow.console.log(`Tampermonkey waiting for calendar and events`);
+        window.setTimeout(initCalendar, 200);
+      }
     }
   }
 }
