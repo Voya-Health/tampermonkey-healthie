@@ -92,7 +92,7 @@ function initJQuery() {
   }
 }
 
-function generateIframe(routeURL) {
+function generateIframe(routeURL, className = "misha-iframe-container") {
   const $ = initJQuery();
   if (!$) {
     unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
@@ -101,7 +101,7 @@ function generateIframe(routeURL) {
     }, 200);
     return;
   } else {
-    let iFrame = $("<div>").css({ padding: "0 11px" }).addClass("misha-iframe-container");
+    let iFrame = $("<div>").css({ padding: "0 11px" }).addClass(className);
     // Check for Healthie environment
     let mishaURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
 
