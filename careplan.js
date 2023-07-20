@@ -328,13 +328,6 @@ function initCalendar() {
         showOverlay($);
       });
 
-      $(".rbc-btn-group").on("click", function (e) {
-        // Check that we're not clicking on the add button
-        if (!$(e.target).text().toLowerCase().includes("add")) {
-          initCalendar();
-        }
-      });
-
       unsafeWindow.console.log(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
     } else {
