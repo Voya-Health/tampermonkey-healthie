@@ -141,7 +141,7 @@ function waitAppointmentsHome() {
         unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
         appointmentWindowObj.removeChild(appointmentWindowObj.lastChild);
       }
-      const iframe = generateIframe(routeURLs.appointments);
+      const iframe = generateIframe(routeURLs.appointments.view);
       $(appointmentWindowObj).append(iframe);
     } else {
       //wait for content load
@@ -194,7 +194,7 @@ function waitAppointmentsProfile() {
         appointmentWindow.removeChild(appointmentWindow.lastChild);
       }
 
-      const iframe = generateIframe(routeURLs.appointments);
+      const iframe = generateIframe(routeURLs.appointments.view);
       $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
