@@ -98,7 +98,7 @@ function generateIframe(routeURL) {
     }, 200);
     return;
   } else {
-    let iFrame = $("<div>").css({ padding: "0 11px" });
+    let iFrame = $("<div>").css({ padding: "0 11px" }).addClass("misha-iframe-container");
     // Check for Healthie environment
     let mishaURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
 
@@ -121,39 +121,30 @@ function generateIframe(routeURL) {
 }
 
 function waitAppointmentsHome() {
-  //check to see if the appointment view contents has loaded
-  let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
-  if (appointmentWindow.length > 0) {
-    unsafeWindow.console.log(`tampermonkey found appointment view`, appointmentWindow.length);
-    let appointmentWindowObj = appointmentWindow[0];
-    //remove all except first child
-    while (appointmentWindowObj.childNodes.length > 1) {
-      let childClassName = appointmentWindowObj.lastChild.className;
-      unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
-      appointmentWindowObj.removeChild(appointmentWindowObj.lastChild);
-    }
-    //Create Div
-    var iFrameNode = document.createElement("div");
-    //Check for Healthie environment
-    let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
-
-    //Define inner HTML for created div
-    //Update in future to dedicated component
-    //https://dev.misha.vori.health/app/schedule
-    iFrameNode.innerHTML =
-      '<iframe id="MishaFrame"' +
-      'title="Misha iFrame"' +
-      'style="height: 100vh; width: 100%"' +
-      'src="https://' +
-      iFrameURL +
-      'app/schedule"' +
-      ">" +
-      "</iframe>";
-    appointmentWindowObj.appendChild(iFrameNode);
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
+    window.setTimeout(waitAppointmentsProfile, 200);
+    return;
   } else {
-    //wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting appointment view`);
-    window.setTimeout(waitAppointmentsHome, 200);
+    //check to see if the appointment view contents has loaded
+    let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
+    if (appointmentWindow.length > 0) {
+      unsafeWindow.console.log(`tampermonkey found appointment view`, appointmentWindow.length);
+      let appointmentWindowObj = appointmentWindow[0];
+      //remove all except first child
+      while (appointmentWindowObj.childNodes.length > 1) {
+        let childClassName = appointmentWindowObj.lastChild.className;
+        unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
+        appointmentWindowObj.removeChild(appointmentWindowObj.lastChild);
+      }
+      const iframe = generateIframe(routeURLs.appointments);
+      $(appointmentWindowObj).append(iframe);
+    } else {
+      //wait for content load
+      unsafeWindow.console.log(`tampermonkey waiting appointment view`);
+      window.setTimeout(waitAppointmentsHome, 200);
+    }
   }
 }
 
@@ -200,7 +191,6 @@ function waitAppointmentsProfile() {
         appointmentWindow.removeChild(appointmentWindow.lastChild);
       }
 
-      // Create Div
       const iframe = generateIframe(routeURLs.appointments);
       $(appointmentWindow).append(iframe);
     } else {
@@ -211,73 +201,66 @@ function waitAppointmentsProfile() {
   }
 }
 
-function showOverlay($) {
-  // Create overlay element
-  let overlay = $("<div>").addClass("overlay-dialog").css({
-    position: "fixed",
-    inset: "0",
-    zIndex: "999",
-    background: "#000000d9",
-    display: "flex",
-    flexDirection: "column",
-    placeContent: "center",
-    alignItems: "center",
-    justifyContent: "center",
-  });
-  $(overlay).on("click", function () {
-    if ($(".overlay-dialog")) {
-      $(".overlay-dialog").remove();
-    }
-  });
-
-  // Create close button element
-  let closeButton = $("<span>").addClass("close-button").html("&times;").css({
-    position: "absolute",
-    right: "1rem",
-    top: "1rem",
-    color: "#fff",
-    fontSize: "2.5rem",
-    cursor: "pointer",
-  });
-  $(closeButton).on("click", function () {
-    if ($(".overlay-dialog")) {
-      $(".overlay-dialog").remove();
-    }
-  });
-  overlay.append(closeButton);
-
-  // Create dialog body element with iframe
-  let dialogBody = $("<div>").addClass("dialog-body").css({
-    background: "#fff",
-    maxWidth: "max(600px, 60vw)",
-    width: "100vw",
-    height: "80vh",
-    height: "80dvh",
-    overflowY: "scroll",
-  });
-
-  // Check for Healthie environment
-  let iFrameURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
-
-  // Create iframe element
-  let iframe = $("<iframe>")
-    .attr({
-      id: "MishaFrame",
-      title: "Misha iFrame",
-      src: "https://" + iFrameURL + "app/schedule", // TODO: update to add appointments route
-    })
-    .css({
-      height: "100vh",
-      width: "100%",
+function showOverlay(url) {
+  const $ = initJQuery();
+  if (!$) {
+    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    window.setTimeout(showOverlay, 200);
+    return;
+  } else {
+    // Create overlay element
+    let overlay = $("<div>").addClass("overlay-dialog").css({
+      position: "fixed",
+      inset: "0",
+      zIndex: "999",
+      background: "#000000d9",
+      display: "flex",
+      flexDirection: "column",
+      placeContent: "center",
+      alignItems: "center",
+      justifyContent: "center",
+    });
+    $(overlay).on("click", function () {
+      if ($(".overlay-dialog")) {
+        $(".overlay-dialog").remove();
+      }
     });
 
-  dialogBody.append(iframe); // Append iframe to dialog body
-  overlay.append(dialogBody); // Append dialog body to overlay
-  const existingOverlay = $(".body").find(".overlay-dialog");
+    // Create close button element
+    let closeButton = $("<span>").addClass("close-button").html("&times;").css({
+      position: "absolute",
+      right: "1rem",
+      top: "1rem",
+      color: "#fff",
+      fontSize: "2.5rem",
+      cursor: "pointer",
+    });
+    $(closeButton).on("click", function () {
+      if ($(".overlay-dialog")) {
+        $(".overlay-dialog").remove();
+      }
+    });
+    overlay.append(closeButton);
 
-  if (existingOverlay.length === 0) {
-    $("body").append(overlay); // Append overlay to body
-    unsafeWindow.console.log(`Tampermonkey displayed overlay`);
+    // Create dialog body element with iframe
+    let dialogBody = $("<div>").addClass("dialog-body").css({
+      background: "#fff",
+      maxWidth: "max(600px, 60vw)",
+      width: "100vw",
+      height: "80vh",
+      height: "80dvh",
+      overflowY: "scroll",
+    });
+
+    let iframe = generateIframe(url);
+    dialogBody.append(iframe); // Append iframe to dialog body
+    overlay.append(dialogBody); // Append dialog body to overlay
+    const existingOverlay = $(".body").find(".overlay-dialog");
+
+    if (existingOverlay.length === 0) {
+      $("body").append(overlay); // Append overlay to body
+      unsafeWindow.console.log(`Tampermonkey displayed overlay`);
+    }
   }
 }
 
