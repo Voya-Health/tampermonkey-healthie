@@ -398,7 +398,7 @@ function initAddButton() {
       $(addAppointmentBtn).replaceWith(clonedBtn);
       clonedBtn.on("click", function (e) {
         e.stopPropagation();
-        showOverlay(routeURLs.appointments.create);
+        showOverlay(`${routeURLs.schedule}/create/blah`); //TODO: replace this placeholder with actual route
       });
     } else {
       unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
