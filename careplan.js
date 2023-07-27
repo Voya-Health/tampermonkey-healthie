@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.35
+// @version      0.36
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -20,11 +20,11 @@ let patientNumber = "";
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 const routeURLs = {
   // TODO: update to standalone routes
-  scheduling: "app/schedule",
+  schedule: "schedule",
   careplan: "careplan",
   goals: "app/schedule",
-  appointment: "/appointment",
-  appointments: "/appointments",
+  appointment: "appointment",
+  appointments: "appointments",
 };
 
 //observe changes to the DOM, check for URL changes
@@ -365,11 +365,12 @@ function initCalendar() {
       // Event listeners
       $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
         e.stopPropagation();
-        showOverlay(routeURLs.appointments.create);
+        showOverlay(`${routeURLs.schedule}/create/blah`); //TODO: replace this placeholder with actual route
       });
       $(".rbc-event.calendar-event").on("click", function (e) {
         e.stopPropagation();
-        showOverlay(routeURLs.appointments.view);
+        const apptUuid = $(this).attr("data-appointment-uuid"); //TODO: replace this placeholder with actual uuid
+        showOverlay(`${routeURLs.appointments}/${apptUuid}`);
       });
       $(".cloned-calendar") && unsafeWindow.console.log(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
