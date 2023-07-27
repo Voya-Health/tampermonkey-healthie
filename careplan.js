@@ -624,7 +624,7 @@ function waitCarePlan() {
 function waitForMishaMessages(patientNumber) {
   window.onmessage = function (event) {
     //check event to see if is care plan message
-    if (event.data.tmInput !== undefined) {
+    if (event.data.tmInput !== undefined && patientNumber !== "") {
       // let's get all user goals and delete them before adding new ones
       const getGoalQuery = `query {
                     goals(user_id: "${patientNumber}", per_page: 100) {
@@ -772,6 +772,10 @@ function waitForMishaMessages(patientNumber) {
           }
         });
       });
+    }
+
+    if (event.data.reschedule !== undefined || event.data.reload !== undefined) {
+      window.location.reload();
     }
   };
 }
