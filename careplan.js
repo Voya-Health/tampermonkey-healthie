@@ -23,10 +23,8 @@ const routeURLs = {
   scheduling: "app/schedule",
   careplan: "careplan",
   goals: "app/schedule",
-  appointments: {
-    create: "app/schedule",
-    view: "app/schedule",
-  },
+  appointment: "/appointment",
+  appointments: "/appointments",
 };
 
 //observe changes to the DOM, check for URL changes
@@ -144,7 +142,7 @@ function waitAppointmentsHome() {
         unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
         appointmentWindowObj.removeChild(appointmentWindowObj.lastChild);
       }
-      const iframe = generateIframe(routeURLs.appointments.view);
+      const iframe = generateIframe(routeURLs.appointments);
       $(appointmentWindowObj).append(iframe);
     } else {
       //wait for content load
@@ -197,7 +195,8 @@ function waitAppointmentsProfile() {
         appointmentWindow.removeChild(appointmentWindow.lastChild);
       }
 
-      const iframe = generateIframe(routeURLs.appointments.view);
+      const apptUuid = "af411d08-5861-438a-9f47-e15b2fb594ce"; // demo appointment uuid
+      const iframe = generateIframe(`${routeURLs.appointments}/${apptUuid}`);
       $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
@@ -623,6 +622,7 @@ function waitCarePlan() {
 
 function waitForMishaMessages(patientNumber) {
   window.onmessage = function (event) {
+    unsafeWindow.console.log("tampermonkey received misha event", event);
     //check event to see if is care plan message
     if (event.data.tmInput !== undefined && patientNumber !== "") {
       // let's get all user goals and delete them before adding new ones
