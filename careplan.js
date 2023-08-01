@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.36
+// @version      0.37
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -71,7 +71,10 @@ const observer = new MutationObserver(function (mutations) {
       waitAppointmentSidebar();
       waitInfo();
     }
-
+    if (location.href.includes("/clients/active")) {
+      unsafeWindow.console.log("tampermonkey wait client list");
+      waitClientList();
+    }
     isAPIconnected();
   }
 });
@@ -1058,6 +1061,30 @@ function waitAppointmentSidebar() {
     //wait for content load
     unsafeWindow.console.log(`tampermonkey waiting to hide chat links`);
     window.setTimeout(waitAppointmentSidebar, 500);
+  }
+}
+
+function waitClientList() {
+  const $ = initJQuery();
+  let bookLinks = Array.from(document.querySelectorAll('button')).filter(e => e.textContent === 'Book Session');
+  unsafeWindow.console.log(`tampermonkey waiting to update book link`, bookLinks);
+  if (bookLinks.length > 0) {
+    Array.from(bookLinks).forEach((element) => {
+      unsafeWindow.console.log("tampermonkey book link found", element);
+      let ID = element.parentElement.getAttribute("data-testid").split("-").at(-1)
+      let bookButton = $(element);
+      let clonedButton = bookButton.clone(true);
+      clonedButton.on("click", function (e) {
+        e.stopPropagation();
+        showOverlay(`${routeURLs.schedule}/create/${ID}`);
+      });
+      bookButton.replaceWith(clonedButton);
+    });
+    window.setTimeout(waitClientList, 500);
+  } else {
+    //wait for content load
+    unsafeWindow.console.log(`tampermonkey waiting to update book link`);
+    window.setTimeout(waitClientList, 500);
   }
 }
 
