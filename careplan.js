@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.37
+// @version      0.38
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
+// @match        https://secure.vorihealth.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
 // @sandbox      JavaScript
 // @grant        GM_setValue
@@ -42,6 +43,7 @@ const observer = new MutationObserver(function (mutations) {
 
     if (location.href.includes("/users")) {
       //Function that will check when goal tab has loaded
+      unsafeWindow.console.log("tampermonkey inside users")
       waitGoalTab();
       waitAppointmentsProfile();
     }
@@ -61,9 +63,9 @@ const observer = new MutationObserver(function (mutations) {
       waitCalendar(); //Function to handle clicking on empty appointment slots
     }
 
-    const baseURL = location.href.split(".").splice(1).join(".");
+    const baseURL = location.href.split(".").splice(2).join(".");
     unsafeWindow.console.log("tampermonkey splice is ", baseURL);
-    if (baseURL == "gethealthie.com/overview" || baseURL == "gethealthie.com/") {
+    if (baseURL == "com/overview" || baseURL == "com/") {
       waitAppointmentsHome();
     }
 
@@ -497,7 +499,7 @@ function waitCarePlan() {
   } else {
     //check to see if the care plan tab contents has loaded
     const cpTabContents = $(".cp-tab-contents");
-    if (cpTabContents.length) {
+    if (cpTabContents.length > 0) {
       // handle edge case: clicking on careplan tab multiple times
       const careplanTabBtn = $('a[data-testid="careplans-tab-btn"]');
       careplanTabBtn.on("click", handleCarePlanTabClick);
@@ -511,9 +513,9 @@ function waitCarePlan() {
         }
       }
 
-      unsafeWindow.console.log(`tampermonkey removing`);
+      unsafeWindow.console.log(`tampermonkey removing cpTabContents `, cpTabContents);
       //Locate and remove existing care plan tab content  - remove each child of .cp-tab-contents
-      cpTabContents.empty();
+//      cpTabContents.empty();
 
       const parent = cpTabContents.eq(0);
 
@@ -594,6 +596,7 @@ function waitCarePlan() {
           if (mishaID === "" || mishaID === null) {
             const iframeMsgExists = $(".vori-iframe-message").length > 0;
             if (!iframeMsgExists) {
+              unsafeWindow.console.log("tampermonkey iframe does not exist")
               $("<div>", {
                 class: "vori-iframe-message",
                 text: "This patient's account has not been linked. \r\n Please contact Vori Health tech team to set it up!",
