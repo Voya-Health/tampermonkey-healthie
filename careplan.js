@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.37
+// @version      0.38
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
+// @match        https://secure.vorihealth.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
 // @sandbox      JavaScript
 // @grant        GM_setValue
@@ -61,9 +62,9 @@ const observer = new MutationObserver(function (mutations) {
       waitCalendar(); //Function to handle clicking on empty appointment slots
     }
 
-    const baseURL = location.href.split(".").splice(1).join(".");
+    const baseURL = location.href.split(".").splice(2).join(".");
     unsafeWindow.console.log("tampermonkey splice is ", baseURL);
-    if (baseURL == "gethealthie.com/overview" || baseURL == "gethealthie.com/") {
+    if (baseURL == "com/overview" || baseURL == "com/") {
       waitAppointmentsHome();
     }
 
@@ -497,7 +498,7 @@ function waitCarePlan() {
   } else {
     //check to see if the care plan tab contents has loaded
     const cpTabContents = $(".cp-tab-contents");
-    if (cpTabContents.length) {
+    if (cpTabContents.length > 0) {
       // handle edge case: clicking on careplan tab multiple times
       const careplanTabBtn = $('a[data-testid="careplans-tab-btn"]');
       careplanTabBtn.on("click", handleCarePlanTabClick);
@@ -511,9 +512,9 @@ function waitCarePlan() {
         }
       }
 
-      unsafeWindow.console.log(`tampermonkey removing`);
       //Locate and remove existing care plan tab content  - remove each child of .cp-tab-contents
-      cpTabContents.empty();
+      //causing crash in prod Healthie
+      //cpTabContents.empty();
 
       const parent = cpTabContents.eq(0);
 
