@@ -43,7 +43,6 @@ const observer = new MutationObserver(function (mutations) {
 
     if (location.href.includes("/users")) {
       //Function that will check when goal tab has loaded
-      unsafeWindow.console.log("tampermonkey inside users")
       waitGoalTab();
       waitAppointmentsProfile();
     }
@@ -513,9 +512,9 @@ function waitCarePlan() {
         }
       }
 
-      unsafeWindow.console.log(`tampermonkey removing cpTabContents `, cpTabContents);
       //Locate and remove existing care plan tab content  - remove each child of .cp-tab-contents
-//      cpTabContents.empty();
+      //causing crash in prod Healthie
+      //cpTabContents.empty();
 
       const parent = cpTabContents.eq(0);
 
@@ -596,7 +595,6 @@ function waitCarePlan() {
           if (mishaID === "" || mishaID === null) {
             const iframeMsgExists = $(".vori-iframe-message").length > 0;
             if (!iframeMsgExists) {
-              unsafeWindow.console.log("tampermonkey iframe does not exist")
               $("<div>", {
                 class: "vori-iframe-message",
                 text: "This patient's account has not been linked. \r\n Please contact Vori Health tech team to set it up!",
