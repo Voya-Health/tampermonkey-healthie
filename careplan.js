@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.38
+// @version      0.39
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -26,6 +26,7 @@ const routeURLs = {
   goals: "app/schedule",
   appointment: "appointment",
   appointments: "appointments",
+  patientStatus: "patientStatusStandalone",
 };
 
 //observe changes to the DOM, check for URL changes
@@ -45,6 +46,7 @@ const observer = new MutationObserver(function (mutations) {
       //Function that will check when goal tab has loaded
       waitGoalTab();
       waitAppointmentsProfile();
+      addMembershipAndOnboarding();
     }
 
     if (location.href.includes("/settings/api_keys")) {
@@ -97,8 +99,9 @@ function initJQuery() {
   }
 }
 
-function generateIframe(routeURL, className = "misha-iframe-container") {
+function generateIframe(routeURL, options = {}) {
   const $ = initJQuery();
+  const { className = "misha-iframe-container", height = "100vh", width = "100%" } = options;
   if (!$) {
     unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
     window.setTimeout(function () {
@@ -115,14 +118,14 @@ function generateIframe(routeURL, className = "misha-iframe-container") {
     // https://dev.misha.vori.health/app/schedule
     iFrame.html(
       '<iframe id="MishaFrame" ' +
-        'title="Misha iFrame" ' +
-        'style="height: 100vh; width: 100%" ' +
-        'src="https://' +
-        mishaURL +
-        routeURL +
-        '"' +
-        ">" +
-        "</iframe>"
+      'title="Misha iFrame" ' +
+      'style="height: ' + height + '; width: ' + width + '" ' +
+      'src="https://' +
+      mishaURL +
+      routeURL +
+      '"' +
+      ">" +
+      "</iframe>"
     );
     return iFrame;
   }
@@ -608,7 +611,7 @@ function waitCarePlan() {
               }).appendTo(parent.empty());
             }
           } else {
-            let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, "cp-tab-contents");
+            let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, { className: "cp-tab-contents" });
             parent && parent.empty();
             parent && parent.append(iframe);
 
@@ -1114,4 +1117,42 @@ function goalMutation(payload) {
     });
 
   return response;
+}
+
+function addMembershipAndOnboarding() {
+  //get phone icon and related column
+  const phoneColumn = document.querySelector('.col-12.col-sm-6:has(.telephone-icon)');
+
+  if (phoneColumn) {
+
+    // get the patient number from the URL
+    patientNumber = location.href.split("/")[location.href.split("/").length - 1];
+
+    // get the user data
+    const getUserQuery = `query {
+        user(id: "${patientNumber}") {
+          id
+          additional_record_identifier
+        }
+      }`;
+
+    const getUserPayload = JSON.stringify({ query: getUserQuery });
+    goalMutation(getUserPayload).then((response) => {
+      unsafeWindow.console.log(`tampermonkey get user response`, response);
+      // load  mishaID
+      const mishaID = response.data.user.additional_record_identifier;
+      unsafeWindow.console.log(`tampermonkey mishaID`, mishaID);
+      // create iframe (generateIframe returns a jQuery object)
+      const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: '110px' });
+      // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
+      phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling)
+
+    });
+
+  } else {
+
+    setTimeout(() => {
+      addMembershipAndOnboarding();
+    }, 200);
+  }
 }
