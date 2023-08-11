@@ -1143,7 +1143,7 @@ function addMembershipAndOnboarding() {
       const mishaID = response.data.user.additional_record_identifier;
       unsafeWindow.console.log(`tampermonkey mishaID`, mishaID);
       // create iframe (generateIframe returns a jQuery object)
-      const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: '110px' });
+      const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: '90px' });
       // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
       phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling)
 
