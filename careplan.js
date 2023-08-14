@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.39
+// @version      0.40
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -15,10 +15,10 @@
 /* globals contentful */
 
 let previousUrl = "";
-let healthieAPIKey = GM_getValue("healthieApiKey", "");
-let auth = `Basic ${healthieAPIKey}`;
 let patientNumber = "";
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
+let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
+let auth = `Basic ${healthieAPIKey}`;
 const routeURLs = {
   // TODO: update to standalone routes
   schedule: "schedule",
@@ -45,6 +45,7 @@ const observer = new MutationObserver(function (mutations) {
     if (location.href.includes("/users")) {
       //Function that will check when goal tab has loaded
       waitGoalTab();
+      //TODO separate route for appointment screen
       waitAppointmentsProfile();
       addMembershipAndOnboarding();
     }
@@ -509,7 +510,7 @@ function waitCarePlan() {
       function handleCarePlanTabClick() {
         if (location.href.includes("all_plans")) {
           if (healthieAPIKey !== "") {
-            cpTabContents && cpTabContents.empty();
+            //cpTabContents && cpTabContents.empty();
           }
           waitCarePlan();
         }
@@ -611,7 +612,7 @@ function waitCarePlan() {
               }).appendTo(parent.empty());
             }
           } else {
-            let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, { className: "cp-tab-contents" });
+            let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, "cp-tab-contents");
             parent && parent.empty();
             parent && parent.append(iframe);
 
@@ -861,7 +862,7 @@ function waitSettingsAPIpage() {
       newInput = existingWrapper.querySelector("input");
     }
 
-    let storedApiKey = GM_getValue("healthieApiKey", ""); // Retrieve the stored API key using GM_getValue
+    let storedApiKey = GM_getValue(isStagingEnv? "healthieStagingApiKey" : "healthieApiKey", ""); // Retrieve the stored API key using GM_getValue
 
     if (storedApiKey === "") {
       newInput.value = storedApiKey; // Set the initial value of the input
@@ -894,7 +895,7 @@ function waitSettingsAPIpage() {
           if (response.errors) {
             alert("That is not a valid API key. Please verify the key and try again.");
           } else {
-            GM_setValue("healthieApiKey", apiKey);
+            GM_setValue(isStagingEnv? "healthieStagingApiKey" : "healthieApiKey", apiKey);
             alert("API key saved successfully!");
             window.setTimeout(null, 2000);
             window.location.reload();
