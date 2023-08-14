@@ -45,7 +45,6 @@ const observer = new MutationObserver(function (mutations) {
     if (location.href.includes("/users")) {
       //Function that will check when goal tab has loaded
       waitGoalTab();
-      //TODO separate route for appointment screen
       waitAppointmentsProfile();
       addMembershipAndOnboarding();
     }
@@ -510,7 +509,7 @@ function waitCarePlan() {
       function handleCarePlanTabClick() {
         if (location.href.includes("all_plans")) {
           if (healthieAPIKey !== "") {
-            //cpTabContents && cpTabContents.empty();
+            cpTabContents && cpTabContents.empty();
           }
           waitCarePlan();
         }
