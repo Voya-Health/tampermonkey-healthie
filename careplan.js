@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.40
+// @version      0.41
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -27,6 +27,7 @@ const routeURLs = {
   appointment: "appointment",
   appointments: "appointments",
   patientStatus: "patientStatusStandalone",
+  providerSchedule: "provider-schedule",
 };
 
 //observe changes to the DOM, check for URL changes
@@ -118,14 +119,18 @@ function generateIframe(routeURL, options = {}) {
     // https://dev.misha.vori.health/app/schedule
     iFrame.html(
       '<iframe id="MishaFrame" ' +
-      'title="Misha iFrame" ' +
-      'style="height: ' + height + '; width: ' + width + '" ' +
-      'src="https://' +
-      mishaURL +
-      routeURL +
-      '"' +
-      ">" +
-      "</iframe>"
+        'title="Misha iFrame" ' +
+        'style="height: ' +
+        height +
+        "; width: " +
+        width +
+        '" ' +
+        'src="https://' +
+        mishaURL +
+        routeURL +
+        '"' +
+        ">" +
+        "</iframe>"
     );
     return iFrame;
   }
@@ -1070,12 +1075,12 @@ function waitAppointmentSidebar() {
 
 function waitClientList() {
   const $ = initJQuery();
-  let bookLinks = Array.from(document.querySelectorAll('button')).filter(e => e.textContent === 'Book Session');
+  let bookLinks = Array.from(document.querySelectorAll("button")).filter((e) => e.textContent === "Book Session");
   unsafeWindow.console.log(`tampermonkey waiting to update book link`, bookLinks);
   if (bookLinks.length > 0) {
     Array.from(bookLinks).forEach((element) => {
       unsafeWindow.console.log("tampermonkey book link found", element);
-      let ID = element.parentElement.getAttribute("data-testid").split("-").at(-1)
+      let ID = element.parentElement.getAttribute("data-testid").split("-").at(-1);
       let bookButton = $(element);
       let clonedButton = bookButton.clone(true);
       clonedButton.on("click", function (e) {
@@ -1121,10 +1126,9 @@ function goalMutation(payload) {
 
 function addMembershipAndOnboarding() {
   //get phone icon and related column
-  const phoneColumn = document.querySelector('.col-12.col-sm-6:has(.telephone-icon)');
+  const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
 
   if (phoneColumn) {
-
     // get the patient number from the URL
     patientNumber = location.href.split("/")[location.href.split("/").length - 1];
 
@@ -1143,14 +1147,11 @@ function addMembershipAndOnboarding() {
       const mishaID = response.data.user.additional_record_identifier;
       unsafeWindow.console.log(`tampermonkey mishaID`, mishaID);
       // create iframe (generateIframe returns a jQuery object)
-      const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: '90px' });
+      const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
       // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
-      phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling)
-
+      phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
     });
-
   } else {
-
     setTimeout(() => {
       addMembershipAndOnboarding();
     }, 200);
