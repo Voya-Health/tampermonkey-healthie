@@ -635,9 +635,7 @@ function waitCarePlan() {
 }
 
 function rescheduleAppointment(appointmentID) {
-  // get patient id from url
-  const patientID = location.href.split("/").pop();
-  showOverlay(`${routeURLs.schedule}/${patientID}/${appointmentID}`);
+  showOverlay(`${routeURLs.schedule}/${appointmentID}`);
 }
 
 function waitForMishaMessages(patientNumber) {
