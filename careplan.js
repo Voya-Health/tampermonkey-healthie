@@ -208,8 +208,8 @@ function waitAppointmentsProfile() {
       }
 
       // example of url to load - https://securestaging.gethealthie.com/users/388687
-      const apptUuid = location.href.split("/").pop();
-      const iframe = generateIframe(`${routeURLs.appointments}/patient/${apptUuid}`);
+      const patientID = location.href.split("/").pop();
+      const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
       $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
@@ -634,6 +634,12 @@ function waitCarePlan() {
   }
 }
 
+function rescheduleAppointment(appointmentID) {
+  // get patient id from url
+  const patientID = location.href.split("/").pop();
+  showOverlay(`${routeURLs.schedule}/${patientID}/${appointmentID}`);
+}
+
 function waitForMishaMessages(patientNumber) {
   window.onmessage = function (event) {
     unsafeWindow.console.log("tampermonkey received misha event", event);
@@ -789,7 +795,7 @@ function waitForMishaMessages(patientNumber) {
     }
 
     if (event.data.reschedule !== undefined || event.data.reload !== undefined) {
-      window.location.reload();
+      rescheduleAppointment(event.data.reschedule);
     }
   };
 }
