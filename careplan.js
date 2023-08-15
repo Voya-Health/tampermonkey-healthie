@@ -611,7 +611,7 @@ function waitCarePlan() {
               }).appendTo(parent.empty());
             }
           } else {
-            let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, "cp-tab-contents");
+            let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, { className: "cp-tab-contents" });
             parent && parent.empty();
             parent && parent.append(iframe);
 
@@ -861,7 +861,7 @@ function waitSettingsAPIpage() {
       newInput = existingWrapper.querySelector("input");
     }
 
-    let storedApiKey = GM_getValue(isStagingEnv? "healthieStagingApiKey" : "healthieApiKey", ""); // Retrieve the stored API key using GM_getValue
+    let storedApiKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", ""); // Retrieve the stored API key using GM_getValue
 
     if (storedApiKey === "") {
       newInput.value = storedApiKey; // Set the initial value of the input
@@ -894,7 +894,7 @@ function waitSettingsAPIpage() {
           if (response.errors) {
             alert("That is not a valid API key. Please verify the key and try again.");
           } else {
-            GM_setValue(isStagingEnv? "healthieStagingApiKey" : "healthieApiKey", apiKey);
+            GM_setValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", apiKey);
             alert("API key saved successfully!");
             window.setTimeout(null, 2000);
             window.location.reload();
