@@ -207,8 +207,9 @@ function waitAppointmentsProfile() {
         appointmentWindow.removeChild(appointmentWindow.lastChild);
       }
 
-      const apptUuid = "af411d08-5861-438a-9f47-e15b2fb594ce"; // demo appointment uuid
-      const iframe = generateIframe(`${routeURLs.appointments}/${apptUuid}`);
+      // example of url to load - https://securestaging.gethealthie.com/users/388687
+      const apptUuid = location.href.split("/").pop();
+      const iframe = generateIframe(`${routeURLs.appointments}/patient/${apptUuid}`);
       $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
