@@ -241,6 +241,17 @@ function waitAppointmentsProfile() {
   }
 }
 
+function hideOverlay() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    window.setTimeout(hideOverlay, 200);
+    return;
+  } else {
+    $(".overlay-dialog").remove();
+  }
+}
+
 function showOverlay(url) {
   const $ = initJQuery();
   if (!$) {
@@ -822,6 +833,10 @@ function waitForMishaMessages(patientNumber) {
 
     if (event.data.reload !== undefined) {
       window.location.reload();
+    }
+
+    if (event.data.closeWindow !== undefined) {
+      hideOverlay();
     }
   };
 }
