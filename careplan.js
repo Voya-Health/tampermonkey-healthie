@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.40
+// @version      0.42
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -27,6 +27,7 @@ const routeURLs = {
   appointment: "appointment",
   appointments: "appointments",
   patientStatus: "patientStatusStandalone",
+  providerSchedule: "provider-schedule",
 };
 
 //observe changes to the DOM, check for URL changes
@@ -119,7 +120,11 @@ function generateIframe(routeURL, options = {}) {
     iFrame.html(
       '<iframe id="MishaFrame" ' +
       'title="Misha iFrame" ' +
-      'style="height: ' + height + '; width: ' + width + '" ' +
+      'style="height: ' +
+      height +
+      "; width: " +
+      width +
+      '" ' +
       'src="https://' +
       mishaURL +
       routeURL +
@@ -149,8 +154,26 @@ function waitAppointmentsHome() {
         unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
         appointmentWindowObj.removeChild(appointmentWindowObj.lastChild);
       }
-      const iframe = generateIframe(routeURLs.appointments);
-      $(appointmentWindowObj).append(iframe);
+
+      // get the patient number from the URL
+      patientNumber = location.href.split("/")[location.href.split("/").length - 1];
+
+      // get the user data for provider id
+      const getCurrentUserQuery = `query user{
+        user(or_current_user: true){
+         id
+       }
+       }`;
+
+      const getCurrentUserPayload = JSON.stringify({ query: getCurrentUserQuery });
+      goalMutation(getCurrentUserPayload).then((response) => {
+
+        const userId = response.data.user.id;
+        //provider-schedule/id
+        const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
+        $(appointmentWindowObj).append(iframe);
+      });
+
     } else {
       //wait for content load
       unsafeWindow.console.log(`tampermonkey waiting appointment view`);
@@ -202,8 +225,9 @@ function waitAppointmentsProfile() {
         appointmentWindow.removeChild(appointmentWindow.lastChild);
       }
 
-      const apptUuid = "af411d08-5861-438a-9f47-e15b2fb594ce"; // demo appointment uuid
-      const iframe = generateIframe(`${routeURLs.appointments}/${apptUuid}`);
+      // example of url to load - https://securestaging.gethealthie.com/users/388687
+      const patientID = location.href.split("/").pop();
+      const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
       $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
@@ -372,12 +396,15 @@ function initCalendar() {
       // Event listeners
       $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/create/blah`); //TODO: replace this placeholder with actual route
+        //schedule/
+        showOverlay(`${routeURLs.schedule}`);
       });
       $(".rbc-event.calendar-event").on("click", function (e) {
         e.stopPropagation();
-        const apptUuid = $(this).attr("data-appointment-uuid"); //TODO: replace this placeholder with actual uuid
-        showOverlay(`${routeURLs.appointments}/${apptUuid}`);
+        const dataForValue = $(this).attr("data-for");
+        const apptUuid = dataForValue.split('__')[1].split('_')[0];
+        //appointment/appointment id
+        showOverlay(`${routeURLs.appointment}/${apptUuid}`);
       });
       $(".cloned-calendar") && unsafeWindow.console.log(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
@@ -405,7 +432,8 @@ function initAddButton() {
       $(addAppointmentBtn).replaceWith(clonedBtn);
       clonedBtn.on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/create/blah`); //TODO: replace this placeholder with actual route
+        //https://dev.misha.vori.health/schedule/
+        showOverlay(`${routeURLs.schedule}`);
       });
     } else {
       unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
@@ -628,6 +656,10 @@ function waitCarePlan() {
   }
 }
 
+function rescheduleAppointment(appointmentID) {
+  showOverlay(`${routeURLs.schedule}/${appointmentID}`);
+}
+
 function waitForMishaMessages(patientNumber) {
   window.onmessage = function (event) {
     unsafeWindow.console.log("tampermonkey received misha event", event);
@@ -783,7 +815,7 @@ function waitForMishaMessages(patientNumber) {
     }
 
     if (event.data.reschedule !== undefined || event.data.reload !== undefined) {
-      window.location.reload();
+      rescheduleAppointment(event.data.reschedule);
     }
   };
 }
@@ -1070,17 +1102,18 @@ function waitAppointmentSidebar() {
 
 function waitClientList() {
   const $ = initJQuery();
-  let bookLinks = Array.from(document.querySelectorAll('button')).filter(e => e.textContent === 'Book Session');
+  let bookLinks = Array.from(document.querySelectorAll("button")).filter((e) => e.textContent === "Book Session");
   unsafeWindow.console.log(`tampermonkey waiting to update book link`, bookLinks);
   if (bookLinks.length > 0) {
     Array.from(bookLinks).forEach((element) => {
       unsafeWindow.console.log("tampermonkey book link found", element);
-      let ID = element.parentElement.getAttribute("data-testid").split("-").at(-1)
+      let ID = element.parentElement.getAttribute("data-testid").split("-").at(-1);
       let bookButton = $(element);
       let clonedButton = bookButton.clone(true);
       clonedButton.on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/create/${ID}`);
+        //schedule/patientid
+        showOverlay(`${routeURLs.schedule}/${ID}`);
       });
       bookButton.replaceWith(clonedButton);
     });
@@ -1121,10 +1154,9 @@ function goalMutation(payload) {
 
 function addMembershipAndOnboarding() {
   //get phone icon and related column
-  const phoneColumn = document.querySelector('.col-12.col-sm-6:has(.telephone-icon)');
+  const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
 
   if (phoneColumn) {
-
     // get the patient number from the URL
     patientNumber = location.href.split("/")[location.href.split("/").length - 1];
 
@@ -1143,14 +1175,11 @@ function addMembershipAndOnboarding() {
       const mishaID = response.data.user.additional_record_identifier;
       unsafeWindow.console.log(`tampermonkey mishaID`, mishaID);
       // create iframe (generateIframe returns a jQuery object)
-      const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: '90px' });
+      const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
       // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
-      phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling)
-
+      phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
     });
-
   } else {
-
     setTimeout(() => {
       addMembershipAndOnboarding();
     }, 200);
