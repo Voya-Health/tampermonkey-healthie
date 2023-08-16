@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.43
+// @version      0.44
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -125,18 +125,18 @@ function generateIframe(routeURL, options = {}) {
     // https://dev.misha.vori.health/app/schedule
     iFrame.html(
       '<iframe id="MishaFrame" ' +
-      'title="Misha iFrame" ' +
-      'style="height: ' +
-      height +
-      "; width: " +
-      width +
-      '" ' +
-      'src="https://' +
-      mishaURL +
-      routeURL +
-      '"' +
-      ">" +
-      "</iframe>"
+        'title="Misha iFrame" ' +
+        'style="height: ' +
+        height +
+        "; width: " +
+        width +
+        '" ' +
+        'src="https://' +
+        mishaURL +
+        routeURL +
+        '"' +
+        ">" +
+        "</iframe>"
     );
     return iFrame;
   }
@@ -173,13 +173,11 @@ function waitAppointmentsHome() {
 
       const getCurrentUserPayload = JSON.stringify({ query: getCurrentUserQuery });
       goalMutation(getCurrentUserPayload).then((response) => {
-
         const userId = response.data.user.id;
         //provider-schedule/id
         const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
         $(appointmentWindowObj).append(iframe);
       });
-
     } else {
       //wait for content load
       debugLog(`tampermonkey waiting appointment view`);
@@ -408,7 +406,7 @@ function initCalendar() {
       $(".rbc-event.calendar-event").on("click", function (e) {
         e.stopPropagation();
         const dataForValue = $(this).attr("data-for");
-        const apptUuid = dataForValue.split('__')[1].split('_')[0];
+        const apptUuid = dataForValue.split("__")[1].split("_")[0];
         //appointment/appointment id
         showOverlay(`${routeURLs.appointment}/${apptUuid}`);
       });
@@ -708,9 +706,7 @@ function waitForMishaMessages(patientNumber) {
         });
 
         const carePlan = event.data.tmInput;
-        debugLog(
-          `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
-        );
+        debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
         const goal = carePlan.goal.title;
         debugLog("tampermokey goal title ", goal);
 
@@ -822,6 +818,10 @@ function waitForMishaMessages(patientNumber) {
 
     if (event.data.reschedule !== undefined || event.data.reload !== undefined) {
       rescheduleAppointment(event.data.reschedule);
+    }
+
+    if (event.data.reload !== undefined) {
+      window.location.reload();
     }
   };
 }
