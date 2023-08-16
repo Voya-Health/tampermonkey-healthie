@@ -22,7 +22,7 @@ const isStagingEnv = location.href.includes("securestaging") ? true : false;
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 function debugLog(...messages) {
-  if (isStagingEnv && debug) {
+  if (isStagingEnv || debug) {
     unsafeWindow.console.log(...messages);
   }
 }
