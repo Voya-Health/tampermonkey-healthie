@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.41
+// @version      0.42
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -154,8 +154,26 @@ function waitAppointmentsHome() {
         unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
         appointmentWindowObj.removeChild(appointmentWindowObj.lastChild);
       }
-      const iframe = generateIframe(routeURLs.appointments);
-      $(appointmentWindowObj).append(iframe);
+
+      // get the patient number from the URL
+      patientNumber = location.href.split("/")[location.href.split("/").length - 1];
+
+      // get the user data for provider id
+      const getCurrentUserQuery = `query user{
+        user(or_current_user: true){
+         id
+       }
+       }`;
+
+      const getCurrentUserPayload = JSON.stringify({ query: getCurrentUserQuery });
+      goalMutation(getCurrentUserPayload).then((response) => {
+
+        const userId = response.data.user.id;
+        //provider-schedule/id
+        const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
+        $(appointmentWindowObj).append(iframe);
+      });
+
     } else {
       //wait for content load
       unsafeWindow.console.log(`tampermonkey waiting appointment view`);
@@ -378,12 +396,15 @@ function initCalendar() {
       // Event listeners
       $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/create/blah`); //TODO: replace this placeholder with actual route
+        //schedule/
+        showOverlay(`${routeURLs.schedule}`);
       });
       $(".rbc-event.calendar-event").on("click", function (e) {
         e.stopPropagation();
-        const apptUuid = $(this).attr("data-appointment-uuid"); //TODO: replace this placeholder with actual uuid
-        showOverlay(`${routeURLs.appointments}/${apptUuid}`);
+        const dataForValue = $(this).attr("data-for");
+        const apptUuid = dataForValue.split('__')[1].split('_')[0];
+        //appointment/appointment id
+        showOverlay(`${routeURLs.appointment}/${apptUuid}`);
       });
       $(".cloned-calendar") && unsafeWindow.console.log(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
@@ -411,7 +432,8 @@ function initAddButton() {
       $(addAppointmentBtn).replaceWith(clonedBtn);
       clonedBtn.on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/create/blah`); //TODO: replace this placeholder with actual route
+        //https://dev.misha.vori.health/schedule/
+        showOverlay(`${routeURLs.schedule}`);
       });
     } else {
       unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
@@ -1090,7 +1112,8 @@ function waitClientList() {
       let clonedButton = bookButton.clone(true);
       clonedButton.on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/create/${ID}`);
+        //schedule/patientid
+        showOverlay(`${routeURLs.schedule}/${ID}`);
       });
       bookButton.replaceWith(clonedButton);
     });
