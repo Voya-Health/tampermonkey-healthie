@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.42
+// @version      0.43
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -14,13 +14,19 @@
 
 /* globals contentful */
 
+//Enable/Disable debug mode
+let debug = false;
 let previousUrl = "";
 let patientNumber = "";
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
+function debugLog(...messages) {
+  if (isStagingEnv && debug) {
+    unsafeWindow.console.log(...messages);
+  }
+}
 const routeURLs = {
-  // TODO: update to standalone routes
   schedule: "schedule",
   careplan: "careplan",
   goals: "app/schedule",
@@ -34,7 +40,7 @@ const routeURLs = {
 const observer = new MutationObserver(function (mutations) {
   if (location.href !== previousUrl) {
     previousUrl = location.href;
-    unsafeWindow.console.log(`tampermonkey URL changed to ${location.href}`);
+    debugLog(`tampermonkey URL changed to ${location.href}`);
     waitForMishaMessages();
 
     //Care plans URL
@@ -66,7 +72,7 @@ const observer = new MutationObserver(function (mutations) {
     }
 
     const baseURL = location.href.split(".").splice(2).join(".");
-    unsafeWindow.console.log("tampermonkey splice is ", baseURL);
+    debugLog("tampermonkey splice is ", baseURL);
     if (baseURL == "com/overview" || baseURL == "com/") {
       waitAppointmentsHome();
     }
@@ -76,7 +82,7 @@ const observer = new MutationObserver(function (mutations) {
       waitInfo();
     }
     if (location.href.includes("/clients/active")) {
-      unsafeWindow.console.log("tampermonkey wait client list");
+      debugLog("tampermonkey wait client list");
       waitClientList();
     }
     isAPIconnected();
@@ -88,12 +94,12 @@ function initJQuery() {
   if ($ && $ !== undefined && typeof $ === "function") {
     return $;
   } else {
-    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    debugLog(`tampermonkey waiting for jquery to load`);
     let script = document.createElement("script");
     script.src = "https://code.jquery.com/jquery-3.7.0.min.js";
     script.type = "text/javascript";
     script.onload = function () {
-      unsafeWindow.console.log(`tampermonkey jquery loaded successfully`);
+      debugLog(`tampermonkey jquery loaded successfully`);
     };
     document.getElementsByTagName("head")[0].appendChild(script);
     window.setTimeout(initJQuery, 200);
@@ -104,7 +110,7 @@ function generateIframe(routeURL, options = {}) {
   const $ = initJQuery();
   const { className = "misha-iframe-container", height = "100vh", width = "100%" } = options;
   if (!$) {
-    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    debugLog(`tampermonkey waiting for jquery to load`);
     window.setTimeout(function () {
       generateIframe(routeURL);
     }, 200);
@@ -119,18 +125,18 @@ function generateIframe(routeURL, options = {}) {
     // https://dev.misha.vori.health/app/schedule
     iFrame.html(
       '<iframe id="MishaFrame" ' +
-        'title="Misha iFrame" ' +
-        'style="height: ' +
-        height +
-        "; width: " +
-        width +
-        '" ' +
-        'src="https://' +
-        mishaURL +
-        routeURL +
-        '"' +
-        ">" +
-        "</iframe>"
+      'title="Misha iFrame" ' +
+      'style="height: ' +
+      height +
+      "; width: " +
+      width +
+      '" ' +
+      'src="https://' +
+      mishaURL +
+      routeURL +
+      '"' +
+      ">" +
+      "</iframe>"
     );
     return iFrame;
   }
@@ -139,19 +145,19 @@ function generateIframe(routeURL, options = {}) {
 function waitAppointmentsHome() {
   const $ = initJQuery();
   if (!$) {
-    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
+    debugLog(`tampermonkey jquery not loaded`);
     window.setTimeout(waitAppointmentsProfile, 200);
     return;
   } else {
     //check to see if the appointment view contents has loaded
     let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
     if (appointmentWindow.length > 0) {
-      unsafeWindow.console.log(`tampermonkey found appointment view`, appointmentWindow.length);
+      debugLog(`tampermonkey found appointment view`, appointmentWindow.length);
       let appointmentWindowObj = appointmentWindow[0];
       //remove all except first child
       while (appointmentWindowObj.childNodes.length > 1) {
         let childClassName = appointmentWindowObj.lastChild.className;
-        unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
+        debugLog(`tampermonkey removing child `, childClassName);
         appointmentWindowObj.removeChild(appointmentWindowObj.lastChild);
       }
 
@@ -176,7 +182,7 @@ function waitAppointmentsHome() {
 
     } else {
       //wait for content load
-      unsafeWindow.console.log(`tampermonkey waiting appointment view`);
+      debugLog(`tampermonkey waiting appointment view`);
       window.setTimeout(waitAppointmentsHome, 200);
     }
   }
@@ -185,7 +191,7 @@ function waitAppointmentsHome() {
 function waitAppointmentsProfile() {
   const $ = initJQuery();
   if (!$) {
-    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
+    debugLog(`tampermonkey jquery not loaded`);
     window.setTimeout(waitAppointmentsProfile, 200);
     return;
   } else {
@@ -194,7 +200,7 @@ function waitAppointmentsProfile() {
       return $(this).find("h1.level-item:contains('Appointments')").length > 0;
     })[0];
     if (appointmentWindow) {
-      unsafeWindow.console.log(`tampermonkey found appointment view on user profile`);
+      debugLog(`tampermonkey found appointment view on user profile`);
       $(appointmentWindow).css({ margin: "0", padding: "3px" });
       // get the parent with class .column.is-6 and change the width to 100%
       let parent = $(appointmentWindow).closest(".column.is-6");
@@ -221,7 +227,7 @@ function waitAppointmentsProfile() {
       // remove all children of appointments section
       while (appointmentWindow.childNodes.length > 0) {
         let childClassName = appointmentWindow.lastChild.className;
-        unsafeWindow.console.log(`tampermonkey removing child `, childClassName);
+        debugLog(`tampermonkey removing child `, childClassName);
         appointmentWindow.removeChild(appointmentWindow.lastChild);
       }
 
@@ -231,7 +237,7 @@ function waitAppointmentsProfile() {
       $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
-      unsafeWindow.console.log(`tampermonkey waiting appointment view on user profile`);
+      debugLog(`tampermonkey waiting appointment view on user profile`);
       window.setTimeout(waitAppointmentsProfile, 200);
     }
   }
@@ -240,7 +246,7 @@ function waitAppointmentsProfile() {
 function showOverlay(url) {
   const $ = initJQuery();
   if (!$) {
-    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    debugLog(`tampermonkey waiting for jquery to load`);
     window.setTimeout(showOverlay, 200);
     return;
   } else {
@@ -295,7 +301,7 @@ function showOverlay(url) {
 
     if (existingOverlay.length === 0) {
       $("body").append(overlay); // Append overlay to body
-      unsafeWindow.console.log(`Tampermonkey displayed overlay`);
+      debugLog(`Tampermonkey displayed overlay`);
     }
   }
 }
@@ -305,11 +311,11 @@ let maxWaitForInit = 200; // comically high number to prevent infinite loop
 function initCalendar() {
   const $ = initJQuery();
   if (!$) {
-    unsafeWindow.console.log(`Tampermonkey jQuery not loaded`);
+    debugLog(`Tampermonkey jQuery not loaded`);
     window.setTimeout(initCalendar, 200);
     return;
   } else {
-    unsafeWindow.console.log(`Tampermonkey initializing calendar`);
+    debugLog(`Tampermonkey initializing calendar`);
 
     maxWaitForInit--;
     if (maxWaitForInit < 0) {
@@ -319,7 +325,7 @@ function initCalendar() {
 
     // Check if calendar is loaded and cloned
     if ($(".main-calendar-column").find(".cloned-calendar").length > 0) {
-      unsafeWindow.console.log(`Tampermonkey calendar already cloned`);
+      debugLog(`Tampermonkey calendar already cloned`);
       return;
     }
 
@@ -339,7 +345,7 @@ function initCalendar() {
     });
     if (!$(".main-calendar-column").find(".overlay-vori").length > 0) {
       $(".main-calendar-column").css({ position: "relative" }).append(overlay);
-      unsafeWindow.console.log(`Tampermonkey added overlay to calendar`);
+      debugLog(`Tampermonkey added overlay to calendar`);
     }
 
     // First init add button to make sure event gets overwritten
@@ -348,7 +354,7 @@ function initCalendar() {
     // Move on to calendar
     const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
     if (calendarLoading.length > 0) {
-      unsafeWindow.console.log(`Tampermonkey waiting for calendar to load`);
+      debugLog(`Tampermonkey waiting for calendar to load`);
       window.setTimeout(initCalendar, 200);
       return;
     }
@@ -366,13 +372,13 @@ function initCalendar() {
         activeBtn &&
         (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week"))
       ) {
-        unsafeWindow.console.log(`Tampermonkey calendar is on day or week view`);
+        debugLog(`Tampermonkey calendar is on day or week view`);
         calendar = $(".rbc-time-content");
         let clonedCalendar = calendar.clone(true);
         clonedCalendar.addClass("cloned-calendar");
         calendar.replaceWith(clonedCalendar);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month")) {
-        unsafeWindow.console.log(`Tampermonkey calendar is on month view`);
+        debugLog(`Tampermonkey calendar is on month view`);
         calendar = $(".rbc-month-view");
         if ($(".rbc-month-view").length > 0) {
           let monthView = $(".rbc-month-view")[0].childNodes;
@@ -385,7 +391,7 @@ function initCalendar() {
         }
       }
     } else if (availabilitiesTab) {
-      unsafeWindow.console.log(`Tampermonkey calendar is on availability tab`);
+      debugLog(`Tampermonkey calendar is on availability tab`);
       calendar = $(".rbc-time-content");
       let clonedCalendar = calendar.clone(true);
       clonedCalendar.addClass("cloned-calendar");
@@ -406,14 +412,14 @@ function initCalendar() {
         //appointment/appointment id
         showOverlay(`${routeURLs.appointment}/${apptUuid}`);
       });
-      $(".cloned-calendar") && unsafeWindow.console.log(`Tampermonkey calendar cloned`);
+      $(".cloned-calendar") && debugLog(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
     } else {
       maxWaitForEvents--;
       if (maxWaitForEvents === 0) {
         window.location.reload();
       } else {
-        unsafeWindow.console.log(`Tampermonkey waiting for calendar and events`);
+        debugLog(`Tampermonkey waiting for calendar and events`);
         window.setTimeout(initCalendar, 200);
       }
     }
@@ -422,7 +428,7 @@ function initCalendar() {
 
 function initAddButton() {
   if (!$) {
-    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    debugLog(`tampermonkey waiting for jquery to load`);
     window.setTimeout(showOverlay, 200);
     return;
   } else {
@@ -436,7 +442,7 @@ function initAddButton() {
         showOverlay(`${routeURLs.schedule}`);
       });
     } else {
-      unsafeWindow.console.log(`tampermonkey waiting for add appointment button`);
+      debugLog(`tampermonkey waiting for add appointment button`);
       window.setTimeout(waitAddAppointmentsBtn, 200);
     }
   }
@@ -500,7 +506,7 @@ function waitCalendar() {
 function waitAddAppointmentsBtn() {
   const $ = initJQuery();
   if (!$) {
-    unsafeWindow.console.log(`tampermonkey jquery not loaded`);
+    debugLog(`tampermonkey jquery not loaded`);
     window.setTimeout(waitAppointmentsProfile, 200);
     return;
   } else {
@@ -511,11 +517,11 @@ function waitAddAppointmentsBtn() {
 function waitGoalTab() {
   //check to see if the care plan tab contents has loaded
   if (document.querySelector('[data-testid="goals-tab-btn"]')) {
-    unsafeWindow.console.log(`tampermonkey found goals tab`);
+    debugLog(`tampermonkey found goals tab`);
     document.querySelector('[data-testid="goals-tab-btn"]').parentElement.remove();
   } else {
     //wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting goals tab`);
+    debugLog(`tampermonkey waiting goals tab`);
     window.setTimeout(waitGoalTab, 200);
   }
 }
@@ -523,7 +529,7 @@ function waitGoalTab() {
 function waitCarePlan() {
   const $ = initJQuery();
   if (!$) {
-    unsafeWindow.console.log(`tampermonkey waiting for jquery to load`);
+    debugLog(`tampermonkey waiting for jquery to load`);
     window.setTimeout(waitCarePlan, 200);
     return;
   } else {
@@ -619,9 +625,9 @@ function waitCarePlan() {
 
         const getUserPayload = JSON.stringify({ query: getUserQuery });
         goalMutation(getUserPayload).then((response) => {
-          unsafeWindow.console.log(`tampermonkey get user response`, response);
+          debugLog(`tampermonkey get user response`, response);
           const mishaID = response.data.user.additional_record_identifier;
-          unsafeWindow.console.log(`tampermonkey mishaID`, mishaID);
+          debugLog(`tampermonkey mishaID`, mishaID);
 
           if (mishaID === "" || mishaID === null) {
             const iframeMsgExists = $(".vori-iframe-message").length > 0;
@@ -650,7 +656,7 @@ function waitCarePlan() {
       }
     } else {
       //wait for content load
-      unsafeWindow.console.log(`tampermonkey waiting for careplan tab`);
+      debugLog(`tampermonkey waiting for careplan tab`);
       window.setTimeout(waitCarePlan, 200);
     }
   }
@@ -662,7 +668,7 @@ function rescheduleAppointment(appointmentID) {
 
 function waitForMishaMessages(patientNumber) {
   window.onmessage = function (event) {
-    unsafeWindow.console.log("tampermonkey received misha event", event);
+    debugLog("tampermonkey received misha event", event);
     //check event to see if is care plan message
     if (event.data.tmInput !== undefined && patientNumber !== "") {
       // let's get all user goals and delete them before adding new ones
@@ -676,7 +682,7 @@ function waitForMishaMessages(patientNumber) {
       const getGoalPayload = JSON.stringify({ query: getGoalQuery });
       goalMutation(getGoalPayload).then((response) => {
         const allGoals = response.data.goals;
-        unsafeWindow.console.log("tampermonkey all goals", response);
+        debugLog("tampermonkey all goals", response);
 
         // delete all goals
         allGoals.forEach((goal) => {
@@ -697,21 +703,21 @@ function waitForMishaMessages(patientNumber) {
             query: deleteGoalQuery,
           });
           goalMutation(deleteGoalPayload).then((response) => {
-            unsafeWindow.console.log("tampermonkey deleted goal", response);
+            debugLog("tampermonkey deleted goal", response);
           });
         });
 
         const carePlan = event.data.tmInput;
-        unsafeWindow.console.log(
+        debugLog(
           `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
         );
         const goal = carePlan.goal.title;
-        unsafeWindow.console.log("tampermokey goal title ", goal);
+        debugLog("tampermokey goal title ", goal);
 
         const milestones = carePlan.milestones;
         //create goal for each milestone
         milestones.forEach((element) => {
-          unsafeWindow.console.log("tampermonkey milestone inserted", element);
+          debugLog("tampermonkey milestone inserted", element);
           const milestoneTitle = element.title;
           if (element.isVisible) {
             const query = `mutation {
@@ -756,16 +762,16 @@ function waitForMishaMessages(patientNumber) {
         goalMutation(payload);
 
         const tasks = carePlan.tasks.tasks;
-        unsafeWindow.console.log("tampermonkey tasks are ", tasks);
+        debugLog("tampermonkey tasks are ", tasks);
         //create goal for each task
         tasks.forEach((element) => {
-          unsafeWindow.console.log("tampermonkey task is ", element);
+          debugLog("tampermonkey task is ", element);
           if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
             //motion guide task
-            unsafeWindow.console.log("tampermonkey motion guide assigned");
+            debugLog("tampermonkey motion guide assigned");
             //create goal for each assigned exercise
             element.items[0].exercises.forEach((element) => {
-              unsafeWindow.console.log("tampermonkey", element);
+              debugLog("tampermonkey", element);
               const name = element.contentfulEntityId + " - " + element.side;
               const query = `mutation {
                                   createGoal(input: {
@@ -789,7 +795,7 @@ function waitForMishaMessages(patientNumber) {
           } else {
             if (element.isVisible) {
               //regular task
-              unsafeWindow.console.log("tampermonkey regular task assigned");
+              debugLog("tampermonkey regular task assigned");
               const query = `mutation {
                                   createGoal(input: {
                                     name: "${element.title}",
@@ -823,7 +829,7 @@ function waitForMishaMessages(patientNumber) {
 function waitSettingsAPIpage() {
   //check to see if the care plan tab contents has loaded
   if (document.querySelector(".api_keys")) {
-    unsafeWindow.console.log(`tampermonkey found api keys section`);
+    debugLog(`tampermonkey found api keys section`);
     // Check if the api-keys-wrapper already exists
     let existingWrapper = document.querySelector(".api-keys-wrapper.vori");
     let newButton;
@@ -921,7 +927,7 @@ function waitSettingsAPIpage() {
                             `;
         const getGoalPayload = JSON.stringify({ query: getGoalQuery });
         goalMutation(getGoalPayload).then((response) => {
-          unsafeWindow.console.log(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
+          debugLog(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
 
           if (response.errors) {
             alert("That is not a valid API key. Please verify the key and try again.");
@@ -936,7 +942,7 @@ function waitSettingsAPIpage() {
     };
   } else {
     //wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting for api keys section`);
+    debugLog(`tampermonkey waiting for api keys section`);
     window.setTimeout(waitSettingsAPIpage, 200);
   }
 }
@@ -989,7 +995,7 @@ function isAPIconnected() {
     }
   } else {
     //wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting for header`);
+    debugLog(`tampermonkey waiting for header`);
     window.setTimeout(isAPIconnected, 200);
   }
 }
@@ -1020,19 +1026,19 @@ function showInstructions() {
     }
   } else {
     //wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting to show instructions`);
+    debugLog(`tampermonkey waiting to show instructions`);
     window.setTimeout(showInstructions, 200);
   }
 }
 
 function setGeneralTab() {
   let generalTab = document.querySelector('[data-testid="activetab-general"]');
-  unsafeWindow.console.log(`tampermonkey general tab is`, generalTab);
+  debugLog(`tampermonkey general tab is`, generalTab);
   generalTab &&
     generalTab.addEventListener(
       "click",
       function () {
-        unsafeWindow.console.log(`tampermonkey clicked general tab`, generalTab);
+        debugLog(`tampermonkey clicked general tab`, generalTab);
         waitAppointmentSidebar();
         window.setTimeout(function () {
           setAppointmentCollapse();
@@ -1048,7 +1054,7 @@ function setAppointmentCollapse() {
     appointmentSectionTitle.addEventListener(
       "click",
       function () {
-        unsafeWindow.console.log(`tampermonkey clicked section title`, appointmentSectionTitle.className);
+        debugLog(`tampermonkey clicked section title`, appointmentSectionTitle.className);
         appointmentSectionTitle.className != "cp-sidebar-expandable-section undefined opened" &&
           waitAppointmentSidebar();
       },
@@ -1068,7 +1074,7 @@ function waitInfo() {
       function () {
         window.setTimeout(function () {
           let appointmentWindow = document.querySelector('[data-testid="cp-section-appointments"]');
-          unsafeWindow.console.log(`tampermonkey info clicked`, appointmentWindow);
+          debugLog(`tampermonkey info clicked`, appointmentWindow);
           setGeneralTab();
           setAppointmentCollapse();
           appointmentWindow && waitAppointmentSidebar();
@@ -1084,18 +1090,18 @@ function waitInfo() {
 function waitAppointmentSidebar() {
   let appointmentWindow = document.querySelector('[data-testid="cp-section-appointments"]');
   let goalsTab = document.querySelector('[data-testid="tab-goals"]');
-  unsafeWindow.console.log(`tampermonkey goals tab `, goalsTab);
+  debugLog(`tampermonkey goals tab `, goalsTab);
   goalsTab && goalsTab.remove();
   let actionLinks = Array.from(document.getElementsByClassName("healthie-action-link"));
   if (appointmentWindow && actionLinks[0]) {
     goalsTab && goalsTab.remove();
     actionLinks.forEach((element) => {
-      unsafeWindow.console.log("tampermonkey action link found", element);
+      debugLog("tampermonkey action link found", element);
       element.remove();
     });
   } else {
     //wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting to hide chat links`);
+    debugLog(`tampermonkey waiting to hide chat links`);
     window.setTimeout(waitAppointmentSidebar, 500);
   }
 }
@@ -1103,10 +1109,10 @@ function waitAppointmentSidebar() {
 function waitClientList() {
   const $ = initJQuery();
   let bookLinks = Array.from(document.querySelectorAll("button")).filter((e) => e.textContent === "Book Session");
-  unsafeWindow.console.log(`tampermonkey waiting to update book link`, bookLinks);
+  debugLog(`tampermonkey waiting to update book link`, bookLinks);
   if (bookLinks.length > 0) {
     Array.from(bookLinks).forEach((element) => {
-      unsafeWindow.console.log("tampermonkey book link found", element);
+      debugLog("tampermonkey book link found", element);
       let ID = element.parentElement.getAttribute("data-testid").split("-").at(-1);
       let bookButton = $(element);
       let clonedButton = bookButton.clone(true);
@@ -1120,7 +1126,7 @@ function waitClientList() {
     window.setTimeout(waitClientList, 500);
   } else {
     //wait for content load
-    unsafeWindow.console.log(`tampermonkey waiting to update book link`);
+    debugLog(`tampermonkey waiting to update book link`);
     window.setTimeout(waitClientList, 500);
   }
 }
@@ -1145,7 +1151,7 @@ function goalMutation(payload) {
   })
     .then((res) => res.json())
     .then((result) => {
-      unsafeWindow.console.log("tampermonkey", result);
+      debugLog("tampermonkey", result);
       return result;
     });
 
@@ -1170,10 +1176,10 @@ function addMembershipAndOnboarding() {
 
     const getUserPayload = JSON.stringify({ query: getUserQuery });
     goalMutation(getUserPayload).then((response) => {
-      unsafeWindow.console.log(`tampermonkey get user response`, response);
+      debugLog(`tampermonkey get user response`, response);
       // load  mishaID
       const mishaID = response.data.user.additional_record_identifier;
-      unsafeWindow.console.log(`tampermonkey mishaID`, mishaID);
+      debugLog(`tampermonkey mishaID`, mishaID);
       // create iframe (generateIframe returns a jQuery object)
       const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
       // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
