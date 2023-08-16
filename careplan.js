@@ -119,18 +119,18 @@ function generateIframe(routeURL, options = {}) {
     // https://dev.misha.vori.health/app/schedule
     iFrame.html(
       '<iframe id="MishaFrame" ' +
-      'title="Misha iFrame" ' +
-      'style="height: ' +
-      height +
-      "; width: " +
-      width +
-      '" ' +
-      'src="https://' +
-      mishaURL +
-      routeURL +
-      '"' +
-      ">" +
-      "</iframe>"
+        'title="Misha iFrame" ' +
+        'style="height: ' +
+        height +
+        "; width: " +
+        width +
+        '" ' +
+        'src="https://' +
+        mishaURL +
+        routeURL +
+        '"' +
+        ">" +
+        "</iframe>"
     );
     return iFrame;
   }
