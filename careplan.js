@@ -196,8 +196,8 @@ function waitAppointmentsProfile() {
     return;
   } else {
     // check to see if the appointment view contents have loaded
-    let appointmentWindow = $(".insurance-authorization-section").filter(function () {
-      return $(this).find("h1.level-item:contains('Appointments')").length > 0;
+    let appointmentWindow = $(".insurance-authorization-section div").filter(function () {
+      return $(this).find(".tabs.apps-tabs").length > 0;
     })[0];
     if (appointmentWindow) {
       debugLog(`tampermonkey found appointment view on user profile`);
