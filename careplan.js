@@ -36,6 +36,17 @@ const routeURLs = {
   providerSchedule: "provider-schedule",
 };
 
+const styles = {
+  scheduleOverlay: {
+    display: "inline-block",
+    background: "rgb(255, 255, 255)",
+    maxWidth: "90svw",
+    width: "100vw",
+    height: "90svh",
+    overflow: "hidden",
+  },
+};
+
 //observe changes to the DOM, check for URL changes
 const observer = new MutationObserver(function (mutations) {
   if (location.href !== previousUrl) {
@@ -116,7 +127,7 @@ function generateIframe(routeURL, options = {}) {
     }, 200);
     return;
   } else {
-    let iFrame = $("<div>").css({ padding: "0 11px" }).addClass(className);
+    let iFrame = $("<div>").css({ padding: "0" }).addClass(className);
     // Check for Healthie environment
     let mishaURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
 
@@ -199,14 +210,7 @@ function initBookAppointmentButton() {
       $(bookAppointmentBtn).replaceWith(clonedBtn);
       clonedBtn.on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/${patientNumber}`, {
-          display: "inline-block",
-          background: "rgb(255, 255, 255)",
-          maxWidth: "90svw",
-          width: "100vw",
-          height: "90svh",
-          overflow: "hidden",
-        });
+        showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
       });
     } else {
       debugLog(`tampermonkey waiting for book appointment button`);
@@ -445,7 +449,7 @@ function initCalendar() {
       // Event listeners
       $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}`);
+        showOverlay(`${routeURLs.schedule}`, styles.scheduleOverlay);
       });
       $(".rbc-event.calendar-event").on("click", function (e) {
         e.stopPropagation();
@@ -481,7 +485,7 @@ function initAddButton() {
       clonedBtn.on("click", function (e) {
         e.stopPropagation();
         //https://dev.misha.vori.health/schedule/
-        showOverlay(`${routeURLs.schedule}`);
+        showOverlay(`${routeURLs.schedule}`, styles.scheduleOverlay);
       });
     } else {
       debugLog(`tampermonkey waiting for add appointment button`);
@@ -709,7 +713,7 @@ function waitCarePlan() {
 }
 
 function rescheduleAppointment(appointmentID) {
-  showOverlay(`${routeURLs.schedule}/${appointmentID}`);
+  showOverlay(`${routeURLs.schedule}/${appointmentID}`, styles.scheduleOverlay);
 }
 
 function waitForMishaMessages() {
@@ -1171,7 +1175,7 @@ function waitClientList() {
       clonedButton.on("click", function (e) {
         e.stopPropagation();
         //schedule/patientid
-        showOverlay(`${routeURLs.schedule}/${ID}`);
+        showOverlay(`${routeURLs.schedule}/${ID}`, styles.scheduleOverlay);
       });
       bookButton.replaceWith(clonedButton);
     });
