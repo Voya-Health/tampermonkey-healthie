@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.44
+// @version      0.46
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -186,6 +186,28 @@ function waitAppointmentsHome() {
   }
 }
 
+function initBookAppointmentButton() {
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    window.setTimeout(showOverlay, 200);
+    return;
+  } else {
+    let bookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
+    if (bookAppointmentBtn) {
+      let patientNumber = location.href.split("/")[4];
+      let clonedBtn = $(bookAppointmentBtn).clone();
+      $(bookAppointmentBtn).replaceWith(clonedBtn);
+      clonedBtn.on("click", function (e) {
+        e.stopPropagation();
+        showOverlay(`${routeURLs.schedule}/${patientNumber}`);
+      });
+    } else {
+      debugLog(`tampermonkey waiting for book appointment button`);
+      window.setTimeout(initBookAppointmentButton, 200);
+    }
+  }
+}
+
 function waitAppointmentsProfile() {
   const $ = initJQuery();
   if (!$) {
@@ -193,9 +215,10 @@ function waitAppointmentsProfile() {
     window.setTimeout(waitAppointmentsProfile, 200);
     return;
   } else {
+    initBookAppointmentButton();
     // check to see if the appointment view contents have loaded
-    let appointmentWindow = $(".insurance-authorization-section").filter(function () {
-      return $(this).find("h1.level-item:contains('Appointments')").length > 0;
+    let appointmentWindow = $(".insurance-authorization-section div").filter(function () {
+      return $(this).find(".tabs.apps-tabs").length > 0;
     })[0];
     if (appointmentWindow) {
       debugLog(`tampermonkey found appointment view on user profile`);
