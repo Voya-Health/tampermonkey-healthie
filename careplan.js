@@ -253,7 +253,7 @@ function hideOverlay() {
   }
 }
 
-function showOverlay(url) {
+function showOverlay(url, style = {}) {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
@@ -295,14 +295,17 @@ function showOverlay(url) {
     overlay.append(closeButton);
 
     // Create dialog body element with iframe
-    let dialogBody = $("<div>").addClass("dialog-body").css({
-      background: "#fff",
-      maxWidth: "max(600px, 60vw)",
-      width: "100vw",
-      height: "80vh",
-      height: "80dvh",
-      overflowY: "scroll",
-    });
+    let dialogBody = $("<div>")
+      .addClass("dialog-body")
+      .css({
+        background: "#fff",
+        maxWidth: "max(600px, 60vw)",
+        width: "100vw",
+        height: "80vh",
+        height: "80dvh",
+        overflowY: "scroll",
+        ...style,
+      });
 
     let iframe = generateIframe(url);
     dialogBody.append(iframe); // Append iframe to dialog body
@@ -412,7 +415,6 @@ function initCalendar() {
       // Event listeners
       $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
         e.stopPropagation();
-        //schedule/
         showOverlay(`${routeURLs.schedule}`);
       });
       $(".rbc-event.calendar-event").on("click", function (e) {
@@ -658,10 +660,10 @@ function waitCarePlan() {
           } else {
             debugLog(`tampermonkey mishaID iFrame missing else`, mishaID);
             let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, { className: "cp-tab-contents" });
-            window.setTimeout(()=> {
-                parent.empty();
-                parent.append(iframe);
-            },50)
+            window.setTimeout(() => {
+              parent.empty();
+              parent.append(iframe);
+            }, 50);
 
             //remove styling of healthie tab element
             // document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
@@ -680,7 +682,7 @@ function rescheduleAppointment(appointmentID) {
   showOverlay(`${routeURLs.schedule}/${appointmentID}`);
 }
 
-function waitForMishaMessages(patientNumber) {
+function waitForMishaMessages() {
   window.onmessage = function (event) {
     debugLog("tampermonkey received misha event", event);
     //check event to see if is care plan message
@@ -1199,13 +1201,13 @@ function addMembershipAndOnboarding() {
     goalMutation(getUserPayload).then((response) => {
       debugLog(`tampermonkey get user response`, response);
       // load  mishaID
-      if(response.data.user){
-          const mishaID = response.data.user.additional_record_identifier;
-          debugLog(`tampermonkey mishaID`, mishaID);
-          // create iframe (generateIframe returns a jQuery object)
-          const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
-          // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
-          phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
+      if (response.data.user) {
+        const mishaID = response.data.user.additional_record_identifier;
+        debugLog(`tampermonkey mishaID`, mishaID);
+        // create iframe (generateIframe returns a jQuery object)
+        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
+        // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
+        phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
       }
     });
   } else {
