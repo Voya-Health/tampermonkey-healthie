@@ -1,8 +1,7 @@
 // ==UserScript==
-// @name         Healthie Care Plan Integration
+// @name         Healthie Care Plan Integration dev
 // @namespace    http://tampermonkey.net/
 // @version      0.45
-
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -126,18 +125,18 @@ function generateIframe(routeURL, options = {}) {
     // https://dev.misha.vori.health/app/schedule
     iFrame.html(
       '<iframe id="MishaFrame" ' +
-      'title="Misha iFrame" ' +
-      'style="height: ' +
-      height +
-      "; width: " +
-      width +
-      '" ' +
-      'src="https://' +
-      mishaURL +
-      routeURL +
-      '"' +
-      ">" +
-      "</iframe>"
+        'title="Misha iFrame" ' +
+        'style="height: ' +
+        height +
+        "; width: " +
+        width +
+        '" ' +
+        'src="https://' +
+        mishaURL +
+        routeURL +
+        '"' +
+        ">" +
+        "</iframe>"
     );
     return iFrame;
   }
@@ -174,13 +173,11 @@ function waitAppointmentsHome() {
 
       const getCurrentUserPayload = JSON.stringify({ query: getCurrentUserQuery });
       goalMutation(getCurrentUserPayload).then((response) => {
-
         const userId = response.data.user.id;
         //provider-schedule/id
         const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
         $(appointmentWindowObj).append(iframe);
       });
-
     } else {
       //wait for content load
       debugLog(`tampermonkey waiting appointment view`);
@@ -234,9 +231,12 @@ function waitAppointmentsProfile() {
 
       // example of url to load - https://securestaging.gethealthie.com/users/388687 -
       // if the url is https://securestaging.gethealthie.com/users/388687/Overview then we need to remove the /Overview
-      const patientID = location.href.includes("Overview")
-        ? location.href.split("/")[location.href.split("/").length - 2]
-        : location.href.split("/")[location.href.split("/").length - 1];
+      // const patientID = location.href.includes("Overview")
+      //   ? location.href.split("/")[location.href.split("/").length - 2]
+      //   : location.href.split("/")[location.href.split("/").length - 1];
+      // example of url to load - https://securestaging.gethealthie.com/users/388687
+      // can also be - https://securestaging.gethealthie.com/users/388687/Overview
+      const patientID = location.href.split("/")[4];
       const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
       $(appointmentWindow).append(iframe);
     } else {
@@ -244,6 +244,17 @@ function waitAppointmentsProfile() {
       debugLog(`tampermonkey waiting appointment view on user profile`);
       window.setTimeout(waitAppointmentsProfile, 200);
     }
+  }
+}
+
+function hideOverlay() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    window.setTimeout(hideOverlay, 200);
+    return;
+  } else {
+    $(".overlay-dialog").remove();
   }
 }
 
@@ -412,7 +423,7 @@ function initCalendar() {
       $(".rbc-event.calendar-event").on("click", function (e) {
         e.stopPropagation();
         const dataForValue = $(this).attr("data-for");
-        const apptUuid = dataForValue.split('__')[1].split('_')[0];
+        const apptUuid = dataForValue.split("__")[1].split("_")[0];
         //appointment/appointment id
         showOverlay(`${routeURLs.appointment}/${apptUuid}`);
       });
@@ -636,6 +647,7 @@ function waitCarePlan() {
           if (mishaID === "" || mishaID === null) {
             const iframeMsgExists = $(".vori-iframe-message").length > 0;
             if (!iframeMsgExists) {
+              debugLog(`tampermonkey mishaID iFrame missing`, mishaID);
               $("<div>", {
                 class: "vori-iframe-message",
                 text: "This patient's account has not been linked. \r\n Please contact Vori Health tech team to set it up!",
@@ -649,9 +661,12 @@ function waitCarePlan() {
               }).appendTo(parent.empty());
             }
           } else {
+            debugLog(`tampermonkey mishaID iFrame missing else`, mishaID);
             let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, { className: "cp-tab-contents" });
-            parent && parent.empty();
-            parent && parent.append(iframe);
+            window.setTimeout(() => {
+              parent.empty();
+              parent.append(iframe);
+            }, 50);
 
             //remove styling of healthie tab element
             // document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
@@ -712,9 +727,7 @@ function waitForMishaMessages(patientNumber) {
         });
 
         const carePlan = event.data.tmInput;
-        debugLog(
-          `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`
-        );
+        debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
         const goal = carePlan.goal.title;
         debugLog("tampermokey goal title ", goal);
 
@@ -826,6 +839,14 @@ function waitForMishaMessages(patientNumber) {
 
     if (event.data.reschedule !== undefined || event.data.reload !== undefined) {
       rescheduleAppointment(event.data.reschedule);
+    }
+
+    if (event.data.reload !== undefined) {
+      window.location.reload();
+    }
+
+    if (event.data.closeWindow !== undefined) {
+      hideOverlay();
     }
   };
 }
@@ -1168,7 +1189,8 @@ function addMembershipAndOnboarding() {
 
   if (phoneColumn) {
     // get the patient number from the URL
-    patientNumber = location.href.split("/")[location.href.split("/").length - 1];
+    patientNumber = location.href.split("/")[4];
+    debugLog(`tampermonkey patient number`, patientNumber);
 
     // get the user data
     const getUserQuery = `query {
@@ -1182,12 +1204,14 @@ function addMembershipAndOnboarding() {
     goalMutation(getUserPayload).then((response) => {
       debugLog(`tampermonkey get user response`, response);
       // load  mishaID
-      const mishaID = response.data.user.additional_record_identifier;
-      debugLog(`tampermonkey mishaID`, mishaID);
-      // create iframe (generateIframe returns a jQuery object)
-      const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
-      // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
-      phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
+      if (response.data.user) {
+        const mishaID = response.data.user.additional_record_identifier;
+        debugLog(`tampermonkey mishaID`, mishaID);
+        // create iframe (generateIframe returns a jQuery object)
+        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
+        // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
+        phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
+      }
     });
   } else {
     setTimeout(() => {
