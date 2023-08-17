@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.43
+// @version      0.45
+
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -231,8 +232,11 @@ function waitAppointmentsProfile() {
         appointmentWindow.removeChild(appointmentWindow.lastChild);
       }
 
-      // example of url to load - https://securestaging.gethealthie.com/users/388687
-      const patientID = location.href.split("/").pop();
+      // example of url to load - https://securestaging.gethealthie.com/users/388687 -
+      // if the url is https://securestaging.gethealthie.com/users/388687/Overview then we need to remove the /Overview
+      const patientID = location.href.includes("Overview")
+        ? location.href.split("/")[location.href.split("/").length - 2]
+        : location.href.split("/")[location.href.split("/").length - 1];
       const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
       $(appointmentWindow).append(iframe);
     } else {
