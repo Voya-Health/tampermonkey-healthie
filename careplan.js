@@ -232,7 +232,8 @@ function waitAppointmentsProfile() {
       }
 
       // example of url to load - https://securestaging.gethealthie.com/users/388687
-      const patientID = location.href.split("/").pop();
+      // can also be - https://securestaging.gethealthie.com/users/388687/Overview
+      const patientID = location.href.split("/")[4];
       const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
       $(appointmentWindow).append(iframe);
     } else {
