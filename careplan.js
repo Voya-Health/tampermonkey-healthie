@@ -199,7 +199,14 @@ function initBookAppointmentButton() {
       $(bookAppointmentBtn).replaceWith(clonedBtn);
       clonedBtn.on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/${patientNumber}`);
+        showOverlay(`${routeURLs.schedule}/${patientNumber}`, {
+          display: "inline-block",
+          background: "rgb(255, 255, 255)",
+          maxWidth: "90svw",
+          width: "100vw",
+          height: "90svh",
+          overflow: "hidden",
+        });
       });
     } else {
       debugLog(`tampermonkey waiting for book appointment button`);
