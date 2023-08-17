@@ -143,7 +143,14 @@ function initJQuery() {
 
 function generateIframe(routeURL, options = {}) {
   const $ = initJQuery();
-  const { className = "misha-iframe-container", height = "100vh", width = "100%" } = options;
+
+  className = "misha-iframe-container";
+  const iframeStyles = {
+    height: options.height || "100vh",
+    width: options.width || "100%",
+    ...options,
+  };
+
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
     window.setTimeout(function () {
@@ -151,27 +158,18 @@ function generateIframe(routeURL, options = {}) {
     }, 200);
     return;
   } else {
-    let iFrame = $("<div>").css({ padding: "0" }).addClass(className);
+    const iframeElement = $("<div>").css({ padding: "0" }).addClass(className);
+
     // Check for Healthie environment
     let mishaURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
-
-    // Define inner HTML for created div using jquery
-    iFrame.html(
-      '<iframe id="MishaFrame" ' +
-        'title="Misha iFrame" ' +
-        'style="height: ' +
-        height +
-        "; width: " +
-        width +
-        '" ' +
-        'src="https://' +
-        mishaURL +
-        routeURL +
-        '"' +
-        ">" +
-        "</iframe>"
-    );
-    return iFrame;
+    const iframeContent = $("<iframe>", {
+      id: "MishaFrame",
+      title: "Misha iFrame",
+      style: { ...iframeStyles },
+      src: `https://${mishaURL}${routeURL}`,
+    });
+    iframeElement.append(iframeContent);
+    return iframeElement;
   }
 }
 
