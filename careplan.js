@@ -40,8 +40,10 @@ const styles = {
   scheduleOverlay: {
     display: "inline-block",
     background: "rgb(255, 255, 255)",
+    maxWidth: "90vw", // fallback for browsers that don't support svw
     maxWidth: "90svw",
     width: "100vw",
+    height: "90vh", // fallback for browsers that don't support svh
     height: "90svh",
     overflow: "hidden",
   },
@@ -131,9 +133,7 @@ function generateIframe(routeURL, options = {}) {
     // Check for Healthie environment
     let mishaURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
 
-    // Define inner HTML for created div
-    // Update in the future to a dedicated component
-    // https://dev.misha.vori.health/app/schedule
+    // Define inner HTML for created div using jquery
     iFrame.html(
       '<iframe id="MishaFrame" ' +
         'title="Misha iFrame" ' +
