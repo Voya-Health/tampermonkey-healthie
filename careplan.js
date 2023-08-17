@@ -186,6 +186,28 @@ function waitAppointmentsHome() {
   }
 }
 
+function initBookAppointmentButton() {
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    window.setTimeout(showOverlay, 200);
+    return;
+  } else {
+    let bookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
+    if (bookAppointmentBtn) {
+      let patientNumber = location.href.split("/")[4];
+      let clonedBtn = $(bookAppointmentBtn).clone();
+      $(bookAppointmentBtn).replaceWith(clonedBtn);
+      clonedBtn.on("click", function (e) {
+        e.stopPropagation();
+        showOverlay(`${routeURLs.schedule}/${patientNumber}`);
+      });
+    } else {
+      debugLog(`tampermonkey waiting for book appointment button`);
+      window.setTimeout(initBookAppointmentButton, 200);
+    }
+  }
+}
+
 function waitAppointmentsProfile() {
   const $ = initJQuery();
   if (!$) {
@@ -193,6 +215,7 @@ function waitAppointmentsProfile() {
     window.setTimeout(waitAppointmentsProfile, 200);
     return;
   } else {
+    initBookAppointmentButton();
     // check to see if the appointment view contents have loaded
     let appointmentWindow = $(".insurance-authorization-section div").filter(function () {
       return $(this).find(".tabs.apps-tabs").length > 0;
@@ -229,11 +252,6 @@ function waitAppointmentsProfile() {
         appointmentWindow.removeChild(appointmentWindow.lastChild);
       }
 
-      // example of url to load - https://securestaging.gethealthie.com/users/388687 -
-      // if the url is https://securestaging.gethealthie.com/users/388687/Overview then we need to remove the /Overview
-      // const patientID = location.href.includes("Overview")
-      //   ? location.href.split("/")[location.href.split("/").length - 2]
-      //   : location.href.split("/")[location.href.split("/").length - 1];
       // example of url to load - https://securestaging.gethealthie.com/users/388687
       // can also be - https://securestaging.gethealthie.com/users/388687/Overview
       const patientID = location.href.split("/")[4];
