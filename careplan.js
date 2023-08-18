@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.47
+// @version      0.48
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -18,11 +18,11 @@
 let debug = false;
 let previousUrl = "";
 let patientNumber = "";
+//Keep track of timeouts
+let timeoutIds = [];
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
-const validAppointmentAndMembershibUrlRegex = /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/Overview)?\/?$/;
-
 const urlValidation = {
   apiKeys: /\/settings\/api_keys$/,
   appointments: /\/appointments|\/organization|\/providers\//,
@@ -62,11 +62,30 @@ const styles = {
   },
 };
 
+function createTimeout(timeoutFunction, delay) {
+  let timeoutId = window.setTimeout(() => {
+    timeoutFunction();
+    // Remove timeoutId from the array after function execution
+    // debugLog(`tampermonkey remove timeout ${timeoutId}`);
+    timeoutIds = timeoutIds.filter(id => id !== timeoutId);
+  }, delay);
+  //debugLog(`tampermonkey create timeout ${timeoutId}`);
+  timeoutIds.push(timeoutId);
+}
+
 //observe changes to the DOM, check for URL changes
 const observer = new MutationObserver(function (mutations) {
   if (location.href !== previousUrl) {
     previousUrl = location.href;
     debugLog(`tampermonkey URL changed to ${location.href}`);
+
+    // Clear all timeouts
+    for (let i = 0; i < timeoutIds.length; i++) {
+      //debugLog(`tampermonkey clear timeout ${timeoutIds[i]}`);
+      clearTimeout(timeoutIds[i]);
+    }
+    timeoutIds = [];
+
     waitForMishaMessages();
 
     //Care plans URL
@@ -137,7 +156,7 @@ function initJQuery() {
       debugLog(`tampermonkey jquery loaded successfully`);
     };
     document.getElementsByTagName("head")[0].appendChild(script);
-    window.setTimeout(initJQuery, 200);
+    createTimeout(initJQuery, 200);
   }
 }
 
@@ -161,7 +180,7 @@ function generateIframe(routeURL, options = {}) {
 
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    window.setTimeout(function () {
+    createTimeout(function () {
       generateIframe(routeURL);
     }, 200);
     return;
@@ -185,7 +204,7 @@ function waitAppointmentsHome() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey jquery not loaded`);
-    window.setTimeout(waitAppointmentsProfile, 200);
+    createTimeout(waitAppointmentsHome, 200);
     return;
   } else {
     //check to see if the appointment view contents has loaded
@@ -220,7 +239,7 @@ function waitAppointmentsHome() {
     } else {
       //wait for content load
       debugLog(`tampermonkey waiting appointment view`);
-      window.setTimeout(waitAppointmentsHome, 200);
+      createTimeout(waitAppointmentsHome, 200);
     }
   }
 }
@@ -228,7 +247,7 @@ function waitAppointmentsHome() {
 function initBookAppointmentButton() {
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    window.setTimeout(showOverlay, 200);
+    createTimeout(showOverlay, 200);
     return;
   } else {
     let bookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
@@ -242,7 +261,7 @@ function initBookAppointmentButton() {
       });
     } else {
       debugLog(`tampermonkey waiting for book appointment button`);
-      window.setTimeout(initBookAppointmentButton, 200);
+      createTimeout(initBookAppointmentButton, 200);
     }
   }
 }
@@ -251,7 +270,7 @@ function waitAppointmentsProfile() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey jquery not loaded`);
-    window.setTimeout(waitAppointmentsProfile, 200);
+    createTimeout(waitAppointmentsProfile, 200);
     return;
   } else {
     initBookAppointmentButton();
@@ -299,7 +318,7 @@ function waitAppointmentsProfile() {
     } else {
       // wait for content load
       debugLog(`tampermonkey waiting appointment view on user profile`);
-      window.setTimeout(waitAppointmentsProfile, 200);
+      createTimeout(waitAppointmentsProfile, 200);
     }
   }
 }
@@ -308,7 +327,7 @@ function hideOverlay() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    window.setTimeout(hideOverlay, 200);
+    createTimeout(hideOverlay, 200);
     return;
   } else {
     $(".overlay-dialog").remove();
@@ -319,7 +338,7 @@ function showOverlay(url, style = {}) {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    window.setTimeout(showOverlay, 200);
+    createTimeout(showOverlay, 200);
     return;
   } else {
     // Create overlay element
@@ -387,7 +406,7 @@ function initCalendar() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`Tampermonkey jQuery not loaded`);
-    window.setTimeout(initCalendar, 200);
+    createTimeout(initCalendar, 200);
     return;
   } else {
     debugLog(`Tampermonkey initializing calendar`);
@@ -430,7 +449,7 @@ function initCalendar() {
     const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
     if (calendarLoading.length > 0) {
       debugLog(`Tampermonkey waiting for calendar to load`);
-      window.setTimeout(initCalendar, 200);
+      createTimeout(initCalendar, 200);
       return;
     }
 
@@ -494,7 +513,7 @@ function initCalendar() {
         window.location.reload();
       } else {
         debugLog(`Tampermonkey waiting for calendar and events`);
-        window.setTimeout(initCalendar, 200);
+        createTimeout(initCalendar, 200);
       }
     }
   }
@@ -503,7 +522,7 @@ function initCalendar() {
 function initAddButton() {
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    window.setTimeout(showOverlay, 200);
+    createTimeout(showOverlay, 200);
     return;
   } else {
     let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
@@ -517,7 +536,7 @@ function initAddButton() {
       });
     } else {
       debugLog(`tampermonkey waiting for add appointment button`);
-      window.setTimeout(waitAddAppointmentsBtn, 200);
+      createTimeout(waitAddAppointmentsBtn, 200);
     }
   }
 }
@@ -581,7 +600,7 @@ function waitAddAppointmentsBtn() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey jquery not loaded`);
-    window.setTimeout(waitAppointmentsProfile, 200);
+    createTimeout(waitAppointmentsProfile, 200);
     return;
   } else {
     initAddButton($);
@@ -596,7 +615,7 @@ function waitGoalTab() {
   } else {
     //wait for content load
     debugLog(`tampermonkey waiting goals tab`);
-    window.setTimeout(waitGoalTab, 200);
+    createTimeout(waitGoalTab, 200);
   }
 }
 
@@ -604,7 +623,7 @@ function waitCarePlan() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    window.setTimeout(waitCarePlan, 200);
+    createTimeout(waitCarePlan, 200);
     return;
   } else {
     //check to see if the care plan tab contents has loaded
@@ -722,7 +741,7 @@ function waitCarePlan() {
           } else {
             debugLog(`tampermonkey mishaID iFrame missing else`, mishaID);
             let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, { className: "cp-tab-contents" });
-            window.setTimeout(() => {
+            createTimeout(() => {
               parent.empty();
               parent.append(iframe);
             }, 50);
@@ -735,7 +754,7 @@ function waitCarePlan() {
     } else {
       //wait for content load
       debugLog(`tampermonkey waiting for careplan tab`);
-      window.setTimeout(waitCarePlan, 200);
+      createTimeout(waitCarePlan, 200);
     }
   }
 }
@@ -1018,7 +1037,7 @@ function waitSettingsAPIpage() {
           } else {
             GM_setValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", apiKey);
             alert("API key saved successfully!");
-            window.setTimeout(null, 2000);
+            createTimeout(null, 2000);
             window.location.reload();
           }
         });
@@ -1027,7 +1046,7 @@ function waitSettingsAPIpage() {
   } else {
     //wait for content load
     debugLog(`tampermonkey waiting for api keys section`);
-    window.setTimeout(waitSettingsAPIpage, 200);
+    createTimeout(waitSettingsAPIpage, 200);
   }
 }
 
@@ -1080,7 +1099,7 @@ function isAPIconnected() {
   } else {
     //wait for content load
     debugLog(`tampermonkey waiting for header`);
-    window.setTimeout(isAPIconnected, 200);
+    createTimeout(isAPIconnected, 200);
   }
 }
 
@@ -1111,7 +1130,7 @@ function showInstructions() {
   } else {
     //wait for content load
     debugLog(`tampermonkey waiting to show instructions`);
-    window.setTimeout(showInstructions, 200);
+    createTimeout(showInstructions, 200);
   }
 }
 
@@ -1124,7 +1143,7 @@ function setGeneralTab() {
       function () {
         debugLog(`tampermonkey clicked general tab`, generalTab);
         waitAppointmentSidebar();
-        window.setTimeout(function () {
+        createTimeout(function () {
           setAppointmentCollapse();
         }, 600);
       },
@@ -1149,14 +1168,14 @@ function setAppointmentCollapse() {
 function waitInfo() {
   let infoButton = document.getElementsByClassName("right-menu-trigger is-hidden-mobile")[0];
   if (infoButton) {
-    window.setTimeout(function () {
+    createTimeout(function () {
       setGeneralTab();
       setAppointmentCollapse();
     }, 600);
     infoButton.addEventListener(
       "click",
       function () {
-        window.setTimeout(function () {
+        createTimeout(function () {
           let appointmentWindow = document.querySelector('[data-testid="cp-section-appointments"]');
           debugLog(`tampermonkey info clicked`, appointmentWindow);
           setGeneralTab();
@@ -1167,7 +1186,7 @@ function waitInfo() {
       false
     );
   } else {
-    window.setTimeout(waitInfo, 500);
+    createTimeout(waitInfo, 500);
   }
 }
 
@@ -1186,7 +1205,7 @@ function waitAppointmentSidebar() {
   } else {
     //wait for content load
     debugLog(`tampermonkey waiting to hide chat links`);
-    window.setTimeout(waitAppointmentSidebar, 500);
+    createTimeout(waitAppointmentSidebar, 500);
   }
 }
 
@@ -1207,11 +1226,11 @@ function waitClientList() {
       });
       bookButton.replaceWith(clonedButton);
     });
-    window.setTimeout(waitClientList, 500);
+    createTimeout(waitClientList, 500);
   } else {
     //wait for content load
     debugLog(`tampermonkey waiting to update book link`);
-    window.setTimeout(waitClientList, 500);
+    createTimeout(waitClientList, 500);
   }
 }
 
@@ -1273,7 +1292,7 @@ function addMembershipAndOnboarding() {
       }
     });
   } else {
-    setTimeout(() => {
+    createTimeout(() => {
       addMembershipAndOnboarding();
     }, 200);
   }
