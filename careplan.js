@@ -150,9 +150,14 @@ function generateIframe(routeURL, options = {}) {
     width: options.width || "100%",
     ...options,
   };
+  // Convert iframeStyles object to CSS string
   const iframeStyleString = Object.entries(iframeStyles)
-    .map(([property, value]) => `${property}: ${value};`)
+    .map(([property, value]) => `${convertToCSSProperty(property)}: ${value};`)
     .join(" ");
+
+  function convertToCSSProperty(jsProperty) {
+    return jsProperty.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+  }
 
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
