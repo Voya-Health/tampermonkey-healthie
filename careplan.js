@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.47
+// @version      0.48
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -1268,8 +1268,10 @@ function addMembershipAndOnboarding() {
         debugLog(`tampermonkey mishaID`, mishaID);
         // create iframe (generateIframe returns a jQuery object)
         const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
+        // check if iframe already exists by searching for .misha-iframe-container in the phone column
+        const iframeExists = phoneColumn.querySelector(".misha-iframe-container");
         // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
-        phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
+        !iframeExists && phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
       }
     });
   } else {
