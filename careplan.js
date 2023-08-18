@@ -1242,7 +1242,38 @@ function goalMutation(payload) {
   return response;
 }
 
+function observeBasicInfoChanges(mutations, observer) {
+  const targetClasses = ["cp-sidebar-expandable-section"];
+
+  for (const mutation of mutations) {
+    const { target, addedNodes, removedNodes } = mutation;
+
+    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
+    if (
+      (target && targetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => addedNode.classList.contains(className))
+        ))
+    ) {
+      // // Disconnect the observer temporarily to prevent observing during the cloning process
+      observer.disconnect();
+      // initCalendar();
+      addMembershipAndOnboarding();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break;
+    }
+  }
+}
+
 function addMembershipAndOnboarding() {
+  const observer = new MutationObserver(observeBasicInfoChanges);
+  const targetNode = document.documentElement;
+  const config = { childList: true, subtree: true };
+  observer.observe(targetNode, config);
+
   //get phone icon and related column
   const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
 
