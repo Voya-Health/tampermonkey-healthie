@@ -150,6 +150,9 @@ function generateIframe(routeURL, options = {}) {
     width: options.width || "100%",
     ...options,
   };
+  const iframeStyleString = Object.entries(iframeStyles)
+    .map(([property, value]) => `${property}: ${value};`)
+    .join(" ");
 
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
@@ -165,7 +168,7 @@ function generateIframe(routeURL, options = {}) {
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
       title: "Misha iFrame",
-      style: { ...iframeStyles },
+      style: iframeStyleString,
       src: `https://${mishaURL}${routeURL}`,
     });
     iframeElement.append(iframeContent);
