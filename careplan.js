@@ -1269,15 +1269,16 @@ function observeBasicInfoChanges(mutations, observer) {
 }
 
 function addMembershipAndOnboarding() {
-  const observer = new MutationObserver(observeBasicInfoChanges);
-  const targetNode = document.documentElement;
-  const config = { childList: true, subtree: true };
-  observer.observe(targetNode, config);
-
   //get phone icon and related column
   const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
+  const iframeExists = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
 
-  if (phoneColumn) {
+  if (phoneColumn && !iframeExists) {
+    const observer = new MutationObserver(observeBasicInfoChanges);
+    const targetNode = document.documentElement;
+    const config = { childList: true, subtree: true };
+    observer.observe(targetNode, config);
+
     // get the patient number from the URL
     patientNumber = location.href.split("/")[4];
     debugLog(`tampermonkey patient number`, patientNumber);
