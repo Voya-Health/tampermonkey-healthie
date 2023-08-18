@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.48
+// @version      0.49
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -67,7 +67,7 @@ function createTimeout(timeoutFunction, delay) {
     timeoutFunction();
     // Remove timeoutId from the array after function execution
     // debugLog(`tampermonkey remove timeout ${timeoutId}`);
-    timeoutIds = timeoutIds.filter(id => id !== timeoutId);
+    timeoutIds = timeoutIds.filter((id) => id !== timeoutId);
   }, delay);
   //debugLog(`tampermonkey create timeout ${timeoutId}`);
   timeoutIds.push(timeoutId);
@@ -188,7 +188,7 @@ function generateIframe(routeURL, options = {}) {
     const iframeElement = $("<div>").css({ padding: "0" }).addClass(className);
 
     // Check for Healthie environment
-    let mishaURL = isStagingEnv ? "dev.misha.vori.health/" : "misha.vorihealth.com/";
+    let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
       title: "Misha iFrame",
@@ -531,7 +531,7 @@ function initAddButton() {
       $(addAppointmentBtn).replaceWith(clonedBtn);
       clonedBtn.on("click", function (e) {
         e.stopPropagation();
-        //https://dev.misha.vori.health/schedule/
+        //https://qa.misha.vori.health/schedule/
         showOverlay(`${routeURLs.schedule}`, styles.scheduleOverlay);
       });
     } else {
