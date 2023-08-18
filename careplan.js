@@ -1271,9 +1271,9 @@ function observeBasicInfoChanges(mutations, observer) {
 function addMembershipAndOnboarding() {
   //get phone icon and related column
   const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
-  const iframeExists = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
+  const iframeAdded = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
 
-  if (phoneColumn && !iframeExists) {
+  if (phoneColumn && !iframeAdded) {
     const observer = new MutationObserver(observeBasicInfoChanges);
     const targetNode = document.documentElement;
     const config = { childList: true, subtree: true };
