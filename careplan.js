@@ -1261,11 +1261,43 @@ function goalMutation(payload) {
   return response;
 }
 
+function observeBasicInfoChanges(mutations, observer) {
+  const targetClasses = ["cp-sidebar-expandable-section"];
+
+  for (const mutation of mutations) {
+    const { target, addedNodes, removedNodes } = mutation;
+
+    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
+    if (
+      (target && targetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => addedNode.classList.contains(className))
+        ))
+    ) {
+      // // Disconnect the observer temporarily to prevent observing during the cloning process
+      observer.disconnect();
+      // initCalendar();
+      addMembershipAndOnboarding();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break;
+    }
+  }
+}
+
 function addMembershipAndOnboarding() {
   //get phone icon and related column
   const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
+  const iframeAdded = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
 
-  if (phoneColumn) {
+  if (phoneColumn && !iframeAdded) {
+    const observer = new MutationObserver(observeBasicInfoChanges);
+    const targetNode = document.documentElement;
+    const config = { childList: true, subtree: true };
+    observer.observe(targetNode, config);
+
     // get the patient number from the URL
     patientNumber = location.href.split("/")[4];
     debugLog(`tampermonkey patient number`, patientNumber);
@@ -1287,8 +1319,9 @@ function addMembershipAndOnboarding() {
         debugLog(`tampermonkey mishaID`, mishaID);
         // create iframe (generateIframe returns a jQuery object)
         const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
+        const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
         // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
-        phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
+        !iframeExists && phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
       }
     });
   } else {
