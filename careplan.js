@@ -364,7 +364,7 @@ function showOverlay(url, style = {}) {
         ...style,
       });
 
-    let iframe = generateIframe(url);
+    let iframe = generateIframe(url, style);
     dialogBody.append(iframe); // Append iframe to dialog body
     overlay.append(dialogBody); // Append dialog body to overlay
     const existingOverlay = $(".body").find(".overlay-dialog");
