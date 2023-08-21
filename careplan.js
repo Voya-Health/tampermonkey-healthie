@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.49
+// @version      0.50
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -21,6 +21,7 @@ let patientNumber = "";
 //Keep track of timeouts
 let timeoutIds = [];
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
+let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "gethealthie.com";
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 const urlValidation = {
@@ -189,6 +190,7 @@ function generateIframe(routeURL, options = {}) {
 
     // Check for Healthie environment
     let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
+
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
       title: "Misha iFrame",
@@ -925,6 +927,11 @@ function waitForMishaMessages() {
 
     if (event.data.closeWindow !== undefined) {
       hideOverlay();
+    }
+
+    if (event.data.patientProfile !== undefined) {
+      debugLog("tampermonkey navigating to patient profile", event.data.patientProfile);
+      window.open(`https://${healthieURL}/users/${event.data.patientProfile}`, "_top");
     }
   };
 }
