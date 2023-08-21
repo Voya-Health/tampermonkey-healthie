@@ -926,6 +926,10 @@ function waitForMishaMessages() {
     if (event.data.closeWindow !== undefined) {
       hideOverlay();
     }
+
+    if (event.data.patientProfile !== undefined) {
+      window.open(`${mishaURL}users/${event.data.patientProfile}`);
+    }
   };
 }
 
