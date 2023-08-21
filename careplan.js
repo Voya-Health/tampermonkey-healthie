@@ -930,7 +930,8 @@ function waitForMishaMessages() {
     }
 
     if (event.data.patientProfile !== undefined) {
-      window.location.assign = `https://${healthieURL}/users/${event.data.patientProfile}`;
+      debugLog("tampermonkey navigating to patient profile", event.data.patientProfile);
+      window.open(`https://${healthieURL}/users/${event.data.patientProfile}`, "_top");
     }
   };
 }
