@@ -21,7 +21,7 @@ let patientNumber = "";
 //Keep track of timeouts
 let timeoutIds = [];
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
-let healthieURL = isStagingEnv ? "securestaging.gethealthie.com/" : "gethealthie.com/";
+let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "gethealthie.com";
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 const urlValidation = {
@@ -930,7 +930,7 @@ function waitForMishaMessages() {
     }
 
     if (event.data.patientProfile !== undefined) {
-      window.location.assign = `${mishaURL}users/${event.data.patientProfile}`;
+      window.location.assign = `https://${healthieURL}/users/${event.data.patientProfile}`;
     }
   };
 }
