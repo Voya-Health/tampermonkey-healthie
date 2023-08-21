@@ -21,7 +21,7 @@ let patientNumber = "";
 //Keep track of timeouts
 let timeoutIds = [];
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
-let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
+let healthieURL = isStagingEnv ? "securestaging.gethealthie.com/" : "gethealthie.com/";
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 const urlValidation = {
@@ -189,6 +189,8 @@ function generateIframe(routeURL, options = {}) {
     const iframeElement = $("<div>").css({ padding: "0" }).addClass(className);
 
     // Check for Healthie environment
+    let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
+
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
       title: "Misha iFrame",
@@ -928,7 +930,7 @@ function waitForMishaMessages() {
     }
 
     if (event.data.patientProfile !== undefined) {
-      window.open(`${mishaURL}users/${event.data.patientProfile}`);
+      window.location.assign = `${mishaURL}users/${event.data.patientProfile}`;
     }
   };
 }
