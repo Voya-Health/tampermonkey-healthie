@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.49
+// @version      0.50
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -21,6 +21,7 @@ let patientNumber = "";
 //Keep track of timeouts
 let timeoutIds = [];
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
+let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 const urlValidation = {
@@ -188,7 +189,6 @@ function generateIframe(routeURL, options = {}) {
     const iframeElement = $("<div>").css({ padding: "0" }).addClass(className);
 
     // Check for Healthie environment
-    let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
       title: "Misha iFrame",
