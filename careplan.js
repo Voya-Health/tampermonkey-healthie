@@ -526,6 +526,14 @@ function initAddButton() {
     createTimeout(showOverlay, 200);
     return;
   } else {
+    let activeTab = $(".calendar-tabs").find(".tab-item.active");
+    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
+
+    if (availabilitiesTab) {
+      debugLog(`Tampermonkey calendar is on availability tab - nothing to do here`);
+      return;
+    }
+
     let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
     if (addAppointmentBtn) {
       let clonedBtn = $(addAppointmentBtn).clone();
