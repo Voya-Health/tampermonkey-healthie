@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.51
+// @version      0.52
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -419,6 +419,19 @@ function initCalendar() {
       return;
     }
 
+    let calendar = null;
+    let calendarEvents = $(".rbc-event.calendar-event.with-label-spacing");
+    let calendarHeaderBtns = $(".rbc-btn-group");
+    let activeBtn = calendarHeaderBtns.find(".rbc-active");
+    let activeTab = $(".calendar-tabs").find(".tab-item.active");
+    let calendarTab = activeTab && activeTab.text().toLowerCase().includes("calendar");
+    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
+
+    if (availabilitiesTab) {
+      debugLog(`Tampermonkey calendar is on availability tab - nothing to do here`);
+      return;
+    }
+
     // Check if calendar is loaded and cloned
     if ($(".main-calendar-column").find(".cloned-calendar").length > 0) {
       debugLog(`Tampermonkey calendar already cloned`);
@@ -455,14 +468,6 @@ function initCalendar() {
       return;
     }
 
-    let calendar = null;
-    let calendarEvents = $(".rbc-event.calendar-event.with-label-spacing");
-    let calendarHeaderBtns = $(".rbc-btn-group");
-    let activeBtn = calendarHeaderBtns.find(".rbc-active");
-    let activeTab = $(".calendar-tabs").find(".tab-item.active");
-    let calendarTab = activeTab && activeTab.text().toLowerCase().includes("calendar");
-    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
-
     if (calendarTab) {
       if (
         activeBtn &&
@@ -486,12 +491,6 @@ function initCalendar() {
           });
         }
       }
-    } else if (availabilitiesTab) {
-      debugLog(`Tampermonkey calendar is on availability tab`);
-      calendar = $(".rbc-time-content");
-      let clonedCalendar = calendar.clone(true);
-      clonedCalendar.addClass("cloned-calendar");
-      calendar.replaceWith(clonedCalendar);
     }
 
     if (calendar) {
@@ -527,6 +526,14 @@ function initAddButton() {
     createTimeout(showOverlay, 200);
     return;
   } else {
+    let activeTab = $(".calendar-tabs").find(".tab-item.active");
+    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
+
+    if (availabilitiesTab) {
+      debugLog(`Tampermonkey calendar is on availability tab - nothing to do here`);
+      return;
+    }
+
     let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
     if (addAppointmentBtn) {
       let clonedBtn = $(addAppointmentBtn).clone();
@@ -602,7 +609,7 @@ function waitAddAppointmentsBtn() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey jquery not loaded`);
-    createTimeout(waitAppointmentsProfile, 200);
+    createTimeout(waitAddAppointmentsBtn, 200);
     return;
   } else {
     initAddButton($);
