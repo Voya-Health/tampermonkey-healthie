@@ -966,6 +966,7 @@ function waitSettingsAPIpage() {
       newHeader.style.letterSpacing = "-.02em";
 
       let inputButtonWrapper = document.createElement("div");
+      inputButtonWrapper.classList.add("api-keys-input-button-wrapper");
       inputButtonWrapper.style.display = "flex";
       inputButtonWrapper.style.justifyContent = "space-between";
       inputButtonWrapper.style.width = "100%";
@@ -1111,8 +1112,8 @@ function isAPIconnected() {
 }
 
 function showInstructions() {
-  if (document.querySelector(".api-keys-wrapper") && document.querySelector(".api-keys-wrapper p")) {
-    const apiKeyParagraph = document.querySelector(".api-keys-wrapper p");
+  if (document.querySelector(".api-keys-wrapper") && document.querySelector(".api-keys-input-button-wrapper")) {
+    const apiKeyInputContainer = document.querySelector(".api-keys-input-button-wrapper");
 
     if (healthieAPIKey === "") {
       const instructions = document.createElement("p");
@@ -1132,7 +1133,7 @@ function showInstructions() {
       instructions.style.padding = "10px";
       instructions.style.marginTop = "14px";
 
-      apiKeyParagraph.insertAdjacentElement("afterend", instructions);
+      apiKeyInputContainer.insertAdjacentElement("afterend", instructions);
     }
   } else {
     //wait for content load
