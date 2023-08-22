@@ -602,7 +602,7 @@ function waitAddAppointmentsBtn() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey jquery not loaded`);
-    createTimeout(waitAppointmentsProfile, 200);
+    createTimeout(waitAddAppointmentsBtn, 200);
     return;
   } else {
     initAddButton($);
