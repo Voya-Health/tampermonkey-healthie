@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.52
+// @version      0.53
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -123,9 +123,7 @@ const observer = new MutationObserver(function (mutations) {
       waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
       waitCalendar(); //Function to handle clicking on empty appointment slots
     }
-
-    const baseURL = location.href.split(".").splice(2).join(".");
-    debugLog("tampermonkey splice is ", baseURL);
+    
     if (urlValidation.appointmentsHome.test(location.href)) {
       debugLog("tampermonkey calls waitAppointmentsHome");
       waitAppointmentsHome();
@@ -212,6 +210,10 @@ function waitAppointmentsHome() {
     //check to see if the appointment view contents has loaded
     let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
     if (appointmentWindow.length > 0) {
+      const observer = new MutationObserver(observeHomeRouteChanges);
+      const targetNode = document.documentElement;
+      const config = { childList: true, subtree: true };
+      observer.observe(targetNode, config);
       debugLog(`tampermonkey found appointment view`, appointmentWindow.length);
       let appointmentWindowObj = appointmentWindow[0];
       //remove all except first child
@@ -1343,5 +1345,31 @@ function addMembershipAndOnboarding() {
     createTimeout(() => {
       addMembershipAndOnboarding();
     }, 200);
+  }
+}
+
+function observeHomeRouteChanges(mutations, observer) {
+  const targetClasses = ["provider-home-content"];
+
+  for (const mutation of mutations) {
+    const { target, addedNodes, removedNodes } = mutation;
+
+    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
+    if (
+      (target && targetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => addedNode.classList.contains(className))
+        ))
+    ) {
+      // // Disconnect the observer temporarily to prevent observing during the cloning process
+      observer.disconnect();
+      // initCalendar();
+      waitAppointmentsHome();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break;
+    }
   }
 }
