@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.53
+// @version      0.54
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -76,9 +76,12 @@ function createTimeout(timeoutFunction, delay) {
 
 //observe changes to the DOM, check for URL changes
 const observer = new MutationObserver(function (mutations) {
+  debugLog(`tampermonkey debug observable running `);
+
   if (location.href !== previousUrl) {
     previousUrl = location.href;
     debugLog(`tampermonkey URL changed to ${location.href}`);
+    debugLog(`tampermonkey debug  URL changed to ${location.href}`);
 
     // Clear all timeouts
     for (let i = 0; i < timeoutIds.length; i++) {
@@ -94,6 +97,8 @@ const observer = new MutationObserver(function (mutations) {
     if (urlValidation.carePlan.test(location.href)) {
       //Function that will check when care plan tab has loaded
       debugLog("tampermonkey calls waitCarePlan");
+      debugLog(`tampermonkey debug  calls waitCarePlan`);
+
       waitCarePlan();
     }
 
@@ -631,20 +636,32 @@ function waitGoalTab() {
 }
 
 function waitCarePlan() {
+  debugLog(`tampermonkey debug waitCarePlan`);
+
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(waitCarePlan, 200);
     return;
   } else {
+
     //check to see if the care plan tab contents has loaded
     const cpTabContents = $(".cp-tab-contents");
     if (cpTabContents.length > 0) {
+      //-----------------------
+      // const observer = new MutationObserver(observeCarePlansRouteChanges);
+      // const targetNode = document.documentElement;
+      // const config = { childList: true, subtree: true };
+      // observer.observe(targetNode, config);
+      //-----------------------
+      debugLog(`tampermonkey debug cpTabContents.length > 0)`);
       // handle edge case: clicking on careplan tab multiple times
       const careplanTabBtn = $('a[data-testid="careplans-tab-btn"]');
       careplanTabBtn.on("click", handleCarePlanTabClick);
 
       function handleCarePlanTabClick() {
+        debugLog(`tampermonkey debug handleCarePlanTabClick`);
+
         if (location.href.includes("all_plans")) {
           if (healthieAPIKey !== "") {
             cpTabContents && cpTabContents.empty();
@@ -656,6 +673,7 @@ function waitCarePlan() {
       //Locate and remove existing care plan tab content  - remove each child of .cp-tab-contents
       //causing crash in prod Healthie
       //cpTabContents.empty();
+      debugLog(`tampermonkey debug continues`);
 
       const parent = cpTabContents.eq(0);
 
@@ -1373,3 +1391,60 @@ function observeHomeRouteChanges(mutations, observer) {
     }
   }
 }
+
+
+function observeCarePlansRouteChanges(mutations, observer) {
+  const targetClasses = ["cp-tab-contents"];
+
+  for (const mutation of mutations) {
+    const { target, addedNodes, removedNodes } = mutation;
+
+    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
+    if (
+      (target && targetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            targetClasses.some((className) => addedNode.classList.contains(className))
+        ))
+    ) {
+      // // Disconnect the observer temporarily to prevent observing during the cloning process
+      observer.disconnect();
+      // initCalendar();
+      waitCarePlan();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break;
+    }
+  }
+}
+
+
+
+
+//version2
+// function observeCarePlansRouteChanges(mutations, observer) {
+//   const targetTestId = 'cp-tab-contents';
+
+//   for (const mutation of mutations) {
+//     const { target, addedNodes } = mutation;
+
+//     // Check if the mutation target or any added node has the target test id
+//     if (
+//       (target && target.dataset.testid === targetTestId) ||
+//       (addedNodes &&
+//         Array.from(addedNodes).some(
+//           (addedNode) =>
+//             addedNode.nodeType === Node.ELEMENT_NODE &&
+//             addedNode.dataset.testid === targetTestId
+//         ))
+//     ) {
+//       // Disconnect the observer temporarily to prevent observing during the cloning process
+//       observer.disconnect();
+//       // initCalendar();
+//       waitCarePlan();
+//       observer.observe(document.documentElement, { childList: true, subtree: true });
+//       break;
+//     }
+//   }
+// }
