@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.53
+// @version      0.54
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -18,6 +18,7 @@
 let debug = false;
 let previousUrl = "";
 let patientNumber = "";
+let carePlanLoopLock = 0;
 //Keep track of timeouts
 let timeoutIds = [];
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
@@ -76,8 +77,10 @@ function createTimeout(timeoutFunction, delay) {
 
 //observe changes to the DOM, check for URL changes
 const observer = new MutationObserver(function (mutations) {
-  if (location.href !== previousUrl) {
+  if (location.href !== previousUrl)  {
     previousUrl = location.href;
+    //reset loop flag
+    carePlanLoopLock = 0;
     debugLog(`tampermonkey URL changed to ${location.href}`);
 
     // Clear all timeouts
@@ -139,6 +142,21 @@ const observer = new MutationObserver(function (mutations) {
       waitClientList();
     }
     isAPIconnected();
+  } 
+  else {
+    //debugLog(`tampermonkey debug  else`);
+        //if (location.href.includes("/all_plans")) {
+          //carePlanLoopLock avoids triggering infinite loop  
+          if (carePlanLoopLock > 1 && location.href.includes("all_plans")) {
+            var iframe = document.querySelector('#MishaFrame.cp-tab-contents');
+            //check if Iframe doesn't exists 
+            if(!iframe) {
+              //debugLog("tampermonkey debug The iframe does not exist");
+              //reset loop flag
+              carePlanLoopLock = 0;
+             waitCarePlan();
+            } 
+          }
   }
 });
 
@@ -756,7 +774,7 @@ function waitCarePlan() {
               parent.empty();
               parent.append(iframe);
             }, 50);
-
+            	carePlanLoopLock = carePlanLoopLock + 1;
             //remove styling of healthie tab element
             // document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
           }
