@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.54
+// @version      0.55
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -154,6 +154,15 @@ const observer = new MutationObserver(function (mutations) {
               //debugLog("tampermonkey debug The iframe does not exist");
               //reset loop flag
               carePlanLoopLock = 0;
+              //Checks if goals tab exists (with a different id) and removes it.
+              let goalsTab = document.querySelector('[data-testid="goals-tab-btn"]');
+              debugLog(`tampermonkey goals tab `, goalsTab);
+              if (goalsTab) {
+                let parentDiv = goalsTab.closest('div');
+                if (parentDiv) {
+                  parentDiv.remove();
+                }
+              }
              waitCarePlan();
             } 
           }
