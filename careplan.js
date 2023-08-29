@@ -22,7 +22,7 @@ let carePlanLoopLock = 0;
 //Keep track of timeouts
 let timeoutIds = [];
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
-let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "gethealthie.com";
+let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "secure.vorihealth.com";
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 const urlValidation = {
@@ -77,7 +77,7 @@ function createTimeout(timeoutFunction, delay) {
 
 //observe changes to the DOM, check for URL changes
 const observer = new MutationObserver(function (mutations) {
-  if (location.href !== previousUrl)  {
+  if (location.href !== previousUrl) {
     previousUrl = location.href;
     //reset loop flag
     carePlanLoopLock = 0;
@@ -126,7 +126,7 @@ const observer = new MutationObserver(function (mutations) {
       waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
       waitCalendar(); //Function to handle clicking on empty appointment slots
     }
-    
+
     if (urlValidation.appointmentsHome.test(location.href)) {
       debugLog("tampermonkey calls waitAppointmentsHome");
       waitAppointmentsHome();
@@ -142,30 +142,29 @@ const observer = new MutationObserver(function (mutations) {
       waitClientList();
     }
     isAPIconnected();
-  } 
-  else {
+  } else {
     //debugLog(`tampermonkey debug  else`);
-        //if (location.href.includes("/all_plans")) {
-          //carePlanLoopLock avoids triggering infinite loop  
-          if (carePlanLoopLock > 1 && location.href.includes("all_plans")) {
-            var iframe = document.querySelector('#MishaFrame.cp-tab-contents');
-            //check if Iframe doesn't exists 
-            if(!iframe) {
-              //debugLog("tampermonkey debug The iframe does not exist");
-              //reset loop flag
-              carePlanLoopLock = 0;
-              //Checks if goals tab exists (with a different id) and removes it.
-              let goalsTab = document.querySelector('[data-testid="goals-tab-btn"]');
-              debugLog(`tampermonkey goals tab `, goalsTab);
-              if (goalsTab) {
-                let parentDiv = goalsTab.closest('div');
-                if (parentDiv) {
-                  parentDiv.remove();
-                }
-              }
-             waitCarePlan();
-            } 
+    //if (location.href.includes("/all_plans")) {
+    //carePlanLoopLock avoids triggering infinite loop
+    if (carePlanLoopLock > 1 && location.href.includes("all_plans")) {
+      var iframe = document.querySelector("#MishaFrame.cp-tab-contents");
+      //check if Iframe doesn't exists
+      if (!iframe) {
+        //debugLog("tampermonkey debug The iframe does not exist");
+        //reset loop flag
+        carePlanLoopLock = 0;
+        //Checks if goals tab exists (with a different id) and removes it.
+        let goalsTab = document.querySelector('[data-testid="goals-tab-btn"]');
+        debugLog(`tampermonkey goals tab `, goalsTab);
+        if (goalsTab) {
+          let parentDiv = goalsTab.closest("div");
+          if (parentDiv) {
+            parentDiv.remove();
           }
+        }
+        waitCarePlan();
+      }
+    }
   }
 });
 
@@ -783,7 +782,7 @@ function waitCarePlan() {
               parent.empty();
               parent.append(iframe);
             }, 50);
-            	carePlanLoopLock = carePlanLoopLock + 1;
+            carePlanLoopLock = carePlanLoopLock + 1;
             //remove styling of healthie tab element
             // document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
           }
