@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Healthie Care Plan Integration
+// @name         Healthie Care Plan Integration dev
 // @namespace    http://tampermonkey.net/
 // @version      0.56
 // @description  Injecting care plan components into Healthie
@@ -61,6 +61,10 @@ const styles = {
     height: "90vh", // fallback for browsers that don't support svh
     height: "90svh",
     overflow: "hidden",
+  },
+  appointmentDetailsOverlay: {
+    minHeight: "350px",
+    width: "100%",
   },
 };
 
@@ -532,7 +536,7 @@ function initCalendar() {
         const dataForValue = $(this).attr("data-for");
         const apptUuid = dataForValue.split("__")[1].split("_")[0];
         //appointment/appointment id
-        showOverlay(`${routeURLs.appointment}/${apptUuid}`);
+        showOverlay(`${routeURLs.appointment}/${apptUuid}`, styles.appointmentDetailsOverlay);
       });
       $(".cloned-calendar") && debugLog(`Tampermonkey calendar cloned`);
       $(".overlay-vori").remove();
