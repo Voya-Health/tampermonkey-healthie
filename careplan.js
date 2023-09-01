@@ -583,56 +583,13 @@ function initAddButton() {
   }
 }
 
-function observeCalendarChanges(mutations, observer) {
-  const targetClasses = ["rbc-time-content", "rbc-month-view"];
-
-  for (const mutation of mutations) {
-    const { target, addedNodes, removedNodes } = mutation;
-
-    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
-    if (
-      (target && targetClasses.some((className) => target.classList.contains(className))) ||
-      (addedNodes &&
-        [...addedNodes].some(
-          (addedNode) =>
-            addedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => addedNode.classList.contains(className))
-        )) ||
-      (removedNodes &&
-        [...removedNodes].some(
-          (removedNode) =>
-            removedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => removedNode.classList.contains(className))
-        )) ||
-      (addedNodes &&
-        [...addedNodes].some(
-          (addedNode) =>
-            addedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => addedNode.querySelector(`.${className}`))
-        )) ||
-      (removedNodes &&
-        [...removedNodes].some(
-          (removedNode) =>
-            removedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => removedNode.querySelector(`.${className}`))
-        ))
-    ) {
-      // Disconnect the observer temporarily to prevent observing during the cloning process
-      observer.disconnect();
-      initCalendar();
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-      break; // We executed initCalendar() once, no need to check further
-    }
-  }
-}
-
 let calendarInitialized = false;
 function waitCalendar() {
   if (!calendarInitialized) {
     initCalendar();
     calendarInitialized = true;
   }
-  const observer = new MutationObserver(observeCalendarChanges);
+  const observer = new MutationObserver(observeDOMChanges);
   const targetNode = document.documentElement;
   const config = { childList: true, subtree: true };
   observer.observe(targetNode, config);
@@ -1309,25 +1266,73 @@ function goalMutation(payload) {
   return response;
 }
 
-function observeBasicInfoChanges(mutations, observer) {
-  const targetClasses = ["cp-sidebar-expandable-section"];
+function observeDOMChanges(mutations, observer) {
+  const calendarTargetClasses = ["rbc-time-content", "rbc-month-view"];
+  const homeTargetClasses = ["provider-home-content"];
+  const basicInfoTargetClasses = ["cp-sidebar-expandable-section"];
 
   for (const mutation of mutations) {
     const { target, addedNodes, removedNodes } = mutation;
 
     // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
     if (
-      (target && targetClasses.some((className) => target.classList.contains(className))) ||
+      (target && calendarTargetClasses.some((className) => target.classList.contains(className))) ||
       (addedNodes &&
         [...addedNodes].some(
           (addedNode) =>
             addedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => addedNode.classList.contains(className))
+            calendarTargetClasses.some((className) => addedNode.classList.contains(className))
+        )) ||
+      (removedNodes &&
+        [...removedNodes].some(
+          (removedNode) =>
+            removedNode.nodeType === Node.ELEMENT_NODE &&
+            calendarTargetClasses.some((className) => removedNode.classList.contains(className))
+        )) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            calendarTargetClasses.some((className) => addedNode.querySelector(`.${className}`))
+        )) ||
+      (removedNodes &&
+        [...removedNodes].some(
+          (removedNode) =>
+            removedNode.nodeType === Node.ELEMENT_NODE &&
+            calendarTargetClasses.some((className) => removedNode.querySelector(`.${className}`))
         ))
     ) {
-      // // Disconnect the observer temporarily to prevent observing during the cloning process
       observer.disconnect();
-      // initCalendar();
+      initCalendar();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break;
+    }
+
+    if (
+      (target && homeTargetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            homeTargetClasses.some((className) => addedNode.classList.contains(className))
+        ))
+    ) {
+      observer.disconnect();
+      waitAppointmentsHome();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break;
+    }
+
+    if (
+      (target && basicInfoTargetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            basicInfoTargetClasses.some((className) => addedNode.classList.contains(className))
+        ))
+    ) {
+      observer.disconnect();
       addMembershipAndOnboarding();
       observer.observe(document.documentElement, { childList: true, subtree: true });
       break;
@@ -1376,31 +1381,5 @@ function addMembershipAndOnboarding() {
     createTimeout(() => {
       addMembershipAndOnboarding();
     }, 200);
-  }
-}
-
-function observeHomeRouteChanges(mutations, observer) {
-  const targetClasses = ["provider-home-content"];
-
-  for (const mutation of mutations) {
-    const { target, addedNodes, removedNodes } = mutation;
-
-    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
-    if (
-      (target && targetClasses.some((className) => target.classList.contains(className))) ||
-      (addedNodes &&
-        [...addedNodes].some(
-          (addedNode) =>
-            addedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => addedNode.classList.contains(className))
-        ))
-    ) {
-      // // Disconnect the observer temporarily to prevent observing during the cloning process
-      observer.disconnect();
-      // initCalendar();
-      waitAppointmentsHome();
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-      break;
-    }
   }
 }
