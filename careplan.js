@@ -1340,6 +1340,27 @@ function observeDOMChanges(mutations, observer) {
   }
 }
 
+function goalMutation(payload) {
+  let response = null;
+  let api_env = isStagingEnv ? "staging-api" : "api";
+  response = fetch("https://" + api_env + ".gethealthie.com/graphql", {
+    method: "POST",
+    headers: {
+      AuthorizationSource: "API",
+      Authorization: auth,
+      "content-type": "application/json",
+    },
+    body: payload,
+  })
+    .then((res) => res.json())
+    .then((result) => {
+      debugLog("tampermonkey", result);
+      return result;
+    });
+
+  return response;
+}
+
 function addMembershipAndOnboarding() {
   //get phone icon and related column
   const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
