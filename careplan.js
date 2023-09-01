@@ -80,99 +80,6 @@ function createTimeout(timeoutFunction, delay) {
   timeoutIds.push(timeoutId);
 }
 
-//observe changes to the DOM, check for URL changes
-const observer = new MutationObserver(function (mutations) {
-  if (location.href !== previousUrl) {
-    previousUrl = location.href;
-    //reset loop flag
-    carePlanLoopLock = 0;
-    debugLog(`tampermonkey URL changed to ${location.href}`);
-
-    // Clear all timeouts
-    for (let i = 0; i < timeoutIds.length; i++) {
-      //debugLog(`tampermonkey clear timeout ${timeoutIds[i]}`);
-      clearTimeout(timeoutIds[i]);
-    }
-    timeoutIds = [];
-
-    waitForMishaMessages();
-
-    //Care plans URL
-    //if (location.href.includes("/all_plans")) {
-    if (urlValidation.carePlan.test(location.href)) {
-      //Function that will check when care plan tab has loaded
-      debugLog("tampermonkey calls waitCarePlan");
-      waitCarePlan();
-    }
-
-    if (urlValidation.goals.test(location.href)) {
-      //Function that will check when goal tab has loaded
-      debugLog("tampermonkey calls waitGoalTab");
-      waitGoalTab();
-    }
-
-    if (urlValidation.appointmentsProfileAndMembership.test(location.href)) {
-      // Execute only when  /users/id  or  /users/id/Overview
-      debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
-      waitAppointmentsProfile();
-      addMembershipAndOnboarding();
-    }
-
-    if (urlValidation.apiKeys.test(location.href)) {
-      //Function to handle api keys
-      debugLog("tampermonkey calls waitSettingsAPIpage and  showInstructions");
-      waitSettingsAPIpage();
-      showInstructions();
-    }
-
-    if (urlValidation.appointments.test(location.href)) {
-      //"/appointments" ||/organization ||/providers/
-      debugLog("tampermonkey calls waitAddAppointmentsBtn and waitCalendar");
-      waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
-      waitCalendar(); //Function to handle clicking on empty appointment slots
-    }
-
-    if (urlValidation.appointmentsHome.test(location.href)) {
-      debugLog("tampermonkey calls waitAppointmentsHome");
-      waitAppointmentsHome();
-    }
-
-    if (urlValidation.conversations.test(location.href)) {
-      debugLog("tampermonkey calls waitAppointmentSidebar and waitInfo");
-      waitAppointmentSidebar();
-      waitInfo();
-    }
-    if (urlValidation.clientList.test(location.href)) {
-      debugLog("tampermonkey calls waitClientList");
-      waitClientList();
-    }
-    isAPIconnected();
-  } else {
-    //debugLog(`tampermonkey debug  else`);
-    //if (location.href.includes("/all_plans")) {
-    //carePlanLoopLock avoids triggering infinite loop
-    if (carePlanLoopLock > 1 && location.href.includes("all_plans")) {
-      var iframe = document.querySelector("#MishaFrame.cp-tab-contents");
-      //check if Iframe doesn't exists
-      if (!iframe) {
-        //debugLog("tampermonkey debug The iframe does not exist");
-        //reset loop flag
-        carePlanLoopLock = 0;
-        //Checks if goals tab exists (with a different id) and removes it.
-        let goalsTab = document.querySelector('[data-testid="goals-tab-btn"]');
-        debugLog(`tampermonkey goals tab `, goalsTab);
-        if (goalsTab) {
-          let parentDiv = goalsTab.closest("div");
-          if (parentDiv) {
-            parentDiv.remove();
-          }
-        }
-        waitCarePlan();
-      }
-    }
-  }
-});
-
 function initJQuery() {
   let $ = unsafeWindow.jQuery;
   if ($ && $ !== undefined && typeof $ === "function") {
@@ -1241,30 +1148,102 @@ function waitClientList() {
 
 initJQuery();
 
-//config for observer
-const config = { subtree: true, childList: true };
-observer.observe(document, config);
+function observeUrlChanges(mutations) {
+  if (location.href !== previousUrl) {
+    previousUrl = location.href;
+    //reset loop flag
+    carePlanLoopLock = 0;
+    debugLog(`tampermonkey URL changed to ${location.href}`);
 
-function goalMutation(payload) {
-  let response = null;
-  let api_env = isStagingEnv ? "staging-api" : "api";
-  response = fetch("https://" + api_env + ".gethealthie.com/graphql", {
-    method: "POST",
-    headers: {
-      AuthorizationSource: "API",
-      Authorization: auth,
-      "content-type": "application/json",
-    },
-    body: payload,
-  })
-    .then((res) => res.json())
-    .then((result) => {
-      debugLog("tampermonkey", result);
-      return result;
-    });
+    // Clear all timeouts
+    for (let i = 0; i < timeoutIds.length; i++) {
+      //debugLog(`tampermonkey clear timeout ${timeoutIds[i]}`);
+      clearTimeout(timeoutIds[i]);
+    }
+    timeoutIds = [];
 
-  return response;
+    waitForMishaMessages();
+
+    //Care plans URL
+    //if (location.href.includes("/all_plans")) {
+    if (urlValidation.carePlan.test(location.href)) {
+      //Function that will check when care plan tab has loaded
+      debugLog("tampermonkey calls waitCarePlan");
+      waitCarePlan();
+    }
+
+    if (urlValidation.goals.test(location.href)) {
+      //Function that will check when goal tab has loaded
+      debugLog("tampermonkey calls waitGoalTab");
+      waitGoalTab();
+    }
+
+    if (urlValidation.appointmentsProfileAndMembership.test(location.href)) {
+      // Execute only when  /users/id  or  /users/id/Overview
+      debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
+      waitAppointmentsProfile();
+      addMembershipAndOnboarding();
+    }
+
+    if (urlValidation.apiKeys.test(location.href)) {
+      //Function to handle api keys
+      debugLog("tampermonkey calls waitSettingsAPIpage and  showInstructions");
+      waitSettingsAPIpage();
+      showInstructions();
+    }
+
+    if (urlValidation.appointments.test(location.href)) {
+      //"/appointments" ||/organization ||/providers/
+      debugLog("tampermonkey calls waitAddAppointmentsBtn and waitCalendar");
+      waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
+      waitCalendar(); //Function to handle clicking on empty appointment slots
+    }
+
+    if (urlValidation.appointmentsHome.test(location.href)) {
+      debugLog("tampermonkey calls waitAppointmentsHome");
+      waitAppointmentsHome();
+    }
+
+    if (urlValidation.conversations.test(location.href)) {
+      debugLog("tampermonkey calls waitAppointmentSidebar and waitInfo");
+      waitAppointmentSidebar();
+      waitInfo();
+    }
+    if (urlValidation.clientList.test(location.href)) {
+      debugLog("tampermonkey calls waitClientList");
+      waitClientList();
+    }
+    isAPIconnected();
+  } else {
+    //debugLog(`tampermonkey debug  else`);
+    //if (location.href.includes("/all_plans")) {
+    //carePlanLoopLock avoids triggering infinite loop
+    if (carePlanLoopLock > 1 && location.href.includes("all_plans")) {
+      var iframe = document.querySelector("#MishaFrame.cp-tab-contents");
+      //check if Iframe doesn't exists
+      if (!iframe) {
+        //debugLog("tampermonkey debug The iframe does not exist");
+        //reset loop flag
+        carePlanLoopLock = 0;
+        //Checks if goals tab exists (with a different id) and removes it.
+        let goalsTab = document.querySelector('[data-testid="goals-tab-btn"]');
+        debugLog(`tampermonkey goals tab `, goalsTab);
+        if (goalsTab) {
+          let parentDiv = goalsTab.closest("div");
+          if (parentDiv) {
+            parentDiv.remove();
+          }
+        }
+        waitCarePlan();
+      }
+    }
+  }
 }
+
+//observe changes to the DOM, check for URL changes
+const config = { subtree: true, childList: true };
+const observer = new MutationObserver(observeUrlChanges);
+observer.observe(document, config);
 
 function observeDOMChanges(mutations, observer) {
   const calendarTargetClasses = ["rbc-time-content", "rbc-month-view"];
