@@ -96,6 +96,7 @@ function initJQuery() {
     createTimeout(initJQuery, 200);
   }
 }
+initJQuery();
 
 function generateIframe(routeURL, options = {}) {
   const $ = initJQuery();
@@ -148,10 +149,6 @@ function waitAppointmentsHome() {
     //check to see if the appointment view contents has loaded
     let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
     if (appointmentWindow.length > 0) {
-      const observer = new MutationObserver(observeDOMChanges);
-      const targetNode = document.documentElement;
-      const config = { childList: true, subtree: true };
-      observer.observe(targetNode, config);
       debugLog(`tampermonkey found appointment view`, appointmentWindow.length);
       let appointmentWindowObj = appointmentWindow[0];
       //remove all except first child
@@ -496,10 +493,6 @@ function waitCalendar() {
     initCalendar();
     calendarInitialized = true;
   }
-  const observer = new MutationObserver(observeDOMChanges);
-  const targetNode = document.documentElement;
-  const config = { childList: true, subtree: true };
-  observer.observe(targetNode, config);
 }
 
 function waitAddAppointmentsBtn() {
@@ -1146,9 +1139,68 @@ function waitClientList() {
   }
 }
 
-initJQuery();
+function goalMutation(payload) {
+  let response = null;
+  let api_env = isStagingEnv ? "staging-api" : "api";
+  response = fetch("https://" + api_env + ".gethealthie.com/graphql", {
+    method: "POST",
+    headers: {
+      AuthorizationSource: "API",
+      Authorization: auth,
+      "content-type": "application/json",
+    },
+    body: payload,
+  })
+    .then((res) => res.json())
+    .then((result) => {
+      debugLog("tampermonkey", result);
+      return result;
+    });
 
-function observeUrlChanges(mutations) {
+  return response;
+}
+
+function addMembershipAndOnboarding() {
+  //get phone icon and related column
+  const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
+  const iframeAdded = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
+
+  if (phoneColumn && !iframeAdded) {
+    // get the patient number from the URL
+    patientNumber = location.href.split("/")[4];
+    debugLog(`tampermonkey patient number`, patientNumber);
+
+    // get the user data
+    const getUserQuery = `query {
+        user(id: "${patientNumber}") {
+          id
+          additional_record_identifier
+        }
+      }`;
+
+    const getUserPayload = JSON.stringify({ query: getUserQuery });
+    goalMutation(getUserPayload).then((response) => {
+      debugLog(`tampermonkey get user response`, response);
+      // load  mishaID
+      if (response.data.user) {
+        const mishaID = response.data.user.additional_record_identifier;
+        debugLog(`tampermonkey mishaID`, mishaID);
+        // create iframe (generateIframe returns a jQuery object)
+        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
+        const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
+        // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
+        !iframeExists && phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
+      }
+    });
+  } else {
+    createTimeout(() => {
+      addMembershipAndOnboarding();
+    }, 200);
+  }
+}
+
+function observeDOMChanges(mutations, observer) {
+  // handle url changes
   if (location.href !== previousUrl) {
     previousUrl = location.href;
     //reset loop flag
@@ -1238,14 +1290,8 @@ function observeUrlChanges(mutations) {
       }
     }
   }
-}
 
-//observe changes to the DOM, check for URL changes
-const config = { subtree: true, childList: true };
-const observer = new MutationObserver(observeUrlChanges);
-observer.observe(document, config);
-
-function observeDOMChanges(mutations, observer) {
+  // The rest
   const calendarTargetClasses = ["rbc-time-content", "rbc-month-view"];
   const homeTargetClasses = ["provider-home-content"];
   const basicInfoTargetClasses = ["cp-sidebar-expandable-section"];
@@ -1319,67 +1365,7 @@ function observeDOMChanges(mutations, observer) {
   }
 }
 
-function goalMutation(payload) {
-  let response = null;
-  let api_env = isStagingEnv ? "staging-api" : "api";
-  response = fetch("https://" + api_env + ".gethealthie.com/graphql", {
-    method: "POST",
-    headers: {
-      AuthorizationSource: "API",
-      Authorization: auth,
-      "content-type": "application/json",
-    },
-    body: payload,
-  })
-    .then((res) => res.json())
-    .then((result) => {
-      debugLog("tampermonkey", result);
-      return result;
-    });
-
-  return response;
-}
-
-function addMembershipAndOnboarding() {
-  //get phone icon and related column
-  const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
-  const iframeAdded = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
-
-  if (phoneColumn && !iframeAdded) {
-    const observer = new MutationObserver(observeDOMChanges);
-    const targetNode = document.documentElement;
-    const config = { childList: true, subtree: true };
-    observer.observe(targetNode, config);
-
-    // get the patient number from the URL
-    patientNumber = location.href.split("/")[4];
-    debugLog(`tampermonkey patient number`, patientNumber);
-
-    // get the user data
-    const getUserQuery = `query {
-        user(id: "${patientNumber}") {
-          id
-          additional_record_identifier
-        }
-      }`;
-
-    const getUserPayload = JSON.stringify({ query: getUserQuery });
-    goalMutation(getUserPayload).then((response) => {
-      debugLog(`tampermonkey get user response`, response);
-      // load  mishaID
-      if (response.data.user) {
-        const mishaID = response.data.user.additional_record_identifier;
-        debugLog(`tampermonkey mishaID`, mishaID);
-        // create iframe (generateIframe returns a jQuery object)
-        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "90px" });
-        const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
-        // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
-        !iframeExists && phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
-      }
-    });
-  } else {
-    createTimeout(() => {
-      addMembershipAndOnboarding();
-    }, 200);
-  }
-}
+//observe changes to the DOM, check for URL changes
+const config = { subtree: true, childList: true };
+const observer = new MutationObserver(observeDOMChanges);
+observer.observe(document, config);
