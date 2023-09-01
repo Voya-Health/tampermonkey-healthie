@@ -241,7 +241,7 @@ function waitAppointmentsHome() {
     //check to see if the appointment view contents has loaded
     let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
     if (appointmentWindow.length > 0) {
-      const observer = new MutationObserver(observeHomeRouteChanges);
+      const observer = new MutationObserver(observeDOMChanges);
       const targetNode = document.documentElement;
       const config = { childList: true, subtree: true };
       observer.observe(targetNode, config);
@@ -1346,7 +1346,7 @@ function addMembershipAndOnboarding() {
   const iframeAdded = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
 
   if (phoneColumn && !iframeAdded) {
-    const observer = new MutationObserver(observeBasicInfoChanges);
+    const observer = new MutationObserver(observeDOMChanges);
     const targetNode = document.documentElement;
     const config = { childList: true, subtree: true };
     observer.observe(targetNode, config);
