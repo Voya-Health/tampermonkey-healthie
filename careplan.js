@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.57
+// @version      0.58
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -80,99 +80,6 @@ function createTimeout(timeoutFunction, delay) {
   timeoutIds.push(timeoutId);
 }
 
-//observe changes to the DOM, check for URL changes
-const observer = new MutationObserver(function (mutations) {
-  if (location.href !== previousUrl) {
-    previousUrl = location.href;
-    //reset loop flag
-    carePlanLoopLock = 0;
-    debugLog(`tampermonkey URL changed to ${location.href}`);
-
-    // Clear all timeouts
-    for (let i = 0; i < timeoutIds.length; i++) {
-      //debugLog(`tampermonkey clear timeout ${timeoutIds[i]}`);
-      clearTimeout(timeoutIds[i]);
-    }
-    timeoutIds = [];
-
-    waitForMishaMessages();
-
-    //Care plans URL
-    //if (location.href.includes("/all_plans")) {
-    if (urlValidation.carePlan.test(location.href)) {
-      //Function that will check when care plan tab has loaded
-      debugLog("tampermonkey calls waitCarePlan");
-      waitCarePlan();
-    }
-
-    if (urlValidation.goals.test(location.href)) {
-      //Function that will check when goal tab has loaded
-      debugLog("tampermonkey calls waitGoalTab");
-      waitGoalTab();
-    }
-
-    if (urlValidation.appointmentsProfileAndMembership.test(location.href)) {
-      // Execute only when  /users/id  or  /users/id/Overview
-      debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
-      waitAppointmentsProfile();
-      addMembershipAndOnboarding();
-    }
-
-    if (urlValidation.apiKeys.test(location.href)) {
-      //Function to handle api keys
-      debugLog("tampermonkey calls waitSettingsAPIpage and  showInstructions");
-      waitSettingsAPIpage();
-      showInstructions();
-    }
-
-    if (urlValidation.appointments.test(location.href)) {
-      //"/appointments" ||/organization ||/providers/
-      debugLog("tampermonkey calls waitAddAppointmentsBtn and waitCalendar");
-      waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
-      waitCalendar(); //Function to handle clicking on empty appointment slots
-    }
-
-    if (urlValidation.appointmentsHome.test(location.href)) {
-      debugLog("tampermonkey calls waitAppointmentsHome");
-      waitAppointmentsHome();
-    }
-
-    if (urlValidation.conversations.test(location.href)) {
-      debugLog("tampermonkey calls waitAppointmentSidebar and waitInfo");
-      waitAppointmentSidebar();
-      waitInfo();
-    }
-    if (urlValidation.clientList.test(location.href)) {
-      debugLog("tampermonkey calls waitClientList");
-      waitClientList();
-    }
-    isAPIconnected();
-  } else {
-    //debugLog(`tampermonkey debug  else`);
-    //if (location.href.includes("/all_plans")) {
-    //carePlanLoopLock avoids triggering infinite loop
-    if (carePlanLoopLock > 1 && location.href.includes("all_plans")) {
-      var iframe = document.querySelector("#MishaFrame.cp-tab-contents");
-      //check if Iframe doesn't exists
-      if (!iframe) {
-        //debugLog("tampermonkey debug The iframe does not exist");
-        //reset loop flag
-        carePlanLoopLock = 0;
-        //Checks if goals tab exists (with a different id) and removes it.
-        let goalsTab = document.querySelector('[data-testid="goals-tab-btn"]');
-        debugLog(`tampermonkey goals tab `, goalsTab);
-        if (goalsTab) {
-          let parentDiv = goalsTab.closest("div");
-          if (parentDiv) {
-            parentDiv.remove();
-          }
-        }
-        waitCarePlan();
-      }
-    }
-  }
-});
-
 function initJQuery() {
   let $ = unsafeWindow.jQuery;
   if ($ && $ !== undefined && typeof $ === "function") {
@@ -189,6 +96,7 @@ function initJQuery() {
     createTimeout(initJQuery, 200);
   }
 }
+initJQuery();
 
 function generateIframe(routeURL, options = {}) {
   const $ = initJQuery();
@@ -241,10 +149,6 @@ function waitAppointmentsHome() {
     //check to see if the appointment view contents has loaded
     let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
     if (appointmentWindow.length > 0) {
-      const observer = new MutationObserver(observeHomeRouteChanges);
-      const targetNode = document.documentElement;
-      const config = { childList: true, subtree: true };
-      observer.observe(targetNode, config);
       debugLog(`tampermonkey found appointment view`, appointmentWindow.length);
       let appointmentWindowObj = appointmentWindow[0];
       //remove all except first child
@@ -583,59 +487,12 @@ function initAddButton() {
   }
 }
 
-function observeCalendarChanges(mutations, observer) {
-  const targetClasses = ["rbc-time-content", "rbc-month-view"];
-
-  for (const mutation of mutations) {
-    const { target, addedNodes, removedNodes } = mutation;
-
-    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
-    if (
-      (target && targetClasses.some((className) => target.classList.contains(className))) ||
-      (addedNodes &&
-        [...addedNodes].some(
-          (addedNode) =>
-            addedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => addedNode.classList.contains(className))
-        )) ||
-      (removedNodes &&
-        [...removedNodes].some(
-          (removedNode) =>
-            removedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => removedNode.classList.contains(className))
-        )) ||
-      (addedNodes &&
-        [...addedNodes].some(
-          (addedNode) =>
-            addedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => addedNode.querySelector(`.${className}`))
-        )) ||
-      (removedNodes &&
-        [...removedNodes].some(
-          (removedNode) =>
-            removedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => removedNode.querySelector(`.${className}`))
-        ))
-    ) {
-      // Disconnect the observer temporarily to prevent observing during the cloning process
-      observer.disconnect();
-      initCalendar();
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-      break; // We executed initCalendar() once, no need to check further
-    }
-  }
-}
-
 let calendarInitialized = false;
 function waitCalendar() {
   if (!calendarInitialized) {
     initCalendar();
     calendarInitialized = true;
   }
-  const observer = new MutationObserver(observeCalendarChanges);
-  const targetNode = document.documentElement;
-  const config = { childList: true, subtree: true };
-  observer.observe(targetNode, config);
 }
 
 function waitAddAppointmentsBtn() {
@@ -1282,12 +1139,6 @@ function waitClientList() {
   }
 }
 
-initJQuery();
-
-//config for observer
-const config = { subtree: true, childList: true };
-observer.observe(document, config);
-
 function goalMutation(payload) {
   let response = null;
   let api_env = isStagingEnv ? "staging-api" : "api";
@@ -1309,43 +1160,12 @@ function goalMutation(payload) {
   return response;
 }
 
-function observeBasicInfoChanges(mutations, observer) {
-  const targetClasses = ["cp-sidebar-expandable-section"];
-
-  for (const mutation of mutations) {
-    const { target, addedNodes, removedNodes } = mutation;
-
-    // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
-    if (
-      (target && targetClasses.some((className) => target.classList.contains(className))) ||
-      (addedNodes &&
-        [...addedNodes].some(
-          (addedNode) =>
-            addedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => addedNode.classList.contains(className))
-        ))
-    ) {
-      // // Disconnect the observer temporarily to prevent observing during the cloning process
-      observer.disconnect();
-      // initCalendar();
-      addMembershipAndOnboarding();
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-      break;
-    }
-  }
-}
-
 function addMembershipAndOnboarding() {
   //get phone icon and related column
   const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
   const iframeAdded = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
 
   if (phoneColumn && !iframeAdded) {
-    const observer = new MutationObserver(observeBasicInfoChanges);
-    const targetNode = document.documentElement;
-    const config = { childList: true, subtree: true };
-    observer.observe(targetNode, config);
-
     // get the patient number from the URL
     patientNumber = location.href.split("/")[4];
     debugLog(`tampermonkey patient number`, patientNumber);
@@ -1379,28 +1199,173 @@ function addMembershipAndOnboarding() {
   }
 }
 
-function observeHomeRouteChanges(mutations, observer) {
-  const targetClasses = ["provider-home-content"];
+function observeDOMChanges(mutations, observer) {
+  // handle url changes
+  if (location.href !== previousUrl) {
+    previousUrl = location.href;
+    //reset loop flag
+    carePlanLoopLock = 0;
+    debugLog(`tampermonkey URL changed to ${location.href}`);
+
+    // Clear all timeouts
+    for (let i = 0; i < timeoutIds.length; i++) {
+      //debugLog(`tampermonkey clear timeout ${timeoutIds[i]}`);
+      clearTimeout(timeoutIds[i]);
+    }
+    timeoutIds = [];
+
+    waitForMishaMessages();
+
+    //Care plans URL
+    //if (location.href.includes("/all_plans")) {
+    if (urlValidation.carePlan.test(location.href)) {
+      //Function that will check when care plan tab has loaded
+      debugLog("tampermonkey calls waitCarePlan");
+      waitCarePlan();
+    }
+
+    if (urlValidation.goals.test(location.href)) {
+      //Function that will check when goal tab has loaded
+      debugLog("tampermonkey calls waitGoalTab");
+      waitGoalTab();
+    }
+
+    if (urlValidation.appointmentsProfileAndMembership.test(location.href)) {
+      // Execute only when  /users/id  or  /users/id/Overview
+      debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
+      waitAppointmentsProfile();
+      addMembershipAndOnboarding();
+    }
+
+    if (urlValidation.apiKeys.test(location.href)) {
+      //Function to handle api keys
+      debugLog("tampermonkey calls waitSettingsAPIpage and  showInstructions");
+      waitSettingsAPIpage();
+      showInstructions();
+    }
+
+    if (urlValidation.appointments.test(location.href)) {
+      //"/appointments" ||/organization ||/providers/
+      debugLog("tampermonkey calls waitAddAppointmentsBtn and waitCalendar");
+      waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
+      waitCalendar(); //Function to handle clicking on empty appointment slots
+    }
+
+    if (urlValidation.appointmentsHome.test(location.href)) {
+      debugLog("tampermonkey calls waitAppointmentsHome");
+      waitAppointmentsHome();
+    }
+
+    if (urlValidation.conversations.test(location.href)) {
+      debugLog("tampermonkey calls waitAppointmentSidebar and waitInfo");
+      waitAppointmentSidebar();
+      waitInfo();
+    }
+    if (urlValidation.clientList.test(location.href)) {
+      debugLog("tampermonkey calls waitClientList");
+      waitClientList();
+    }
+    isAPIconnected();
+  } else {
+    //debugLog(`tampermonkey debug  else`);
+    //if (location.href.includes("/all_plans")) {
+    //carePlanLoopLock avoids triggering infinite loop
+    if (carePlanLoopLock > 1 && location.href.includes("all_plans")) {
+      var iframe = document.querySelector("#MishaFrame.cp-tab-contents");
+      //check if Iframe doesn't exists
+      if (!iframe) {
+        //debugLog("tampermonkey debug The iframe does not exist");
+        //reset loop flag
+        carePlanLoopLock = 0;
+        //Checks if goals tab exists (with a different id) and removes it.
+        let goalsTab = document.querySelector('[data-testid="goals-tab-btn"]');
+        debugLog(`tampermonkey goals tab `, goalsTab);
+        if (goalsTab) {
+          let parentDiv = goalsTab.closest("div");
+          if (parentDiv) {
+            parentDiv.remove();
+          }
+        }
+        waitCarePlan();
+      }
+    }
+  }
+
+  // The rest
+  const calendarTargetClasses = ["rbc-time-content", "rbc-month-view"];
+  const homeTargetClasses = ["provider-home-content"];
+  const basicInfoTargetClasses = ["cp-sidebar-expandable-section"];
 
   for (const mutation of mutations) {
     const { target, addedNodes, removedNodes } = mutation;
 
     // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
     if (
-      (target && targetClasses.some((className) => target.classList.contains(className))) ||
+      (target && calendarTargetClasses.some((className) => target.classList.contains(className))) ||
       (addedNodes &&
         [...addedNodes].some(
           (addedNode) =>
             addedNode.nodeType === Node.ELEMENT_NODE &&
-            targetClasses.some((className) => addedNode.classList.contains(className))
+            calendarTargetClasses.some((className) => addedNode.classList.contains(className))
+        )) ||
+      (removedNodes &&
+        [...removedNodes].some(
+          (removedNode) =>
+            removedNode.nodeType === Node.ELEMENT_NODE &&
+            calendarTargetClasses.some((className) => removedNode.classList.contains(className))
+        )) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            calendarTargetClasses.some((className) => addedNode.querySelector(`.${className}`))
+        )) ||
+      (removedNodes &&
+        [...removedNodes].some(
+          (removedNode) =>
+            removedNode.nodeType === Node.ELEMENT_NODE &&
+            calendarTargetClasses.some((className) => removedNode.querySelector(`.${className}`))
         ))
     ) {
-      // // Disconnect the observer temporarily to prevent observing during the cloning process
       observer.disconnect();
-      // initCalendar();
+      initCalendar();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break;
+    }
+
+    if (
+      (target && homeTargetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            homeTargetClasses.some((className) => addedNode.classList.contains(className))
+        ))
+    ) {
+      observer.disconnect();
       waitAppointmentsHome();
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      break;
+    }
+
+    if (
+      (target && basicInfoTargetClasses.some((className) => target.classList.contains(className))) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            basicInfoTargetClasses.some((className) => addedNode.classList.contains(className))
+        ))
+    ) {
+      observer.disconnect();
+      addMembershipAndOnboarding();
       observer.observe(document.documentElement, { childList: true, subtree: true });
       break;
     }
   }
 }
+
+//observe changes to the DOM, check for URL changes
+const config = { subtree: true, childList: true };
+const observer = new MutationObserver(observeDOMChanges);
+observer.observe(document, config);
