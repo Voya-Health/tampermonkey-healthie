@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.58
+// @version      0.59
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
-// @match        https://secure.vorihealth.com/*
+// @match        https://vorihealth.gethealthie.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
 // @sandbox      JavaScript
 // @grant        GM_setValue
@@ -22,7 +22,7 @@ let carePlanLoopLock = 0;
 //Keep track of timeouts
 let timeoutIds = [];
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
-let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "secure.vorihealth.com";
+let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "vorihealth.gethealthie.com";
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 const urlValidation = {
