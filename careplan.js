@@ -5,7 +5,7 @@
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
-// @match        https://secure.vorihealth.com/*
+// @match        https://vorihealth.gethealthie.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
 // @sandbox      JavaScript
 // @grant        GM_setValue
@@ -21,7 +21,7 @@ let patientNumber = "";
 let carePlanLoopLock = 0;
 //Keep track of timeouts
 let timeoutIds = [];
-    // Check for Healthie environment
+// Check for Healthie environment
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
 let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "secure.vorihealth.com";
