@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.59
+// @version      0.60
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -21,8 +21,10 @@ let patientNumber = "";
 let carePlanLoopLock = 0;
 //Keep track of timeouts
 let timeoutIds = [];
+// Check for Healthie environment
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
-let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "vorihealth.gethealthie.com";
+let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
+let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "secure.vorihealth.com";
 let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let auth = `Basic ${healthieAPIKey}`;
 const urlValidation = {
@@ -125,8 +127,7 @@ function generateIframe(routeURL, options = {}) {
   } else {
     const iframeElement = $("<div>").css({ padding: "0" }).addClass(className);
 
-    // Check for Healthie environment
-    let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
+
 
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
@@ -172,8 +173,15 @@ function waitAppointmentsHome() {
       goalMutation(getCurrentUserPayload).then((response) => {
         const userId = response.data.user.id;
         //provider-schedule/id
-        const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
-        $(appointmentWindowObj).append(iframe);
+        const iframeSrc = `https://${mishaURL}${routeURLs.providerSchedule}/${userId}`;
+
+        // Check if the iframe already exists
+        let existingIframe = document.querySelector(`iframe[src="${iframeSrc}"]`);
+            // If the iframe doesn't exist, create a new one
+        if (!existingIframe) {
+          const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
+          $(appointmentWindowObj).append(iframe);
+        }
       });
     } else {
       //wait for content load
