@@ -402,6 +402,7 @@ function initCalendar() {
 
     // First init add button to make sure event gets overwritten
     initAddButton($);
+    initAddButton();
 
     // Move on to calendar
     const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
@@ -422,7 +423,9 @@ function initCalendar() {
         clonedCalendar.addClass("cloned-calendar");
         // instead of replacing the calendar, we need to hide the original calendar and append the cloned calendar
         calendar.css({ display: "none" });
+        $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
         calendar.parent().append(clonedCalendar);
+        debugLog(`Tampermonkey hid original calendar and appended cloned calendar`);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month")) {
         debugLog(`Tampermonkey calendar is on month view`);
         calendar = $(".rbc-month-view");
