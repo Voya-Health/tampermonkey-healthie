@@ -347,7 +347,7 @@ function showOverlay(url, style = {}) {
 
 let maxWaitForEvents = 200; // comically high number to prevent infinite loop
 let maxWaitForInit = 200; // comically high number to prevent infinite loop
-function initCalendar() {
+function initCalendar(forceInit = false) {
   const $ = initJQuery();
   if (!$) {
     debugLog(`Tampermonkey jQuery not loaded`);
@@ -376,7 +376,7 @@ function initCalendar() {
     }
 
     // Check if calendar is loaded and cloned
-    if ($(".main-calendar-column").find(".cloned-calendar").length > 0) {
+    if (!forceInit && $(".main-calendar-column").find(".cloned-calendar").length > 0) {
       debugLog(`Tampermonkey calendar already cloned`);
       return;
     }
@@ -401,8 +401,8 @@ function initCalendar() {
     }
 
     // First init add button to make sure event gets overwritten
-    initAddButton($);
     initAddButton();
+    initTodayPrevNextBtns();
 
     // Move on to calendar
     const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
@@ -498,6 +498,36 @@ function initAddButton() {
   }
 }
 
+function initTodayPrevNextBtns() {
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    createTimeout(showOverlay, 200);
+    return;
+  } else {
+    let activeTab = $(".calendar-tabs").find(".tab-item.active");
+    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
+
+    if (availabilitiesTab) {
+      debugLog(`Tampermonkey calendar is on availability tab - nothing to do here`);
+      return;
+    }
+
+    let todayBtn = $(".rbc-btn-group button").find("button:contains('today')")[0];
+    let prevBtn = $(".rbc-btn-group button").find("button:contains('<')")[0];
+    let nextBtn = $(".rbc-btn-group button").find("button:contains('>')")[0];
+
+    if (todayBtn && prevBtn && nextBtn) {
+      //add event listeners
+      $(todayBtn, prevBtn, nextBtn).on("click", function (e) {
+        initCalendar(true);
+      });
+    } else {
+      debugLog(`tampermonkey waiting for add today, <, > button`);
+      createTimeout(initTodayPrevNextBtns, 200);
+    }
+  }
+}
+
 let calendarInitialized = false;
 function waitCalendar() {
   if (!calendarInitialized) {
@@ -513,7 +543,7 @@ function waitAddAppointmentsBtn() {
     createTimeout(waitAddAppointmentsBtn, 200);
     return;
   } else {
-    initAddButton($);
+    initAddButton();
   }
 }
 
