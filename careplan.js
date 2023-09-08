@@ -127,8 +127,6 @@ function generateIframe(routeURL, options = {}) {
   } else {
     const iframeElement = $("<div>").css({ padding: "0" }).addClass(className);
 
-
-
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
       title: "Misha iFrame",
@@ -177,7 +175,7 @@ function waitAppointmentsHome() {
 
         // Check if the iframe already exists
         let existingIframe = document.querySelector(`iframe[src="${iframeSrc}"]`);
-            // If the iframe doesn't exist, create a new one
+        // If the iframe doesn't exist, create a new one
         if (!existingIframe) {
           const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
           $(appointmentWindowObj).append(iframe);
@@ -422,7 +420,9 @@ function initCalendar() {
         calendar = $(".rbc-time-content");
         let clonedCalendar = calendar.clone(true);
         clonedCalendar.addClass("cloned-calendar");
-        calendar.replaceWith(clonedCalendar);
+        // instead of replacing the calendar, we need to hide the original calendar and append the cloned calendar
+        calendar.css({ display: "none" });
+        calendar.parent().append(clonedCalendar);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month")) {
         debugLog(`Tampermonkey calendar is on month view`);
         calendar = $(".rbc-month-view");
