@@ -512,9 +512,9 @@ function initTodayPrevNextBtns() {
       return;
     }
 
-    let todayBtn = $(".rbc-btn-group button").find("button:contains('today')")[0];
-    let prevBtn = $(".rbc-btn-group button").find("button:contains('<')")[0];
-    let nextBtn = $(".rbc-btn-group button").find("button:contains('>')")[0];
+    let todayBtn = $(".rbc-btn-group").find("button:contains('today')")[0];
+    let prevBtn = $(".rbc-btn-group").find("button:contains('<')")[0];
+    let nextBtn = $(".rbc-btn-group").find("button:contains('>')")[0];
 
     if (todayBtn && prevBtn && nextBtn) {
       //add event listeners
