@@ -375,6 +375,11 @@ function initCalendar(forceInit = false) {
       return;
     }
 
+    if (forceInit) {
+      debugLog(`Tampermonkey force re-init calendar`);
+      $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
+    }
+
     // Check if calendar is loaded and cloned
     if (!forceInit && $(".main-calendar-column").find(".cloned-calendar").length > 0) {
       debugLog(`Tampermonkey calendar already cloned`);
@@ -408,7 +413,9 @@ function initCalendar(forceInit = false) {
     const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
     if (calendarLoading.length > 0) {
       debugLog(`Tampermonkey waiting for calendar to load`);
-      createTimeout(initCalendar, 200);
+      createTimeout(function () {
+        initCalendar(forceInit);
+      }, 200);
       return;
     }
 
@@ -418,13 +425,17 @@ function initCalendar(forceInit = false) {
         (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week"))
       ) {
         debugLog(`Tampermonkey calendar is on day or week view`);
+        // $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
+        // find the first instance of .rbc-time-content and add class .og-calendar
+
         calendar = $(".rbc-time-content");
-        let clonedCalendar = calendar.clone(true);
-        clonedCalendar.addClass("cloned-calendar");
-        // instead of replacing the calendar, we need to hide the original calendar and append the cloned calendar
-        calendar.css({ display: "none" });
-        $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
-        calendar.parent().append(clonedCalendar);
+        let ogCalendar = calendar && calendar.first().addClass("og-calendar");
+        let clonedCalendar = ogCalendar.clone(true);
+        clonedCalendar.addClass("cloned-calendar").removeClass("og-calendar").removeAttr("style");
+
+        // instead of replacing the calendar, we need to hide the original calendar and append the cloned calendar - but only the first instance of .rbc-time-content
+        ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
+        ogCalendar.parent().append(clonedCalendar);
         debugLog(`Tampermonkey hid original calendar and appended cloned calendar`);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month")) {
         debugLog(`Tampermonkey calendar is on month view`);
@@ -462,13 +473,16 @@ function initCalendar(forceInit = false) {
         window.location.reload();
       } else {
         debugLog(`Tampermonkey waiting for calendar and events`);
-        createTimeout(initCalendar, 200);
+        createTimeout(function () {
+          initCalendar(forceInit);
+        }, 200);
       }
     }
   }
 }
 
 function initAddButton() {
+  const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(showOverlay, 200);
@@ -499,11 +513,13 @@ function initAddButton() {
 }
 
 function initTodayPrevNextBtns() {
+  const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(showOverlay, 200);
     return;
   } else {
+    debugLog(`tampermonkey calendar initializing today, prev, next buttons`);
     let activeTab = $(".calendar-tabs").find(".tab-item.active");
     let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
 
