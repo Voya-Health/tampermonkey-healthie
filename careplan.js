@@ -518,7 +518,16 @@ function initTodayPrevNextBtns() {
 
     if (todayBtn && prevBtn && nextBtn) {
       //add event listeners
-      $(todayBtn, prevBtn, nextBtn).on("click", function (e) {
+      $(todayBtn).on("click", function (e) {
+        debugLog(`tampermonkey - clicked on today. Re-initializing calendar...`);
+        initCalendar(true);
+      });
+      $(prevBtn).on("click", function (e) {
+        debugLog(`tampermonkey - clicked on prev. Re-initializing calendar...`);
+        initCalendar(true);
+      });
+      $(nextBtn).on("click", function (e) {
+        debugLog(`tampermonkey - clicked on next. Re-initializing calendar...`);
         initCalendar(true);
       });
     } else {
