@@ -276,6 +276,7 @@ function hideOverlay() {
     return;
   } else {
     $(".overlay-dialog").remove();
+    debugLog(`Tampermonkey removed overlay`);
   }
 }
 
@@ -286,6 +287,7 @@ function showOverlay(url, style = {}) {
     createTimeout(showOverlay, 200);
     return;
   } else {
+    hideOverlay();
     // Create overlay element
     let overlay = $("<div>").addClass("overlay-dialog").css({
       position: "fixed",
