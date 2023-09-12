@@ -396,6 +396,59 @@ function deepCompareElements(element1, element2) {
   return true; // All comparisons passed, the elements are the same
 }
 
+function showBothCalendars(clonedCalendar, ogCalendar) {
+  clonedCalendar.css({ transform: "translateX(-20%)" });
+  let cssRules = `
+          .rbc-time-content.cloned-calendar::before {
+            content: "Clone";
+            position: absolute;
+            top: 0px;
+            background: #4caf50d1;
+            font-size: 40px;
+            line-height: 1.5;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #000;
+            z-index: 99999999;
+          }
+        `;
+  let cssRuleToCheck = ".rbc-time-content.cloned-calendar::before";
+  let styleElementExists =
+    $("style").filter(function () {
+      return $(this).text().indexOf(cssRuleToCheck) !== -1;
+    }).length > 0;
+  if (!styleElementExists) {
+    let styleElement = document.createElement("style");
+    styleElement.appendChild(document.createTextNode(cssRules));
+    $("head").append(styleElement);
+  }
+
+  cssRules = `
+          .rbc-time-content.og-calendar::before {
+            content: "Original";
+            position: absolute;
+            top: 0px;
+            background: #ff3232d1;
+            font-size: 40px;
+            line-height: 1.5;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #000;
+            z-index: 99999999;
+          }
+        `;
+  cssRuleToCheck = ".rbc-time-content.og-calendar::before";
+  styleElementExists =
+    $("style").filter(function () {
+      return $(this).text().indexOf(cssRuleToCheck) !== -1;
+    }).length > 0;
+  if (!styleElementExists) {
+    let styleElement = document.createElement("style");
+    styleElement.appendChild(document.createTextNode(cssRules));
+    $("head").append(styleElement);
+  }
+}
+
 let maxWaitForEvents = 500; // comically high number to prevent infinite loop
 let maxWaitForInit = 500; // comically high number to prevent infinite loop
 function initCalendar(replaceCalendar = false) {
@@ -487,7 +540,11 @@ function initCalendar(replaceCalendar = false) {
         let clonedCalendar = ogCalendar.clone(true);
         clonedCalendar.addClass("cloned-calendar").removeClass("og-calendar").removeAttr("style");
 
-        // instead of replacing the calendar, we need to hide the original calendar and append the cloned calendar - but only the first instance of .rbc-time-content
+        // debug mode - set to True for quick debugging
+        let enableDebugMode = true; // should always be false in production
+        enableDebugMode && showBothCalendars(clonedCalendar, ogCalendar);
+
+        // instead of replacing the original calendar, we'll hide it, and append the cloned calendar
         ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
         ogCalendar.parent().append(clonedCalendar);
         debugLog(`Tampermonkey hid original calendar and appended cloned calendar`);
