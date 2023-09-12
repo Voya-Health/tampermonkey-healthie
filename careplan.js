@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Healthie Care Plan Integration
+// @name         Healthie Care Plan Integration dev
 // @namespace    http://tampermonkey.net/
 // @version      0.60
 // @description  Injecting care plan components into Healthie
@@ -541,8 +541,7 @@ function initCalendar(replaceCalendar = false) {
         clonedCalendar.addClass("cloned-calendar").removeClass("og-calendar").removeAttr("style");
 
         // debug mode - set to True for quick debugging
-        let enableDebugMode = true; // should always be false in production
-        enableDebugMode && showBothCalendars(clonedCalendar, ogCalendar);
+        debug && showBothCalendars(clonedCalendar, ogCalendar);
 
         // instead of replacing the original calendar, we'll hide it, and append the cloned calendar
         ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
