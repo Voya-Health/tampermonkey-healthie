@@ -347,6 +347,55 @@ function showOverlay(url, style = {}) {
   }
 }
 
+function deepCompareElements(element1, element2) {
+  // Check if the nodes are DOM elements
+  if (!element1 || !element2 || element1.length === 0 || element2.length === 0) {
+    return false;
+  }
+
+  // Check if the nodes have the same tag name
+  if (element1.prop("tagName") !== element2.prop("tagName")) {
+    return false;
+  }
+
+  // Check if the nodes have the same number of attributes
+  if (element1[0].attributes.length !== element2[0].attributes.length) {
+    return false;
+  }
+
+  // Check if all attributes match
+  $.each(element1[0].attributes, function (index, attr1) {
+    const attr2 = element2[0].attributes[index];
+    if (attr1.name !== attr2.name || attr1.value !== attr2.value) {
+      return false;
+    }
+  });
+
+  // Check if the nodes have the same number of child nodes
+  if (element1.children().length !== element2.children().length) {
+    return false;
+  }
+
+  // Recursively compare child nodes
+  element1.children().each(function (index, child1) {
+    const child2 = element2.children()[index];
+
+    if (child1.nodeType === 1) {
+      // If it's an element node
+      if (!deepCompareElements($(child1), $(child2))) {
+        return false;
+      }
+    } else if (child1.nodeType === 3) {
+      // If it's a text node
+      if (child1.textContent !== child2.textContent) {
+        return false;
+      }
+    }
+  });
+
+  return true; // All comparisons passed, the elements are the same
+}
+
 let maxWaitForEvents = 500; // comically high number to prevent infinite loop
 let maxWaitForInit = 500; // comically high number to prevent infinite loop
 function initCalendar(replaceCalendar = false) {
@@ -427,10 +476,16 @@ function initCalendar(replaceCalendar = false) {
         activeBtn &&
         (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week"))
       ) {
+        let copyComplete = deepCompareElements(
+          $(".rbc-time-content.cloned-calendar"),
+          $(".rbc-time-content.og-calendar")
+        );
+        debugLog(`Tampermonkey calendar is copying complete? ${copyComplete}`);
+        if (copyComplete) {
+          debugLog(`Tampermonkey calendar copy complete`);
+          return;
+        }
         debugLog(`Tampermonkey calendar is on day or week view`);
-        // $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
-        // find the first instance of .rbc-time-content and add class .og-calendar
-
         calendar = $(".rbc-time-content");
         let ogCalendar = calendar && calendar.first().addClass("og-calendar");
         let clonedCalendar = ogCalendar.clone(true);
