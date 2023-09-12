@@ -422,20 +422,14 @@ function initCalendar(replaceCalendar = false) {
     let calendarTab = activeTab && activeTab.text().toLowerCase().includes("calendar");
     let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
 
-    if (availabilitiesTab) {
-      debugLog(`Tampermonkey calendar is on availability tab - nothing to do here`);
+    // Check if we're on availabilities tab, or if  calendar is loaded and cloned
+    if (availabilitiesTab || (!replaceCalendar && $(".main-calendar-column").find(".cloned-calendar").length > 0)) {
       return;
     }
 
     if (replaceCalendar) {
       debugLog(`Tampermonkey force re-init calendar`);
       $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
-    }
-
-    // Check if calendar is loaded and cloned
-    if (!forceInit && $(".main-calendar-column").find(".cloned-calendar").length > 0) {
-      debugLog(`Tampermonkey calendar already cloned`);
-      return;
     }
 
     // Check if class .cloned-calendar exists and remove the string from the class name
