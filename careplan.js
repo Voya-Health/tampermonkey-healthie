@@ -397,7 +397,7 @@ function deepCompareElements(element1, element2) {
 }
 
 function showBothCalendars(clonedCalendar, ogCalendar) {
-  clonedCalendar.css({ transform: "translateX(-20%)" });
+  clonedCalendar.css({ transform: "translateX(-35%)" });
   let cssRules = `
           .rbc-time-content.cloned-calendar::before {
             content: "Clone";
@@ -423,6 +423,7 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
     $("head").append(styleElement);
   }
 
+  ogCalendar.css({ position: "absolute", transform: "translateX(35%)", border: "4px solid #ff5c5c" });
   cssRules = `
           .rbc-time-content.og-calendar::before {
             content: "Original";
@@ -520,6 +521,11 @@ function initCalendar(replaceCalendar = false) {
       $(".overlay-vori").remove();
     }
 
+    // wait 3 seconds then proceed
+    createTimeout(function () {
+      initCalendar(replaceCalendar);
+    }, 3000);
+
     if (calendarTab) {
       if (
         activeBtn &&
@@ -544,7 +550,7 @@ function initCalendar(replaceCalendar = false) {
         debug && showBothCalendars(clonedCalendar, ogCalendar);
 
         // instead of replacing the original calendar, we'll hide it, and append the cloned calendar
-        ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
+        !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
         ogCalendar.parent().append(clonedCalendar);
         debugLog(`Tampermonkey hid original calendar and appended cloned calendar`);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month")) {
