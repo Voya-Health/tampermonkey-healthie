@@ -427,7 +427,7 @@ function initCalendar(replaceCalendar = false) {
       return;
     }
 
-    if (forceInit) {
+    if (replaceCalendar) {
       debugLog(`Tampermonkey force re-init calendar`);
       $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
     }
@@ -452,10 +452,6 @@ function initCalendar(replaceCalendar = false) {
       pointerEvents: "none",
       userSelect: "none",
     });
-    if (!$(".main-calendar-column").find(".overlay-vori").length > 0) {
-      $(".main-calendar-column").css({ position: "relative" }).append(overlay);
-      debugLog(`Tampermonkey added overlay to calendar`);
-    }
 
     // First init add button to make sure event gets overwritten
     initAddButton();
@@ -465,10 +461,16 @@ function initCalendar(replaceCalendar = false) {
     const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
     if (calendarLoading.length > 0) {
       debugLog(`Tampermonkey waiting for calendar to load`);
+      if (!$(".main-calendar-column").find(".overlay-vori").length > 0) {
+        $(".main-calendar-column").css({ position: "relative" }).append(overlay);
+        debugLog(`Tampermonkey added overlay to calendar`);
+      }
       createTimeout(function () {
-        initCalendar(forceInit);
-      }, 200);
+        initCalendar(replaceCalendar);
+      }, 1000);
       return;
+    } else {
+      $(".overlay-vori").remove();
     }
 
     if (calendarTab) {
@@ -533,8 +535,8 @@ function initCalendar(replaceCalendar = false) {
       } else {
         debugLog(`Tampermonkey waiting for calendar and events`);
         createTimeout(function () {
-          initCalendar(forceInit);
-        }, 200);
+          initCalendar(replaceCalendar);
+        }, 1000);
       }
     }
   }
