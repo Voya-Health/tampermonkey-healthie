@@ -347,9 +347,9 @@ function showOverlay(url, style = {}) {
   }
 }
 
-let maxWaitForEvents = 200; // comically high number to prevent infinite loop
-let maxWaitForInit = 200; // comically high number to prevent infinite loop
-function initCalendar(forceInit = false) {
+let maxWaitForEvents = 500; // comically high number to prevent infinite loop
+let maxWaitForInit = 500; // comically high number to prevent infinite loop
+function initCalendar(replaceCalendar = false) {
   const $ = initJQuery();
   if (!$) {
     debugLog(`Tampermonkey jQuery not loaded`);
@@ -364,6 +364,7 @@ function initCalendar(forceInit = false) {
       return;
     }
 
+    maxWaitForInit = 200;
     let calendar = null;
     let calendarEvents = $(".rbc-event.calendar-event.with-label-spacing");
     let calendarHeaderBtns = $(".rbc-btn-group");
@@ -455,6 +456,7 @@ function initCalendar(forceInit = false) {
     }
 
     if (calendar) {
+      maxWaitForEvents = 500;
       // Event listeners
       $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
         e.stopPropagation();
