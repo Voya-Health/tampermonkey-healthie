@@ -397,7 +397,7 @@ function deepCompareElements(element1, element2) {
 }
 
 function showBothCalendars(clonedCalendar, ogCalendar) {
-  clonedCalendar.css({ transform: "translateX(-35%)" });
+  clonedCalendar.css({ position: "absolute", transform: "translate(-28%, 0)", left: "-20px" });
   let cssRules = `
           .rbc-time-content.cloned-calendar::before {
             content: "Clone";
@@ -423,7 +423,12 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
     $("head").append(styleElement);
   }
 
-  ogCalendar.css({ position: "absolute", transform: "translateX(35%)", border: "4px solid #ff5c5c" });
+  ogCalendar.css({
+    position: "absolute",
+    transform: "translate(35%, 0)",
+    border: "4px solid rgb(255, 92, 92)",
+    zIndex: "9",
+  });
   cssRules = `
           .rbc-time-content.og-calendar::before {
             content: "Original";
