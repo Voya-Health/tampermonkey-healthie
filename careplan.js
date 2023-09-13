@@ -439,7 +439,7 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
     debugLog(`Tampermonkey initializing calendar`);
 
     maxWaitForInit--;
-    if (maxWaitForInit < 0) {
+    if (maxWaitForInit < 0 || copyComplete > 500) {
       window.location.reload();
       return;
     }
@@ -457,7 +457,7 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
     if (
       availabilitiesTab ||
       (!replaceCalendar && $(".main-calendar-column").find(".cloned-calendar").length > 0) ||
-      copyComplete > 200 ||
+      copyComplete > 500 ||
       copyComplete < 0
     ) {
       return;
@@ -467,9 +467,6 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
       debugLog(`Tampermonkey force re-init calendar`);
       $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
     }
-
-    // Check if class .cloned-calendar exists and remove the string from the class name
-    $(".cloned-calendar").removeClass("cloned-calendar");
 
     // First overlay a transparent div on top of the calendar until cloning is done
     const overlay = $("<div>").addClass("overlay-vori").css({
