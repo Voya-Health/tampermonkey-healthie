@@ -15,7 +15,7 @@
 /* globals contentful */
 
 //Enable/Disable debug mode
-let debug = false;
+let debug = true;
 let previousUrl = "";
 let patientNumber = "";
 let carePlanLoopLock = 0;
@@ -37,6 +37,7 @@ const urlValidation = {
   conversations: /\/conversations/,
   goals: /\/users/,
 };
+let copyComplete = -1;
 
 function debugLog(...messages) {
   if (isStagingEnv || debug) {
@@ -347,58 +348,25 @@ function showOverlay(url, style = {}) {
   }
 }
 
-function deepCompareElements(element1, element2) {
-  // Check if the nodes are DOM elements
-  if (!element1 || !element2 || element1.length === 0 || element2.length === 0) {
-    return false;
-  }
-
-  // Check if the nodes have the same tag name
-  if (element1.prop("tagName") !== element2.prop("tagName")) {
-    return false;
-  }
-
-  // Check if the nodes have the same number of attributes
-  if (element1[0].attributes.length !== element2[0].attributes.length) {
-    return false;
-  }
-
-  // Check if all attributes match
-  $.each(element1[0].attributes, function (index, attr1) {
-    const attr2 = element2[0].attributes[index];
-    if (attr1.name !== attr2.name || attr1.value !== attr2.value) {
-      return false;
-    }
-  });
-
-  // Check if the nodes have the same number of child nodes
-  if (element1.children().length !== element2.children().length) {
-    return false;
-  }
-
-  // Recursively compare child nodes
-  element1.children().each(function (index, child1) {
-    const child2 = element2.children()[index];
-
-    if (child1.nodeType === 1) {
-      // If it's an element node
-      if (!deepCompareElements($(child1), $(child2))) {
-        return false;
-      }
-    } else if (child1.nodeType === 3) {
-      // If it's a text node
-      if (child1.textContent !== child2.textContent) {
-        return false;
-      }
-    }
-  });
-
-  return true; // All comparisons passed, the elements are the same
-}
-
 function showBothCalendars(clonedCalendar, ogCalendar) {
-  clonedCalendar.css({ position: "absolute", transform: "translate(-28%, 0)", left: "-20px" });
+  clonedCalendar.css({
+    position: "absolute",
+    transform: "translate(-46%, 0px)",
+    left: "0px",
+    width: "67%",
+    maxWidth: "750px",
+    background: "rgb(255, 255, 255)",
+  });
   let cssRules = `
+          .rbc-time-content>.rbc-time-gutter {
+            display: none;
+          }
+          #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.cloned-calendar > div:nth-child(2), 
+          #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.cloned-calendar > div:nth-child(8),
+          #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.og-calendar > div:nth-child(2),
+          #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.og-calendar > div:nth-child(8) {
+            display: none;
+          }
           .rbc-time-content.cloned-calendar::before {
             content: "Clone";
             position: absolute;
@@ -425,9 +393,11 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
 
   ogCalendar.css({
     position: "absolute",
-    transform: "translate(35%, 0)",
+    transform: "translate(54%, 0px)",
     border: "4px solid rgb(255, 92, 92)",
     zIndex: "9",
+    width: "63%",
+    background: "#fff",
   });
   cssRules = `
           .rbc-time-content.og-calendar::before {
@@ -457,11 +427,13 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
 
 let maxWaitForEvents = 500; // comically high number to prevent infinite loop
 let maxWaitForInit = 500; // comically high number to prevent infinite loop
-function initCalendar(replaceCalendar = false) {
+function initCalendar(replaceCalendar = false, delayedRun = false) {
   const $ = initJQuery();
   if (!$) {
     debugLog(`Tampermonkey jQuery not loaded`);
-    createTimeout(initCalendar, 200);
+    createTimeout(function () {
+      initCalendar(replaceCalendar);
+    }, 200);
     return;
   } else {
     debugLog(`Tampermonkey initializing calendar`);
@@ -474,15 +446,20 @@ function initCalendar(replaceCalendar = false) {
 
     maxWaitForInit = 200;
     let calendar = null;
-    let calendarEvents = $(".rbc-event.calendar-event.with-label-spacing");
     let calendarHeaderBtns = $(".rbc-btn-group");
     let activeBtn = calendarHeaderBtns.find(".rbc-active");
     let activeTab = $(".calendar-tabs").find(".tab-item.active");
     let calendarTab = activeTab && activeTab.text().toLowerCase().includes("calendar");
     let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
 
+    debugLog(`Tampermonkey copyComplete`, copyComplete);
     // Check if we're on availabilities tab, or if  calendar is loaded and cloned
-    if (availabilitiesTab || (!replaceCalendar && $(".main-calendar-column").find(".cloned-calendar").length > 0)) {
+    if (
+      availabilitiesTab ||
+      (!replaceCalendar && $(".main-calendar-column").find(".cloned-calendar").length > 0) ||
+      copyComplete > 200 ||
+      copyComplete < 0
+    ) {
       return;
     }
 
@@ -510,7 +487,7 @@ function initCalendar(replaceCalendar = false) {
     initAddButton();
     initTodayPrevNextBtns();
 
-    // Move on to calendar
+    // check if calendar is loading
     const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
     if (calendarLoading.length > 0) {
       debugLog(`Tampermonkey waiting for calendar to load`);
@@ -526,30 +503,26 @@ function initCalendar(replaceCalendar = false) {
       $(".overlay-vori").remove();
     }
 
-    // wait 3 seconds then proceed
+    // wait 3 seconds then proceed to clone calendar
     createTimeout(function () {
-      initCalendar(replaceCalendar);
-    }, 3000);
+      initCalendar(replaceCalendar, true);
+      copyComplete++;
+    }, 1000);
 
     if (calendarTab) {
       if (
         activeBtn &&
-        (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week"))
+        (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week")) &&
+        copyComplete > 0
       ) {
-        let copyComplete = deepCompareElements(
-          $(".rbc-time-content.cloned-calendar"),
-          $(".rbc-time-content.og-calendar")
-        );
-        debugLog(`Tampermonkey calendar is copying complete? ${copyComplete}`);
-        if (copyComplete) {
-          debugLog(`Tampermonkey calendar copy complete`);
-          return;
-        }
         debugLog(`Tampermonkey calendar is on day or week view`);
         calendar = $(".rbc-time-content");
         let ogCalendar = calendar && calendar.first().addClass("og-calendar");
         let clonedCalendar = ogCalendar.clone(true);
-        clonedCalendar.addClass("cloned-calendar").removeClass("og-calendar").removeAttr("style");
+        clonedCalendar
+          .addClass(delayedRun ? "cloned-calendar.copy-complete" : "cloned-calendar")
+          .removeClass("og-calendar")
+          .removeAttr("style");
 
         // debug mode - set to True for quick debugging
         debug && showBothCalendars(clonedCalendar, ogCalendar);
@@ -588,6 +561,8 @@ function initCalendar(replaceCalendar = false) {
         showOverlay(`${routeURLs.appointment}/${apptUuid}`, styles.appointmentDetailsOverlay);
       });
       $(".cloned-calendar") && debugLog(`Tampermonkey calendar cloned`);
+      copyComplete = -1;
+      debugLog(`reset copy complete in initCalendar after cloning`, copyComplete);
       $(".overlay-vori").remove();
     } else {
       maxWaitForEvents--;
@@ -658,14 +633,17 @@ function initTodayPrevNextBtns() {
       //add event listeners
       $(todayBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on today. Re-initializing calendar...`);
+        copyComplete = 1;
         initCalendar(true);
       });
       $(prevBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on prev. Re-initializing calendar...`);
+        copyComplete = 1;
         initCalendar(true);
       });
       $(nextBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on next. Re-initializing calendar...`);
+        copyComplete = 1;
         initCalendar(true);
       });
     } else {
@@ -1516,6 +1494,9 @@ function observeDOMChanges(mutations, observer) {
         ))
     ) {
       observer.disconnect();
+      let clonedCalendar = document.querySelector(".cloned-calendar");
+      !clonedCalendar && copyComplete++;
+      debugLog(`increased copy complete in observer`, copyComplete);
       initCalendar();
       observer.observe(document.documentElement, { childList: true, subtree: true });
       break;
