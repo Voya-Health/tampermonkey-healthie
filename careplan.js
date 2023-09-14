@@ -628,9 +628,29 @@ function initTodayPrevNextBtns() {
       return;
     }
 
+    let dayBtn = $(".rbc-btn-group").find("button:contains('day')")[0];
+    let weekBtn = $(".rbc-btn-group").find("button:contains('week')")[0];
+    let monthBtn = $(".rbc-btn-group").find("button:contains('month')")[0];
+
     let todayBtn = $(".rbc-btn-group").find("button:contains('today')")[0];
     let prevBtn = $(".rbc-btn-group").find("button:contains('<')")[0];
     let nextBtn = $(".rbc-btn-group").find("button:contains('>')")[0];
+
+    if (dayBtn && weekBtn && monthBtn) {
+      //add event listeners
+      $(dayBtn).on("click", function (e) {
+        debugLog(`tampermonkey - clicked on day. Removing cloned calendar...`);
+        $(".rbc-month-view").remove(); // remove month view - for when switching from month to day/week
+      });
+      $(weekBtn).on("click", function (e) {
+        debugLog(`tampermonkey - clicked on week. Removing cloned calendar...`);
+        $(".rbc-month-view").remove(); // remove month view - for when switching from month to day/week
+      });
+      $(monthBtn).on("click", function (e) {
+        debugLog(`tampermonkey - clicked on month. Removing cloned calendar...`);
+        $(".rbc-time-content").remove(); // remove day/week view - for when switching from day/week to month
+      });
+    }
 
     if (todayBtn && prevBtn && nextBtn) {
       //add event listeners
