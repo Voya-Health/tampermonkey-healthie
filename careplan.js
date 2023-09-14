@@ -429,6 +429,7 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
 
 let maxWaitForEvents = 500; // comically high number to prevent infinite loop
 let maxWaitForInit = 500; // comically high number to prevent infinite loop
+let maxWaitForCalendarLoad = 1500; // comically high number to prevent infinite loop
 function initCalendar(replaceCalendar = false, delayedRun = false) {
   const $ = initJQuery();
   if (!$) {
@@ -438,15 +439,16 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
     }, 200);
     return;
   } else {
-    debugLog(`Tampermonkey initializing calendar`);
+    debugLog(`Tampermonkey initializing calendar. maxWait: [${maxWaitForInit}, ${maxWaitForCalendarLoad}]`);
 
     maxWaitForInit--;
-    if (maxWaitForInit < 0 || copyComplete > 500) {
+    maxWaitForCalendarLoad--;
+    if (maxWaitForInit < 0 || maxWaitForCalendarLoad < 0) {
       window.location.reload();
       return;
     }
 
-    maxWaitForInit = 200;
+    maxWaitForInit = 500;
     let calendar = null;
     let calendarHeaderBtns = $(".rbc-btn-group");
     let activeBtn = calendarHeaderBtns.find(".rbc-active");
@@ -499,10 +501,11 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
       }, 1000);
       return;
     } else {
+      maxWaitForCalendarLoad = 1500;
       $(".overlay-vori").remove();
     }
 
-    // wait 3 seconds then proceed to clone calendar
+    // wait 1 second then proceed to clone calendar
     createTimeout(function () {
       initCalendar(replaceCalendar, true);
       copyComplete++;
