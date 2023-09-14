@@ -430,14 +430,16 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
 function initSidebarCalendar() {
   let ogSdbrCalendar = $(".react-datepicker__month-container");
   ogSdbrCalendar && ogSdbrCalendar.first().addClass("og-sdbr-calendar");
-  ogSdbrCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
-  let clonedSdbrCalendar = ogSdbrCalendar && ogSdbrCalendar.clone(true);
-  clonedSdbrCalendar
-    .addClass("cloned-sdbr-calendar")
-    .removeClass("og-sdbr-calendar")
-    .removeAttr("style")
-    .css({ pointerEvents: "none", userSelect: "none" });
-
+  $(".og-sdbr-calendar").css({ display: "none", position: "absolute", transform: "translateX(68%)" });
+  let clonedSdbrCalendar =
+    ogSdbrCalendar && ogSdbrCalendar.clone(true).addClass("cloned-sdbr-calendar").removeClass("og-sdbr-calendar");
+  $(".cloned-sdbr-calendar").css({
+    display: "unset",
+    position: "relative",
+    transform: "unset",
+    pointerEvents: "none",
+    userSelect: "none",
+  });
   let clonedSdbrCalendarExists = $(".cloned-sdbr-calendar").length > 0;
   !clonedSdbrCalendarExists && ogSdbrCalendar.parent().append(clonedSdbrCalendar);
 }
