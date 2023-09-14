@@ -642,15 +642,21 @@ function initTodayPrevNextBtns() {
       //add event listeners
       $(dayBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on day. Removing cloned calendar...`);
-        $(".rbc-month-view").remove(); // remove month view - for when switching from month to day/week
+        setTimeout(() => {
+          $(".rbc-month-view").remove();
+        }, 1000);
       });
       $(weekBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on week. Removing cloned calendar...`);
-        $(".rbc-month-view").remove(); // remove month view - for when switching from month to day/week
+        setTimeout(() => {
+          $(".rbc-month-view").remove();
+        }, 1000);
       });
       $(monthBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on month. Removing cloned calendar...`);
-        $(".rbc-time-content").remove(); // remove day/week view - for when switching from day/week to month
+        setTimeout(() => {
+          $(".rbc-time-content").remove();
+        }, 1000);
       });
     }
 
