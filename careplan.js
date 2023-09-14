@@ -367,7 +367,8 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
           #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.og-calendar > div:nth-child(8) {
             display: none;
           }
-          .rbc-time-content.cloned-calendar::before {
+          .rbc-time-content.cloned-calendar::before,
+          .rbc-month-view.cloned-calendar::before {
             content: "Clone";
             position: absolute;
             top: 0px;
@@ -400,7 +401,8 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
     background: "#fff",
   });
   cssRules = `
-          .rbc-time-content.og-calendar::before {
+          .rbc-time-content.og-calendar::before,
+          .rbc-month-view.og-calendar::before {
             content: "Original";
             position: absolute;
             top: 0px;
