@@ -427,6 +427,21 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
   }
 }
 
+function initSidebarCalendar() {
+  let ogSdbrCalendar = $(".react-datepicker__month-container");
+  ogSdbrCalendar && ogSdbrCalendar.first().addClass("og-sdbr-calendar");
+  ogSdbrCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
+  let clonedSdbrCalendar = ogSdbrCalendar && ogSdbrCalendar.clone(true);
+  clonedSdbrCalendar
+    .addClass("cloned-sdbr-calendar")
+    .removeClass("og-sdbr-calendar")
+    .removeAttr("style")
+    .css({ pointerEvents: "none", userSelect: "none" });
+
+  let clonedSdbrCalendarExists = $(".cloned-sdbr-calendar").length > 0;
+  !clonedSdbrCalendarExists && ogSdbrCalendar.parent().append(clonedSdbrCalendar);
+}
+
 let maxWaitForEvents = 500; // comically high number to prevent infinite loop
 let maxWaitForInit = 500; // comically high number to prevent infinite loop
 let maxWaitForCalendarLoad = 1500; // comically high number to prevent infinite loop
@@ -486,7 +501,7 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
 
     // First init add button to make sure event gets overwritten
     initAddButton();
-    initTodayPrevNextBtns();
+    initCalendarHeaderBtns();
 
     // check if calendar is loading
     const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
@@ -512,6 +527,7 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
     }, 1000);
 
     if (calendarTab) {
+      initSidebarCalendar();
       if (
         activeBtn &&
         (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week")) &&
@@ -617,7 +633,7 @@ function initAddButton() {
   }
 }
 
-function initTodayPrevNextBtns() {
+function initCalendarHeaderBtns() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
@@ -682,7 +698,7 @@ function initTodayPrevNextBtns() {
       });
     } else {
       debugLog(`tampermonkey waiting for add today, <, > button`);
-      createTimeout(initTodayPrevNextBtns, 200);
+      createTimeout(initCalendarHeaderBtns, 200);
     }
   }
 }
