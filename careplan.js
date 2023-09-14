@@ -15,7 +15,7 @@
 /* globals contentful */
 
 //Enable/Disable debug mode
-let debug = true;
+let debug = false;
 let previousUrl = "";
 let patientNumber = "";
 let carePlanLoopLock = 0;
@@ -351,7 +351,7 @@ function showOverlay(url, style = {}) {
 function showBothCalendars(clonedCalendar, ogCalendar) {
   clonedCalendar.css({
     position: "absolute",
-    transform: "translate(-46%, 0px)",
+    transform: "translate(-46%, 35px)",
     left: "0px",
     width: "67%",
     maxWidth: "750px",
@@ -393,7 +393,7 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
 
   ogCalendar.css({
     position: "absolute",
-    transform: "translate(54%, 0px)",
+    transform: "translate(54%, 35px)",
     border: "4px solid rgb(255, 92, 92)",
     zIndex: "9",
     width: "63%",
@@ -516,10 +516,7 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
         calendar = $(".rbc-time-content");
         let ogCalendar = calendar && calendar.first().addClass("og-calendar");
         let clonedCalendar = ogCalendar.clone(true);
-        clonedCalendar
-          .addClass(delayedRun ? "cloned-calendar.copy-complete" : "cloned-calendar")
-          .removeClass("og-calendar")
-          .removeAttr("style");
+        clonedCalendar.addClass("cloned-calendar").removeClass("og-calendar").removeAttr("style");
 
         // debug mode - set to True for quick debugging
         debug && showBothCalendars(clonedCalendar, ogCalendar);
@@ -527,18 +524,27 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
         // instead of replacing the original calendar, we'll hide it, and append the cloned calendar
         !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
         ogCalendar.parent().append(clonedCalendar);
-        debugLog(`Tampermonkey hid original calendar and appended cloned calendar`);
-      } else if (activeBtn && activeBtn.text().toLowerCase().includes("month")) {
+        debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
+      } else if (activeBtn && activeBtn.text().toLowerCase().includes("month") && copyComplete > 0) {
         debugLog(`Tampermonkey calendar is on month view`);
         calendar = $(".rbc-month-view");
-        if ($(".rbc-month-view").length > 0) {
-          let monthView = $(".rbc-month-view")[0].childNodes;
+        let ogCalendar = calendar && calendar.first().addClass("og-calendar");
+
+        if (ogCalendar.length > 0) {
+          let clonedCalendar = ogCalendar.clone(true);
+          let monthView = clonedCalendar[0].childNodes;
           let children = Array.from(monthView);
           children.forEach((child) => {
             let clone = $(child).clone();
             $(clone).addClass("cloned");
             $(child).replaceWith(clone);
           });
+
+          clonedCalendar.addClass("cloned-calendar").removeClass("og-calendar").removeAttr("style");
+          debug && showBothCalendars(clonedCalendar, ogCalendar);
+          !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
+          ogCalendar.parent().append(clonedCalendar);
+          debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
         }
       }
     }
