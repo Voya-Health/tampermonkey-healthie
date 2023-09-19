@@ -82,6 +82,21 @@ function createTimeout(timeoutFunction, delay) {
   }, delay);
   //debugLog(`tampermonkey create timeout ${timeoutId}`);
   timeoutIds.push(timeoutId);
+  return timeoutId;
+}
+
+function clearAllTimeouts() {
+  debugLog(`tampermonkey clear all timeouts`);
+  timeoutIds.forEach((id) => {
+    window.clearTimeout(id);
+  });
+  timeoutIds = [];
+}
+
+function clearTimeout(timeoutId) {
+  debugLog(`tampermonkey clear timeout ${timeoutId}`);
+  window.clearTimeout(timeoutId);
+  timeoutIds = timeoutIds.filter((id) => id !== timeoutId);
 }
 
 function initJQuery() {
