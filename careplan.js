@@ -471,11 +471,12 @@ let maxWaitForCalendarLoad = 1500; // comically high number to prevent infinite 
   const $ = initJQuery();
   if (!$) {
     debugLog(`Tampermonkey jQuery not loaded`);
-    createTimeout(function () {
+    initCalTimeout = createTimeout(function () {
       initCalendar(replaceCalendar);
     }, 200);
     return;
   } else {
+    clearTimeout(initCalTimeout); // clear jquery timeout
     debugLog(
       `Tampermonkey initializing calendar. maxWait: [${maxWaitForInit}, ${maxWaitForCalendarLoad}], delayedRun: ${delayedRun}`
     );
@@ -536,18 +537,19 @@ let maxWaitForCalendarLoad = 1500; // comically high number to prevent infinite 
         $(".main-calendar-column").css({ position: "relative" }).append(overlay);
         debugLog(`Tampermonkey added overlay to calendar`);
       }
-      createTimeout(function () {
+      initCalTimeout = createTimeout(function () {
         initCalendar(replaceCalendar);
       }, 1000);
       return;
     } else {
       maxWaitForCalendarLoad = 1500;
       $(".overlay-vori").remove();
+      clearTimeout(initCalTimeout); // clear loading timeout
     }
 
     // wait 1 second then proceed to clone calendar
     delayedRun++;
-    createTimeout(function () {
+    initCalTimeout = createTimeout(function () {
       initCalendar(replaceCalendar);
       copyComplete++;
     }, 1000);
@@ -572,6 +574,7 @@ let maxWaitForCalendarLoad = 1500; // comically high number to prevent infinite 
         !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
         ogCalendar.parent().append(clonedCalendar);
         delayedRun = 0;
+        clearTimeout(initCalTimeout);
         debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month") && copyComplete > 0) {
         debugLog(`Tampermonkey calendar is on month view`);
@@ -593,6 +596,7 @@ let maxWaitForCalendarLoad = 1500; // comically high number to prevent infinite 
           !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
           ogCalendar.parent().append(clonedCalendar);
           delayedRun = 0;
+          clearTimeout(initCalTimeout);
           debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
         }
       }
