@@ -575,6 +575,7 @@ function initCalendar(replaceCalendar = false) {
         ogCalendar.parent().append(clonedCalendar);
         delayedRun = 0;
         clearMyTimeout(initCalTimeout);
+        initCalTimeout = null;
         debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month") && copyComplete > 0) {
         debugLog(`Tampermonkey calendar is on month view`);
@@ -597,6 +598,7 @@ function initCalendar(replaceCalendar = false) {
           ogCalendar.parent().append(clonedCalendar);
           delayedRun = 0;
           clearMyTimeout(initCalTimeout);
+          initCalTimeout = null;
           debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
         }
       }
