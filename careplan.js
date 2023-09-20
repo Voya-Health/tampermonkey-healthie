@@ -448,19 +448,36 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
 
 function initSidebarCalendar() {
   let ogSdbrCalendar = $(".react-datepicker__month-container");
-  ogSdbrCalendar && ogSdbrCalendar.first().addClass("og-sdbr-calendar");
-  $(".og-sdbr-calendar").css({ display: "none", position: "absolute", transform: "translateX(68%)" });
-  let clonedSdbrCalendar =
-    ogSdbrCalendar && ogSdbrCalendar.clone(true).addClass("cloned-sdbr-calendar").removeClass("og-sdbr-calendar");
-  $(".cloned-sdbr-calendar").css({
-    display: "unset",
-    position: "relative",
-    transform: "unset",
-    pointerEvents: "none",
-    userSelect: "none",
-  });
-  let clonedSdbrCalendarExists = $(".cloned-sdbr-calendar").length > 0;
-  !clonedSdbrCalendarExists && ogSdbrCalendar.parent().append(clonedSdbrCalendar);
+  let sidebarTimeout = null;
+  if (!ogSdbrCalendar) {
+    debugLog(`Tampermonkey waiting for sidebar calendar`);
+    sidebarTimeout = createTimeout(initSidebarCalendar, 200);
+    return;
+  } else {
+    debugLog(`Tampermonkey found sidebar calendar`);
+    clearMyTimeout(sidebarTimeout);
+    // create style element to disable pointer events on calendar
+    let cssRules = `
+          .react-datepicker__month-container {
+            pointer-events: none;
+            user-select: none;
+          }
+          .react-datepicker__navigation {
+            pointer-events: none;
+            user-select: none;
+          }
+        `;
+    let cssRuleToCheck = ".react-datepicker__month-container";
+    let styleElementExists =
+      $("style").filter(function () {
+        return $(this).text().indexOf(cssRuleToCheck) !== -1;
+      }).length > 0;
+    if (!styleElementExists) {
+      let styleElement = document.createElement("style");
+      styleElement.appendChild(document.createTextNode(cssRules));
+      $("head").append(styleElement);
+    }
+  }
 }
 
 let maxWaitForEvents = 500; // comically high number to prevent infinite loop
