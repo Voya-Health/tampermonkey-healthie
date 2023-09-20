@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.62
+// @version      0.63
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -473,6 +473,7 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
     let calendarTab = activeTab && activeTab.text().toLowerCase().includes("calendar");
     let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
 
+    $('.react-datepicker').css('display', 'none'); //hide calendar datepicker 
     debugLog(`Tampermonkey copyComplete`, copyComplete);
     // Check if we're on availabilities tab, or if  calendar is loaded and cloned
     if (
@@ -538,6 +539,7 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
         debugLog(`Tampermonkey calendar is on day or week view`);
         calendar = $(".rbc-time-content");
         let ogCalendar = calendar && calendar.first().addClass("og-calendar");
+        $('.react-datepicker').css('display', 'none'); //hide calendar datepicker
         let clonedCalendar = ogCalendar.clone(true);
         clonedCalendar.addClass("cloned-calendar").removeClass("og-calendar").removeAttr("style");
 
@@ -552,7 +554,7 @@ function initCalendar(replaceCalendar = false, delayedRun = false) {
         debugLog(`Tampermonkey calendar is on month view`);
         calendar = $(".rbc-month-view");
         let ogCalendar = calendar && calendar.first().addClass("og-calendar");
-
+        $('.react-datepicker').css('display', 'none'); //hide calendar datepicker
         if (ogCalendar.length > 0) {
           let clonedCalendar = ogCalendar.clone(true);
           let monthView = clonedCalendar[0].childNodes;
