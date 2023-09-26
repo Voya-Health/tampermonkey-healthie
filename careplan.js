@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.64
+// @version      0.65
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -1453,6 +1453,7 @@ function addMembershipAndOnboarding() {
         const mishaID = response.data.user.additional_record_identifier;
         debugLog(`tampermonkey mishaID`, mishaID);
         // create iframe (generateIframe returns a jQuery object)
+        //Add custom height and width to avoid scrollbars because the material ui Select component
         const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "190px", width:'400px' });
         const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
         // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
