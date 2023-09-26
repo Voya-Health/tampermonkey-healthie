@@ -1453,7 +1453,7 @@ function addMembershipAndOnboarding() {
         const mishaID = response.data.user.additional_record_identifier;
         debugLog(`tampermonkey mishaID`, mishaID);
         // create iframe (generateIframe returns a jQuery object)
-        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "190px", width:'365px' });
+        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "190px", width:'400px' });
         const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
         // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
         !iframeExists && phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
