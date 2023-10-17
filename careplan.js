@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Healthie Care Plan Integration
+// @name         Healthie Care Plan Integration dev
 // @namespace    http://tampermonkey.net/
 // @version      0.65
 // @description  Injecting care plan components into Healthie
@@ -39,6 +39,7 @@ const urlValidation = {
 };
 let copyComplete = -1;
 let delayedRun = 0;
+let replaceCalendar = false;
 
 function debugLog(...messages) {
   if (isStagingEnv || debug) {
@@ -484,7 +485,7 @@ let maxWaitForEvents = 500; // comically high number to prevent infinite loop
 let maxWaitForInit = 500; // comically high number to prevent infinite loop
 let maxWaitForCalendarLoad = 1500; // comically high number to prevent infinite loop
 let initCalTimeout = null;
-function initCalendar(replaceCalendar = false) {
+function initCalendar(replaceCalendar) {
   const $ = initJQuery();
   if (!$) {
     debugLog(`Tampermonkey jQuery not loaded`);
@@ -591,6 +592,7 @@ function initCalendar(replaceCalendar = false) {
         !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
         ogCalendar.parent().append(clonedCalendar);
         delayedRun = 0;
+        replaceCalendar = false;
         clearMyTimeout(initCalTimeout);
         initCalTimeout = null;
         debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
@@ -614,6 +616,7 @@ function initCalendar(replaceCalendar = false) {
           !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
           ogCalendar.parent().append(clonedCalendar);
           delayedRun = 0;
+          replaceCalendar = false;
           clearMyTimeout(initCalTimeout);
           initCalTimeout = null;
           debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
@@ -735,17 +738,20 @@ function initCalendarHeaderBtns() {
       $(todayBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on today. Re-initializing calendar...`);
         copyComplete = 1;
-        initCalendar(true);
+        replaceCalendar = true;
+        initCalendar(replaceCalendar);
       });
       $(prevBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on prev. Re-initializing calendar...`);
         copyComplete = 1;
-        initCalendar(true);
+        replaceCalendar = true;
+        initCalendar(replaceCalendar);
       });
       $(nextBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on next. Re-initializing calendar...`);
         copyComplete = 1;
-        initCalendar(true);
+        replaceCalendar = true;
+        initCalendar(replaceCalendar);
       });
     } else {
       debugLog(`tampermonkey waiting for add today, <, > button`);
@@ -757,7 +763,7 @@ function initCalendarHeaderBtns() {
 let calendarInitialized = false;
 function waitCalendar() {
   if (!calendarInitialized) {
-    initCalendar();
+    initCalendar(replaceCalendar);
     calendarInitialized = true;
   }
 }
@@ -1454,7 +1460,7 @@ function addMembershipAndOnboarding() {
         debugLog(`tampermonkey mishaID`, mishaID);
         // create iframe (generateIframe returns a jQuery object)
         //Add custom height and width to avoid scrollbars because the material ui Select component
-        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "190px", width:'400px' });
+        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "190px", width: "400px" });
         const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
         // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
         !iframeExists && phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
@@ -1599,7 +1605,7 @@ function observeDOMChanges(mutations, observer) {
       let clonedCalendar = document.querySelector(".cloned-calendar");
       !clonedCalendar && copyComplete++;
       debugLog(`increased copy complete in observer`, copyComplete);
-      initCalendar();
+      initCalendar(replaceCalendar);
       observer.observe(document.documentElement, { childList: true, subtree: true });
       break;
     }
