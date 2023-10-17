@@ -495,7 +495,7 @@ function initCalendar(replaceCalendar = false) {
   } else {
     clearMyTimeout(initCalTimeout); // clear jquery timeout
     debugLog(
-      `Tampermonkey initializing calendar. maxWait: [${maxWaitForInit}, ${maxWaitForCalendarLoad}], delayedRun: ${delayedRun}`
+      `Tampermonkey initializing calendar. maxWait: [${maxWaitForInit}, ${maxWaitForCalendarLoad}], delayedRun: ${delayedRun}, replaceCalendar: ${replaceCalendar}`
     );
 
     maxWaitForInit--;
