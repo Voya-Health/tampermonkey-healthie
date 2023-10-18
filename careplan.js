@@ -520,8 +520,7 @@ function initCalendar(replaceCalendar) {
       availabilitiesTab ||
       (!replaceCalendar && $(".main-calendar-column").find(".cloned-calendar").length > 0) ||
       copyComplete > 500 ||
-      copyComplete < 0 ||
-      delayedRun > 3
+      copyComplete < 0
     ) {
       return;
     }
@@ -562,13 +561,11 @@ function initCalendar(replaceCalendar) {
     } else {
       maxWaitForCalendarLoad = 1500;
       $(".overlay-vori").remove();
-      clearMyTimeout(initCalTimeout); // clear loading timeout
     }
 
     // wait 1 second then proceed to clone calendar
-    delayedRun++;
-    initCalTimeout = createTimeout(function () {
-      initCalendar(replaceCalendar);
+    createTimeout(function () {
+      initCalendar(replaceCalendar, true);
       copyComplete++;
     }, 1000);
 
@@ -591,10 +588,6 @@ function initCalendar(replaceCalendar) {
         // instead of replacing the original calendar, we'll hide it, and append the cloned calendar
         !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
         ogCalendar.parent().append(clonedCalendar);
-        delayedRun = 0;
-        replaceCalendar = false;
-        clearMyTimeout(initCalTimeout);
-        initCalTimeout = null;
         debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month") && copyComplete > 0) {
         debugLog(`Tampermonkey calendar is on month view`);
@@ -738,20 +731,17 @@ function initCalendarHeaderBtns() {
       $(todayBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on today. Re-initializing calendar...`);
         copyComplete = 1;
-        replaceCalendar = true;
-        initCalendar(replaceCalendar);
+        initCalendar(true);
       });
       $(prevBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on prev. Re-initializing calendar...`);
         copyComplete = 1;
-        replaceCalendar = true;
-        initCalendar(replaceCalendar);
+        initCalendar(true);
       });
       $(nextBtn).on("click", function (e) {
         debugLog(`tampermonkey - clicked on next. Re-initializing calendar...`);
         copyComplete = 1;
-        replaceCalendar = true;
-        initCalendar(replaceCalendar);
+        initCalendar(true);
       });
     } else {
       debugLog(`tampermonkey waiting for add today, <, > button`);
@@ -763,7 +753,7 @@ function initCalendarHeaderBtns() {
 let calendarInitialized = false;
 function waitCalendar() {
   if (!calendarInitialized) {
-    initCalendar(replaceCalendar);
+    initCalendar();
     calendarInitialized = true;
   }
 }
@@ -1605,7 +1595,7 @@ function observeDOMChanges(mutations, observer) {
       let clonedCalendar = document.querySelector(".cloned-calendar");
       !clonedCalendar && copyComplete++;
       debugLog(`increased copy complete in observer`, copyComplete);
-      initCalendar(replaceCalendar);
+      initCalendar();
       observer.observe(document.documentElement, { childList: true, subtree: true });
       break;
     }
