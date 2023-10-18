@@ -15,7 +15,7 @@
 /* globals contentful */
 
 //Enable/Disable debug mode
-let debug = false;
+let debug = true;
 let previousUrl = "";
 let patientNumber = "";
 let carePlanLoopLock = 0;
