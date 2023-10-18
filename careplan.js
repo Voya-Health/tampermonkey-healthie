@@ -15,7 +15,7 @@
 /* globals contentful */
 
 //Enable/Disable debug mode
-let debug = true;
+let debug = false;
 let previousUrl = "";
 let patientNumber = "";
 let carePlanLoopLock = 0;
@@ -564,10 +564,33 @@ function initCalendar(replaceCalendar) {
     }
 
     // wait 1 second then proceed to clone calendar
+    delayedRun++;
     createTimeout(function () {
-      initCalendar(replaceCalendar, true);
+      initCalendar(replaceCalendar);
       copyComplete++;
     }, 1000);
+
+    let cssRules = `
+          .cloned-calendar {
+            position: absolute;
+            top: 20px;
+            width: 100.8%;
+            background: #fff;
+          }
+          .rbc-time-view {
+            position: relative;
+          }
+        `;
+    let cssRuleToCheck = ".cloned-calendar";
+    let styleElementExists =
+      $("style").filter(function () {
+        return $(this).text().indexOf(cssRuleToCheck) !== -1;
+      }).length > 0;
+    if (!styleElementExists) {
+      let styleElement = document.createElement("style");
+      styleElement.appendChild(document.createTextNode(cssRules));
+      $("head").append(styleElement);
+    }
 
     if (calendarTab) {
       initSidebarCalendar();
@@ -608,10 +631,6 @@ function initCalendar(replaceCalendar) {
           debug && showBothCalendars(clonedCalendar, ogCalendar);
           !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
           ogCalendar.parent().append(clonedCalendar);
-          delayedRun = 0;
-          replaceCalendar = false;
-          clearMyTimeout(initCalTimeout);
-          initCalTimeout = null;
           debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
         }
       }
@@ -634,6 +653,8 @@ function initCalendar(replaceCalendar) {
       $(".cloned-calendar") && debugLog(`Tampermonkey calendar cloned`);
       copyComplete = -1;
       debugLog(`reset copy complete in initCalendar after cloning`, copyComplete);
+      let clonedCalendar = $(".cloned-calendar");
+      clonedCalendar && clearMyTimeout(initCalTimeout);
       $(".overlay-vori").remove();
     } else {
       maxWaitForEvents--;
