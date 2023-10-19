@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.65
+// @version      0.66
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -39,6 +39,7 @@ const urlValidation = {
 };
 let copyComplete = -1;
 let delayedRun = 0;
+let replaceCalendar = false;
 
 function debugLog(...messages) {
   if (isStagingEnv || debug) {
@@ -484,7 +485,7 @@ let maxWaitForEvents = 500; // comically high number to prevent infinite loop
 let maxWaitForInit = 500; // comically high number to prevent infinite loop
 let maxWaitForCalendarLoad = 1500; // comically high number to prevent infinite loop
 let initCalTimeout = null;
-function initCalendar(replaceCalendar = false) {
+function initCalendar(replaceCalendar) {
   const $ = initJQuery();
   if (!$) {
     debugLog(`Tampermonkey jQuery not loaded`);
@@ -495,7 +496,7 @@ function initCalendar(replaceCalendar = false) {
   } else {
     clearMyTimeout(initCalTimeout); // clear jquery timeout
     debugLog(
-      `Tampermonkey initializing calendar. maxWait: [${maxWaitForInit}, ${maxWaitForCalendarLoad}], delayedRun: ${delayedRun}`
+      `Tampermonkey initializing calendar. maxWait: [${maxWaitForInit}, ${maxWaitForCalendarLoad}], delayedRun: ${delayedRun}, replaceCalendar: ${replaceCalendar}`
     );
 
     maxWaitForInit--;
@@ -519,8 +520,7 @@ function initCalendar(replaceCalendar = false) {
       availabilitiesTab ||
       (!replaceCalendar && $(".main-calendar-column").find(".cloned-calendar").length > 0) ||
       copyComplete > 500 ||
-      copyComplete < 0 ||
-      delayedRun > 3
+      copyComplete < 0
     ) {
       return;
     }
@@ -561,15 +561,36 @@ function initCalendar(replaceCalendar = false) {
     } else {
       maxWaitForCalendarLoad = 1500;
       $(".overlay-vori").remove();
-      clearMyTimeout(initCalTimeout); // clear loading timeout
     }
 
     // wait 1 second then proceed to clone calendar
     delayedRun++;
-    initCalTimeout = createTimeout(function () {
+    createTimeout(function () {
       initCalendar(replaceCalendar);
       copyComplete++;
     }, 1000);
+
+    let cssRules = `
+          .cloned-calendar {
+            position: absolute;
+            top: 20px;
+            width: 100.8%;
+            background: #fff;
+          }
+          .rbc-time-view {
+            position: relative;
+          }
+        `;
+    let cssRuleToCheck = ".cloned-calendar";
+    let styleElementExists =
+      $("style").filter(function () {
+        return $(this).text().indexOf(cssRuleToCheck) !== -1;
+      }).length > 0;
+    if (!styleElementExists) {
+      let styleElement = document.createElement("style");
+      styleElement.appendChild(document.createTextNode(cssRules));
+      $("head").append(styleElement);
+    }
 
     if (calendarTab) {
       initSidebarCalendar();
@@ -590,9 +611,6 @@ function initCalendar(replaceCalendar = false) {
         // instead of replacing the original calendar, we'll hide it, and append the cloned calendar
         !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
         ogCalendar.parent().append(clonedCalendar);
-        delayedRun = 0;
-        clearMyTimeout(initCalTimeout);
-        initCalTimeout = null;
         debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
       } else if (activeBtn && activeBtn.text().toLowerCase().includes("month") && copyComplete > 0) {
         debugLog(`Tampermonkey calendar is on month view`);
@@ -613,9 +631,6 @@ function initCalendar(replaceCalendar = false) {
           debug && showBothCalendars(clonedCalendar, ogCalendar);
           !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
           ogCalendar.parent().append(clonedCalendar);
-          delayedRun = 0;
-          clearMyTimeout(initCalTimeout);
-          initCalTimeout = null;
           debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
         }
       }
@@ -638,6 +653,8 @@ function initCalendar(replaceCalendar = false) {
       $(".cloned-calendar") && debugLog(`Tampermonkey calendar cloned`);
       copyComplete = -1;
       debugLog(`reset copy complete in initCalendar after cloning`, copyComplete);
+      let clonedCalendar = $(".cloned-calendar");
+      clonedCalendar && clearMyTimeout(initCalTimeout);
       $(".overlay-vori").remove();
     } else {
       maxWaitForEvents--;
@@ -1454,7 +1471,7 @@ function addMembershipAndOnboarding() {
         debugLog(`tampermonkey mishaID`, mishaID);
         // create iframe (generateIframe returns a jQuery object)
         //Add custom height and width to avoid scrollbars because the material ui Select component
-        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "190px", width:'400px' });
+        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "190px", width: "400px" });
         const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
         // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
         !iframeExists && phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
