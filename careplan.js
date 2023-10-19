@@ -31,7 +31,9 @@ const urlValidation = {
   apiKeys: /\/settings\/api_keys$/,
   appointments: /\/appointments|\/organization|\/providers\//,
   appointmentsHome: /^https?:\/\/[^/]+\.com(\/overview|\/)?$/,
-  appointmentsProfileAndMembership: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
+  appointmentsProfile: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview))?\/?$/,
+  membership: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
+  verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions))?\/?$/,
   carePlan: /\/all_plans$/,
   clientList: /\/clients\/active/,
   conversations: /\/conversations/,
@@ -1467,6 +1469,25 @@ function addMembershipAndOnboarding() {
   }
 }
 
+function verifyEmailPhone() {
+    //load invisible iframe for getPatientInfo to determine verification status of phone/email
+
+    //add event to personal information button
+  debugLog(`tampermonkey verifyEmailPhone`);
+  let clientInfoPane = document.getElementsByClassName("client-info-pane");
+  if (clientInfoPane.length > 0) {
+    debugLog(`tampermonkey found client info pane`);
+    let clientInfoPaneObj = clientInfoPane[0];
+    clientInfoPaneObj.onclick = function () {
+        debugLog(`tampermonkey clicked client info pane`);
+    }
+  }else{
+    createTimeout(() => {
+      verifyEmailPhone();
+    }, 200);
+  }
+}
+
 function observeDOMChanges(mutations, observer) {
   // handle url changes
   if (location.href !== previousUrl) {
@@ -1498,11 +1519,17 @@ function observeDOMChanges(mutations, observer) {
       waitGoalTab();
     }
 
-    if (urlValidation.appointmentsProfileAndMembership.test(location.href)) {
-      // Execute only when  /users/id  or  /users/id/Overview
+    if (urlValidation.appointmentsProfile.test(location.href)) {
       debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
       waitAppointmentsProfile();
+    }
+
+    if (urlValidation.membership.test(location.href)){
       addMembershipAndOnboarding();
+    }
+
+    if(urlValidation.verifyEmailPhone.test(location.href)){
+      verifyEmailPhone();
     }
 
     if (urlValidation.apiKeys.test(location.href)) {
