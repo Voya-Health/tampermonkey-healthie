@@ -579,7 +579,10 @@ function initCalendar(replaceCalendar) {
             top: 20px;
             width: 100.8%;
             background: #fff;
-          }          
+          }     
+          .cloned-calendar.rbc-month-view {
+            top: 84px;
+          }     
         `;
     let cssRuleToCheck = ".cloned-calendar";
     let styleElementExists =
