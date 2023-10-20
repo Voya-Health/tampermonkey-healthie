@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.66
+// @version      0.67
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -571,15 +571,18 @@ function initCalendar(replaceCalendar) {
     }, 1000);
 
     let cssRules = `
-          .cloned-calendar {
-            position: absolute;
-            top: 20px;
-            width: 100.8%;
-            background: #fff;
-          }
-          .rbc-time-view {
+          .rbc-calendar {
             position: relative;
           }
+          .cloned-calendar {
+            position: absolute;
+            top: 64px;
+            width: 100.8%;
+            background: #fff;
+          }     
+          .cloned-calendar.rbc-month-view {
+            top: 60px;
+          }     
         `;
     let cssRuleToCheck = ".cloned-calendar";
     let styleElementExists =
