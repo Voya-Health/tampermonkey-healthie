@@ -571,15 +571,15 @@ function initCalendar(replaceCalendar) {
     }, 1000);
 
     let cssRules = `
+          .rbc-calendar {
+            position: relative;
+          }
           .cloned-calendar {
             position: absolute;
             top: 20px;
             width: 100.8%;
             background: #fff;
-          }
-          .rbc-time-view {
-            position: relative;
-          }
+          }          
         `;
     let cssRuleToCheck = ".cloned-calendar";
     let styleElementExists =
