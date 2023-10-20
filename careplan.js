@@ -576,12 +576,12 @@ function initCalendar(replaceCalendar) {
           }
           .cloned-calendar {
             position: absolute;
-            top: 20px;
+            top: 64px;
             width: 100.8%;
             background: #fff;
           }     
           .cloned-calendar.rbc-month-view {
-            top: 84px;
+            top: 60px;
           }     
         `;
     let cssRuleToCheck = ".cloned-calendar";
