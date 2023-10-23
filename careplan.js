@@ -42,6 +42,8 @@ const urlValidation = {
 let copyComplete = -1;
 let delayedRun = 0;
 let replaceCalendar = false;
+let isEmailVerified = true;
+let isPhoneNumberVerified = true;
 
 function debugLog(...messages) {
   if (isStagingEnv || debug) {
@@ -1102,22 +1104,26 @@ function waitForMishaMessages() {
         });
       });
     }
-
     if (event.data.reschedule !== undefined || event.data.reload !== undefined) {
       rescheduleAppointment(event.data.reschedule);
     }
-
     if (event.data.reload !== undefined) {
       window.location.reload();
     }
-
     if (event.data.closeWindow !== undefined) {
       hideOverlay();
     }
-
     if (event.data.patientProfile !== undefined) {
       debugLog("tampermonkey navigating to patient profile", event.data.patientProfile);
       window.open(`https://${healthieURL}/users/${event.data.patientProfile}`, "_top");
+    }
+    if (event.data.isEmailVerified !== undefined) {
+      debugLog('tampermonkey is email verified', event.data.isEmailVerified);
+      isEmailVerified = event.data.isEmailVerified;
+    }
+    if (event.data.isPhoneNumberVerified !== undefined) {
+      debugLog('tampermonkey is phone verified', event.data.isPhoneNumberVerified);
+      isPhoneNumberVerified = event.data.isPhoneNumberVerified;
     }
   };
 }
