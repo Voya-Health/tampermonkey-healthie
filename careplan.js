@@ -190,7 +190,7 @@ function waitAppointmentsHome() {
        }`;
 
       const getCurrentUserPayload = JSON.stringify({ query: getCurrentUserQuery });
-      goalMutation(getCurrentUserPayload).then((response) => {
+      healthieGQL(getCurrentUserPayload).then((response) => {
         const userId = response.data.user.id;
         //provider-schedule/id
         const iframeSrc = `https://${mishaURL}${routeURLs.providerSchedule}/${userId}`;
@@ -885,7 +885,7 @@ function waitCarePlan() {
         }`;
 
         const getUserPayload = JSON.stringify({ query: getUserQuery });
-        goalMutation(getUserPayload).then((response) => {
+        healthieGQL(getUserPayload).then((response) => {
           debugLog(`tampermonkey get user response`, response);
           const mishaID = response.data.user.additional_record_identifier;
           debugLog(`tampermonkey mishaID`, mishaID);
@@ -945,7 +945,7 @@ function waitForMishaMessages() {
                   }
                   `;
       const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-      goalMutation(getGoalPayload).then((response) => {
+      healthieGQL(getGoalPayload).then((response) => {
         const allGoals = response.data.goals;
         debugLog("tampermonkey all goals", response);
 
@@ -967,7 +967,7 @@ function waitForMishaMessages() {
           const deleteGoalPayload = JSON.stringify({
             query: deleteGoalQuery,
           });
-          goalMutation(deleteGoalPayload).then((response) => {
+          healthieGQL(deleteGoalPayload).then((response) => {
             debugLog("tampermonkey deleted goal", response);
           });
         });
@@ -1000,7 +1000,7 @@ function waitForMishaMessages() {
                                 }
                                 `;
             const payload = JSON.stringify({ query });
-            goalMutation(payload);
+            healthieGQL(payload);
           }
         });
 
@@ -1022,7 +1022,7 @@ function waitForMishaMessages() {
                         }
                         `;
         const payload = JSON.stringify({ query });
-        goalMutation(payload);
+        healthieGQL(payload);
 
         const tasks = carePlan.tasks.tasks;
         debugLog("tampermonkey tasks are ", tasks);
@@ -1053,7 +1053,7 @@ function waitForMishaMessages() {
                                 }
                                 `;
               const payload = JSON.stringify({ query });
-              goalMutation(payload);
+              healthieGQL(payload);
             });
           } else {
             if (element.isVisible) {
@@ -1076,7 +1076,7 @@ function waitForMishaMessages() {
                                 }
                                 `;
               const payload = JSON.stringify({ query });
-              goalMutation(payload);
+              healthieGQL(payload);
             }
           }
         });
@@ -1203,7 +1203,7 @@ function waitSettingsAPIpage() {
                             }
                             `;
         const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-        goalMutation(getGoalPayload).then((response) => {
+        healthieGQL(getGoalPayload).then((response) => {
           debugLog(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
 
           if (response.errors) {
@@ -1408,7 +1408,7 @@ function waitClientList() {
   }
 }
 
-function goalMutation(payload) {
+function healthieGQL(payload) {
   let response = null;
   let api_env = isStagingEnv ? "staging-api" : "api";
   response = fetch("https://" + api_env + ".gethealthie.com/graphql", {
@@ -1448,7 +1448,7 @@ function addMembershipAndOnboarding() {
       }`;
 
     const getUserPayload = JSON.stringify({ query: getUserQuery });
-    goalMutation(getUserPayload).then((response) => {
+    healthieGQL(getUserPayload).then((response) => {
       debugLog(`tampermonkey get user response`, response);
       // load  mishaID
       if (response.data.user) {
