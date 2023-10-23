@@ -1470,9 +1470,6 @@ function addMembershipAndOnboarding() {
 }
 
 function verifyEmailPhone() {
-    //load invisible iframe for getPatientInfo to determine verification status of phone/email
-
-    //add event to personal information button
   debugLog(`tampermonkey verifyEmailPhone`);
   let clientInfoPane = document.getElementsByClassName("client-info-pane");
   if (clientInfoPane.length > 0) {
@@ -1481,6 +1478,28 @@ function verifyEmailPhone() {
     clientInfoPaneObj.onclick = function () {
         debugLog(`tampermonkey clicked client info pane`);
     }
+    //load invisible iframe for getPatientInfo to determine verification status of phone/email
+    patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+    const getUserQuery = `query {
+      user(id: "${patientNumber}") {
+        id
+        additional_record_identifier
+      }
+    }`;
+    const getUserPayload = JSON.stringify({ query: getUserQuery });
+    healthieGQL(getUserPayload).then((response) => {
+      debugLog(`tampermonkey get user response`, response);
+      const mishaID = response.data.user.additional_record_identifier;
+      debugLog(`tampermonkey mishaID`, mishaID);
+      if (mishaID === "" || mishaID === null) {
+        //missing id
+      } else {
+        let iframe = generateIframe(`getPatientInfo?id=${mishaID}`,{ position: "absolute", height: "0px", width:'0px', border: "0px" });
+        // append to document body
+        $(clientInfoPaneObj).append(iframe);
+          //listen for message from iframe
+      }
+    })
   }else{
     createTimeout(() => {
       verifyEmailPhone();
