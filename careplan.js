@@ -147,7 +147,7 @@ function generateIframe(routeURL, options = {}) {
     }, 200);
     return;
   } else {
-    const iframeElement = $("<div>").css({ padding: "0" }).addClass(className);
+    const iframeElement = $("<div>").css({ padding: "0", ...options }).addClass(className);
 
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
