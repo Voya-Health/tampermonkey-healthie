@@ -1569,6 +1569,7 @@ function verifyEmailPhoneButtons() {
       id: "verify-email-button",
       text: "Verify",
       style: buttonStyleString,
+      type: "button",
       click: function () {
       debugLog("tampermonkey button clicked");
       //open verification dialog
