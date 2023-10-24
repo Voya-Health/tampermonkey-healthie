@@ -1121,10 +1121,12 @@ function waitForMishaMessages() {
     if (event.data.isEmailVerified !== undefined) {
       debugLog('tampermonkey is email verified', event.data.isEmailVerified);
       isEmailVerified = event.data.isEmailVerified;
+      !isEmailVerified && verifyEmailPhoneButtons(true);
     }
     if (event.data.isPhoneNumberVerified !== undefined) {
       debugLog('tampermonkey is phone verified', event.data.isPhoneNumberVerified);
       isPhoneNumberVerified = event.data.isPhoneNumberVerified;
+      !isPhoneNumberVerified && verifyEmailPhoneButtons(false);
     }
     if (event.data.loading !== undefined) {
       debugLog('tampermonkey loading', event.data.loading);
@@ -1506,10 +1508,6 @@ function verifyEmailPhone() {
   if (clientInfoPane.length > 0) {
     debugLog(`tampermonkey found client info pane`);
     let clientInfoPaneObj = clientInfoPane[0];
-    clientInfoPaneObj.onclick = function () {
-        debugLog(`tampermonkey clicked client info pane`);
-        verifyEmailPhoneButtons();
-    }
     //load invisible iframe for getPatientInfo to determine verification status of phone/email
     patientNumber = location.href.split("/")[location.href.split("/").length - 2];
     const getUserQuery = `query {
@@ -1539,23 +1537,11 @@ function verifyEmailPhone() {
   }
 }
 
-function verifyEmailPhoneButtons() {
-  let additional_record_identifier_field = document.getElementById("additional_record_identifier");
-  let email_field = document.getElementById("email");
-  let phone_field = document.getElementById("phone_number");
-  let verify_email_button = document.getElementById("verify-email-button");
-  let verify_phone_button = document.getElementById("verify-phone-button");
-
-  debugLog("tampermonkey additional_record_identifier_field", additional_record_identifier_field);
-
-  //check if loaded verification informaiton
-  //check if buttons already exist
-  //add the buttons that need to exist
-
-  if(!verify_email_button && !verify_phone_button){
-  if(additional_record_identifier_field && email_field && phone_field){
-  debugLog("tampermonkey additional_record_identifier_field making readOnly");
-    additional_record_identifier_field.readOnly = true
+function verifyEmailPhoneButtons(isEmail) {
+  let field = isEmail ? document.getElementById("email"): document.getElementById("phone_number");
+  let button = isEmail ? document.getElementById("verify-email-button"): document.getElementById("verify-phone-button");
+  if(!button){
+  if(field){
     const buttonStyle = {
       background: "#026460",
       color: "white",
@@ -1564,9 +1550,8 @@ function verifyEmailPhoneButtons() {
     const buttonStyleString = Object.entries(buttonStyle)
     .map(([property, value]) => `${convertToCSSProperty(property)}: ${value};`)
     .join(" ");
-    
     const button = $("<button>", {
-      id: "verify-email-button",
+      id: isEmail ? "verify-email-button" : "verify-phone-button",
       text: "Verify",
       style: buttonStyleString,
       type: "button",
@@ -1575,15 +1560,10 @@ function verifyEmailPhoneButtons() {
       //open verification dialog
       }
     });
-    email_field.parentNode.insertBefore(button[0], email_field.nextSibling);
-    let containerStyle = email_field.parentElement.style;
+    field.parentNode.insertBefore(button[0], field.nextSibling);
+    let containerStyle = field.parentElement.style;
     containerStyle.display = "flex";
     containerStyle.flexDirection = "row";
-  }else{
-    createTimeout(() => {
-      verifyEmailPhoneButtons();
-    }, 200);
-
   }
   }
 }
