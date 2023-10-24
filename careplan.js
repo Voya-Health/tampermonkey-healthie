@@ -45,6 +45,7 @@ let replaceCalendar = false;
 let isEmailVerified = true;
 let isPhoneNumberVerified = true;
 let isLoadingEmailPhone = true;
+let mishaID = "";
 
 function debugLog(...messages) {
   if (isStagingEnv || debug) {
@@ -59,6 +60,7 @@ const routeURLs = {
   appointments: "appointments",
   patientStatus: "patientStatusStandalone",
   providerSchedule: "provider-schedule",
+  otpVerify: "otpVerifyStandalone"
 };
 
 const styles = {
@@ -910,7 +912,7 @@ function waitCarePlan() {
         const getUserPayload = JSON.stringify({ query: getUserQuery });
         healthieGQL(getUserPayload).then((response) => {
           debugLog(`tampermonkey get user response`, response);
-          const mishaID = response.data.user.additional_record_identifier;
+          mishaID = response.data.user.additional_record_identifier;
           debugLog(`tampermonkey mishaID`, mishaID);
 
           if (mishaID === "" || mishaID === null) {
@@ -1485,7 +1487,7 @@ function addMembershipAndOnboarding() {
       debugLog(`tampermonkey get user response`, response);
       // load  mishaID
       if (response.data.user) {
-        const mishaID = response.data.user.additional_record_identifier;
+        mishaID = response.data.user.additional_record_identifier;
         debugLog(`tampermonkey mishaID`, mishaID);
         // create iframe (generateIframe returns a jQuery object)
         //Add custom height and width to avoid scrollbars because the material ui Select component
@@ -1519,7 +1521,7 @@ function verifyEmailPhone() {
     const getUserPayload = JSON.stringify({ query: getUserQuery });
     healthieGQL(getUserPayload).then((response) => {
       debugLog(`tampermonkey get user response`, response);
-      const mishaID = response.data.user.additional_record_identifier;
+      mishaID = response.data.user.additional_record_identifier;
       debugLog(`tampermonkey mishaID`, mishaID);
       if (mishaID === "" || mishaID === null) {
         //missing id
@@ -1540,8 +1542,9 @@ function verifyEmailPhone() {
 function verifyEmailPhoneButtons(isEmail) {
   let field = isEmail ? document.getElementById("email"): document.getElementById("phone_number");
   let button = isEmail ? document.getElementById("verify-email-button"): document.getElementById("verify-phone-button");
-  if(!button){
-  if(field){
+  let verifyOverlayURL = routeURLs.otpVerify + `?id=${mishaID}`;
+  verifyOverlayURL += isEmail ? `&email=${field.value}` : `&phone=${field.value}`;
+  if(!button && field){
     const buttonStyle = {
       background: "#026460",
       color: "white",
@@ -1556,15 +1559,13 @@ function verifyEmailPhoneButtons(isEmail) {
       style: buttonStyleString,
       type: "button",
       click: function () {
-      debugLog("tampermonkey button clicked");
-      //open verification dialog
+      showOverlay(verifyOverlayURL, styles.scheduleOverlay);
       }
     });
     field.parentNode.insertBefore(button[0], field.nextSibling);
     let containerStyle = field.parentElement.style;
     containerStyle.display = "flex";
     containerStyle.flexDirection = "row";
-  }
   }
 }
 
