@@ -33,7 +33,7 @@ const urlValidation = {
   appointmentsHome: /^https?:\/\/[^/]+\.com(\/overview|\/)?$/,
   appointmentsProfile: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview))?\/?$/,
   membership: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
-  verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions))?\/?$/,
+  verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions))\/?$/,
   carePlan: /\/all_plans$/,
   clientList: /\/clients\/active/,
   conversations: /\/conversations/,
