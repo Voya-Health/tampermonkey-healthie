@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.67
+// @version      0.68
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -31,7 +31,9 @@ const urlValidation = {
   apiKeys: /\/settings\/api_keys$/,
   appointments: /\/appointments|\/organization|\/providers\//,
   appointmentsHome: /^https?:\/\/[^/]+\.com(\/overview|\/)?$/,
-  appointmentsProfileAndMembership: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
+  appointmentsProfile: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview))?\/?$/,
+  membership: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
+  verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions))\/?$/,
   carePlan: /\/all_plans$/,
   clientList: /\/clients\/active/,
   conversations: /\/conversations/,
@@ -40,6 +42,10 @@ const urlValidation = {
 let copyComplete = -1;
 let delayedRun = 0;
 let replaceCalendar = false;
+let isEmailVerified = true;
+let isPhoneNumberVerified = true;
+let isLoadingEmailPhone = true;
+let mishaID = "";
 
 function debugLog(...messages) {
   if (isStagingEnv || debug) {
@@ -54,6 +60,7 @@ const routeURLs = {
   appointments: "appointments",
   patientStatus: "patientStatusStandalone",
   providerSchedule: "provider-schedule",
+  otpVerify: "otpVerifyStandalone"
 };
 
 const styles = {
@@ -72,6 +79,10 @@ const styles = {
     width: "100%",
     overflow: "hidden",
   },
+  otpOverlay: {
+    width: "500px",
+    height: "500px"
+  }
 };
 
 function createTimeout(timeoutFunction, delay) {
@@ -121,6 +132,10 @@ function initJQuery() {
 }
 initJQuery();
 
+function convertToCSSProperty(jsProperty) {
+  return jsProperty.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+}
+
 function generateIframe(routeURL, options = {}) {
   const $ = initJQuery();
 
@@ -135,10 +150,6 @@ function generateIframe(routeURL, options = {}) {
     .map(([property, value]) => `${convertToCSSProperty(property)}: ${value};`)
     .join(" ");
 
-  function convertToCSSProperty(jsProperty) {
-    return jsProperty.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
-  }
-
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(function () {
@@ -146,7 +157,7 @@ function generateIframe(routeURL, options = {}) {
     }, 200);
     return;
   } else {
-    const iframeElement = $("<div>").css({ padding: "0" }).addClass(className);
+    const iframeElement = $("<div>").css({ padding: "0", ...options }).addClass(className);
 
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
@@ -189,7 +200,7 @@ function waitAppointmentsHome() {
        }`;
 
       const getCurrentUserPayload = JSON.stringify({ query: getCurrentUserQuery });
-      goalMutation(getCurrentUserPayload).then((response) => {
+      healthieGQL(getCurrentUserPayload).then((response) => {
         const userId = response.data.user.id;
         //provider-schedule/id
         const iframeSrc = `https://${mishaURL}${routeURLs.providerSchedule}/${userId}`;
@@ -903,9 +914,9 @@ function waitCarePlan() {
         }`;
 
         const getUserPayload = JSON.stringify({ query: getUserQuery });
-        goalMutation(getUserPayload).then((response) => {
+        healthieGQL(getUserPayload).then((response) => {
           debugLog(`tampermonkey get user response`, response);
-          const mishaID = response.data.user.additional_record_identifier;
+          mishaID = response.data.user.additional_record_identifier;
           debugLog(`tampermonkey mishaID`, mishaID);
 
           if (mishaID === "" || mishaID === null) {
@@ -963,7 +974,7 @@ function waitForMishaMessages() {
                   }
                   `;
       const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-      goalMutation(getGoalPayload).then((response) => {
+      healthieGQL(getGoalPayload).then((response) => {
         const allGoals = response.data.goals;
         debugLog("tampermonkey all goals", response);
 
@@ -985,7 +996,7 @@ function waitForMishaMessages() {
           const deleteGoalPayload = JSON.stringify({
             query: deleteGoalQuery,
           });
-          goalMutation(deleteGoalPayload).then((response) => {
+          healthieGQL(deleteGoalPayload).then((response) => {
             debugLog("tampermonkey deleted goal", response);
           });
         });
@@ -1018,7 +1029,7 @@ function waitForMishaMessages() {
                                 }
                                 `;
             const payload = JSON.stringify({ query });
-            goalMutation(payload);
+            healthieGQL(payload);
           }
         });
 
@@ -1040,7 +1051,7 @@ function waitForMishaMessages() {
                         }
                         `;
         const payload = JSON.stringify({ query });
-        goalMutation(payload);
+        healthieGQL(payload);
 
         const tasks = carePlan.tasks.tasks;
         debugLog("tampermonkey tasks are ", tasks);
@@ -1071,7 +1082,7 @@ function waitForMishaMessages() {
                                 }
                                 `;
               const payload = JSON.stringify({ query });
-              goalMutation(payload);
+              healthieGQL(payload);
             });
           } else {
             if (element.isVisible) {
@@ -1094,28 +1105,38 @@ function waitForMishaMessages() {
                                 }
                                 `;
               const payload = JSON.stringify({ query });
-              goalMutation(payload);
+              healthieGQL(payload);
             }
           }
         });
       });
     }
-
     if (event.data.reschedule !== undefined || event.data.reload !== undefined) {
       rescheduleAppointment(event.data.reschedule);
     }
-
     if (event.data.reload !== undefined) {
       window.location.reload();
     }
-
     if (event.data.closeWindow !== undefined) {
       hideOverlay();
     }
-
     if (event.data.patientProfile !== undefined) {
       debugLog("tampermonkey navigating to patient profile", event.data.patientProfile);
       window.open(`https://${healthieURL}/users/${event.data.patientProfile}`, "_top");
+    }
+    if (event.data.isEmailVerified !== undefined) {
+      debugLog('tampermonkey is email verified', event.data.isEmailVerified);
+      isEmailVerified = event.data.isEmailVerified;
+      !isEmailVerified && verifyEmailPhoneButtons(true);
+    }
+    if (event.data.isPhoneNumberVerified !== undefined) {
+      debugLog('tampermonkey is phone verified', event.data.isPhoneNumberVerified);
+      isPhoneNumberVerified = event.data.isPhoneNumberVerified;
+      !isPhoneNumberVerified && verifyEmailPhoneButtons(false);
+    }
+    if (event.data.loading !== undefined) {
+      debugLog('tampermonkey loading', event.data.loading);
+      isLoadingEmailPhone = event.data.loading ? true : false;
     }
   };
 }
@@ -1221,7 +1242,7 @@ function waitSettingsAPIpage() {
                             }
                             `;
         const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-        goalMutation(getGoalPayload).then((response) => {
+        healthieGQL(getGoalPayload).then((response) => {
           debugLog(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
 
           if (response.errors) {
@@ -1426,7 +1447,7 @@ function waitClientList() {
   }
 }
 
-function goalMutation(payload) {
+function healthieGQL(payload) {
   let response = null;
   let api_env = isStagingEnv ? "staging-api" : "api";
   response = fetch("https://" + api_env + ".gethealthie.com/graphql", {
@@ -1466,11 +1487,11 @@ function addMembershipAndOnboarding() {
       }`;
 
     const getUserPayload = JSON.stringify({ query: getUserQuery });
-    goalMutation(getUserPayload).then((response) => {
+    healthieGQL(getUserPayload).then((response) => {
       debugLog(`tampermonkey get user response`, response);
       // load  mishaID
       if (response.data.user) {
-        const mishaID = response.data.user.additional_record_identifier;
+        mishaID = response.data.user.additional_record_identifier;
         debugLog(`tampermonkey mishaID`, mishaID);
         // create iframe (generateIframe returns a jQuery object)
         //Add custom height and width to avoid scrollbars because the material ui Select component
@@ -1484,6 +1505,81 @@ function addMembershipAndOnboarding() {
     createTimeout(() => {
       addMembershipAndOnboarding();
     }, 200);
+  }
+}
+
+function verifyEmailPhone() {
+  debugLog(`tampermonkey verifyEmailPhone`);
+  let clientInfoPane = document.getElementsByClassName("client-info-pane");
+  if (clientInfoPane.length > 0) {
+    debugLog(`tampermonkey found client info pane`);
+    let saveButton = document.getElementsByClassName("client-profile-submit-button healthie-button primary-button small-button float-right");
+    debugLog(`tampermonkey save button`, saveButton);
+    if (saveButton.length > 0) {
+      debugLog(`tampermonkey found save button`, saveButton);
+      saveButton[0].onclick = function () {
+        createTimeout(() => {
+            window.location.reload();
+        }, 1000)
+      };
+    }
+    let clientInfoPaneObj = clientInfoPane[0];
+    //load invisible iframe for getPatientInfo to determine verification status of phone/email
+    patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+    const getUserQuery = `query {
+      user(id: "${patientNumber}") {
+        id
+        additional_record_identifier
+      }
+    }`;
+    const getUserPayload = JSON.stringify({ query: getUserQuery });
+    healthieGQL(getUserPayload).then((response) => {
+      debugLog(`tampermonkey get user response`, response);
+      mishaID = response.data.user.additional_record_identifier;
+      debugLog(`tampermonkey mishaID`, mishaID);
+      if (mishaID === "" || mishaID === null) {
+        //missing id
+      } else {
+        let iframe = generateIframe(`getPatientInfo?id=${mishaID}`,{ position: "absolute", height: "0px", width:'0px', border: "0px" });
+        // append to document body
+        $(clientInfoPaneObj).append(iframe);
+          //listen for message from iframe
+      }
+    })
+  }else{
+    createTimeout(() => {
+      verifyEmailPhone();
+    }, 200);
+  }
+}
+
+function verifyEmailPhoneButtons(isEmail) {
+  let field = isEmail ? document.getElementById("email"): document.getElementById("phone_number");
+  let button = isEmail ? document.getElementById("verify-email-button"): document.getElementById("verify-phone-button");
+  let verifyOverlayURL = routeURLs.otpVerify + `?id=${mishaID}`;
+  verifyOverlayURL += isEmail ? `&email=${field.value}` : `&phone=${field.value}`;
+  if(!button && field){
+    const buttonStyle = {
+      background: "#026460",
+      color: "white",
+      borderRadius: "2px"
+    };
+    const buttonStyleString = Object.entries(buttonStyle)
+    .map(([property, value]) => `${convertToCSSProperty(property)}: ${value};`)
+    .join(" ");
+    const button = $("<button>", {
+      id: isEmail ? "verify-email-button" : "verify-phone-button",
+      text: "Verify",
+      style: buttonStyleString,
+      type: "button",
+      click: function () {
+      showOverlay(verifyOverlayURL, styles.otpOverlay);
+      }
+    });
+    field.parentNode.insertBefore(button[0], field.nextSibling);
+    let containerStyle = field.parentElement.style;
+    containerStyle.display = "flex";
+    containerStyle.flexDirection = "row";
   }
 }
 
@@ -1518,11 +1614,17 @@ function observeDOMChanges(mutations, observer) {
       waitGoalTab();
     }
 
-    if (urlValidation.appointmentsProfileAndMembership.test(location.href)) {
-      // Execute only when  /users/id  or  /users/id/Overview
+    if (urlValidation.appointmentsProfile.test(location.href)) {
       debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
       waitAppointmentsProfile();
+    }
+
+    if (urlValidation.membership.test(location.href)){
       addMembershipAndOnboarding();
+    }
+
+    if(urlValidation.verifyEmailPhone.test(location.href)){
+      verifyEmailPhone();
     }
 
     if (urlValidation.apiKeys.test(location.href)) {
