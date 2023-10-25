@@ -79,6 +79,10 @@ const styles = {
     width: "100%",
     overflow: "hidden",
   },
+  otpOverlay: {
+    width: "500px",
+    height: "500px"
+  }
 };
 
 function createTimeout(timeoutFunction, delay) {
@@ -1509,6 +1513,16 @@ function verifyEmailPhone() {
   let clientInfoPane = document.getElementsByClassName("client-info-pane");
   if (clientInfoPane.length > 0) {
     debugLog(`tampermonkey found client info pane`);
+    let saveButton = document.getElementsByClassName("client-profile-submit-button healthie-button primary-button small-button float-right");
+    debugLog(`tampermonkey save button`, saveButton);
+    if (saveButton.length > 0) {
+      debugLog(`tampermonkey found save button`, saveButton);
+      saveButton[0].onclick = function () {
+        createTimeout(() => {
+            window.location.reload();
+        }, 1000)
+      };
+    }
     let clientInfoPaneObj = clientInfoPane[0];
     //load invisible iframe for getPatientInfo to determine verification status of phone/email
     patientNumber = location.href.split("/")[location.href.split("/").length - 2];
@@ -1559,7 +1573,7 @@ function verifyEmailPhoneButtons(isEmail) {
       style: buttonStyleString,
       type: "button",
       click: function () {
-      showOverlay(verifyOverlayURL, styles.scheduleOverlay);
+      showOverlay(verifyOverlayURL, styles.otpOverlay);
       }
     });
     field.parentNode.insertBefore(button[0], field.nextSibling);
