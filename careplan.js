@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.68
+// @version      0.69
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye
 // @match        https://*.gethealthie.com/*
@@ -1556,30 +1556,32 @@ function verifyEmailPhone() {
 function verifyEmailPhoneButtons(isEmail) {
   let field = isEmail ? document.getElementById("email"): document.getElementById("phone_number");
   let button = isEmail ? document.getElementById("verify-email-button"): document.getElementById("verify-phone-button");
-  let verifyOverlayURL = routeURLs.otpVerify + `?id=${mishaID}`;
-  verifyOverlayURL += isEmail ? `&email=${field.value}` : `&phone=${field.value}`;
-  if(!button && field){
-    const buttonStyle = {
-      background: "#026460",
-      color: "white",
-      borderRadius: "2px"
-    };
-    const buttonStyleString = Object.entries(buttonStyle)
-    .map(([property, value]) => `${convertToCSSProperty(property)}: ${value};`)
-    .join(" ");
-    const button = $("<button>", {
-      id: isEmail ? "verify-email-button" : "verify-phone-button",
-      text: "Verify",
-      style: buttonStyleString,
-      type: "button",
-      click: function () {
-      showOverlay(verifyOverlayURL, styles.otpOverlay);
-      }
-    });
-    field.parentNode.insertBefore(button[0], field.nextSibling);
-    let containerStyle = field.parentElement.style;
-    containerStyle.display = "flex";
-    containerStyle.flexDirection = "row";
+  if(field.value != ''){
+    let verifyOverlayURL = routeURLs.otpVerify + `?id=${mishaID}`;
+    verifyOverlayURL += isEmail ? `&email=${field.value}` : `&phone=${field.value}`;
+    if(!button && field){
+      const buttonStyle = {
+        background: "#026460",
+        color: "white",
+        borderRadius: "2px"
+      };
+      const buttonStyleString = Object.entries(buttonStyle)
+      .map(([property, value]) => `${convertToCSSProperty(property)}: ${value};`)
+      .join(" ");
+      const button = $("<button>", {
+        id: isEmail ? "verify-email-button" : "verify-phone-button",
+        text: "Verify",
+        style: buttonStyleString,
+        type: "button",
+        click: function () {
+          showOverlay(verifyOverlayURL, styles.otpOverlay);
+        }
+      });
+      field.parentNode.insertBefore(button[0], field.nextSibling);
+      let containerStyle = field.parentElement.style;
+      containerStyle.display = "flex";
+      containerStyle.flexDirection = "row";
+    }
   }
 }
 
