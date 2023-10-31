@@ -1386,30 +1386,12 @@ function addMembershipAndOnboarding() {
     // get the patient number from the URL
     patientNumber = location.href.split("/")[4];
     debugLog(`tampermonkey patient number`, patientNumber);
-
-    // get the user data
-    const getUserQuery = `query {
-        user(id: "${patientNumber}") {
-          id
-          additional_record_identifier
-        }
-      }`;
-
-    const getUserPayload = JSON.stringify({ query: getUserQuery });
-    healthieGQL(getUserPayload).then((response) => {
-      debugLog(`tampermonkey get user response`, response);
-      // load  mishaID
-      if (response.data.user) {
-        mishaID = response.data.user.additional_record_identifier;
-        debugLog(`tampermonkey mishaID`, mishaID);
         // create iframe (generateIframe returns a jQuery object)
         //Add custom height and width to avoid scrollbars because the material ui Select component
-        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "190px", width: "400px" });
+        const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, { height: "190px", width: "400px" });
         const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
         // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
-        !iframeExists && phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
-      }
-    });
+        !iframeExists && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
   } else {
     createTimeout(() => {
       addMembershipAndOnboarding();
