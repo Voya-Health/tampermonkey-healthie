@@ -1569,7 +1569,7 @@ function verifyEmailPhone() {
     //load invisible iframe for getPatientInfo to determine verification status of phone/email
     patientNumber =
       location.href.split("/")[location.href.split("/").length - 2];
-    let iframe = generateIframe(`getPatientInfo?id=${mishaID}`, {
+    let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
       position: "absolute",
       height: "0px",
       width: "0px",
