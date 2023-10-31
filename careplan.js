@@ -821,7 +821,6 @@ function waitCarePlan() {
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(waitCarePlan, 200);
-    return;
   } else {
     //check to see if the care plan tab contents has loaded
     const cpTabContents = $(".cp-tab-contents");
@@ -838,13 +837,7 @@ function waitCarePlan() {
           waitCarePlan();
         }
       }
-
-      //Locate and remove existing care plan tab content  - remove each child of .cp-tab-contents
-      //causing crash in prod Healthie
-      //cpTabContents.empty();
-
       const parent = cpTabContents.eq(0);
-
       // let's add a div with the text "Loading Careplan..."
       const loadingDiv = $("<div>").addClass("vori-loading-message").text("Loading Careplan...").css({
         textAlign: "center",
@@ -855,89 +848,8 @@ function waitCarePlan() {
       if (!loadingDivExists.length) {
         parent.append(loadingDiv);
       }
-
       patientNumber = location.href.split("/")[location.href.split("/").length - 2];
-
-      //setup message divs and links
-      const iframeMsgDiv = $("<div>").addClass("vori-iframe-message").css({
-        display: "block",
-        position: "relative",
-        background: "rgb(227 229 50 / 21%)",
-        margin: "1.8rem",
-        textAlign: "center",
-        padding: "7rem 7vw",
-      });
-
-      const iframeMsgLink = $("<a>").css({
-        color: "#333",
-        fontSize: "18px",
-        letterSpacing: "0.3px",
-        textDecoration: "none",
-      });
-
-      if (healthieAPIKey === "") {
-        const iframeMsgExists = $(".vori-iframe-message");
-        if (!iframeMsgExists.length) {
-          iframeMsgLink.text(
-            "You cannot view Care Plan's until you connect your Healthie Account to Vori Health. Set it up here!"
-          );
-          iframeMsgLink.attr("href", "/settings/api_keys");
-
-          function addHoverEffect() {
-            iframeMsgLink.css("textDecoration", "underline");
-          }
-
-          function removeHoverEffect() {
-            iframeMsgLink.css("textDecoration", "none");
-          }
-
-          iframeMsgDiv.append(iframeMsgLink);
-
-          if (healthieAPIKey === "") {
-            iframeMsgLink.on("mouseover", addHoverEffect);
-            iframeMsgLink.on("mouseout", removeHoverEffect);
-          } else {
-            iframeMsgLink.off("mouseover", addHoverEffect);
-            iframeMsgLink.off("mouseout", removeHoverEffect);
-          }
-
-          parent.empty();
-          parent.append(iframeMsgDiv);
-        }
-      } else if (healthieAPIKey !== "") {
-        // let's get the user data
-        const getUserQuery = `query {
-          user(id: "${patientNumber}") {
-            id
-            additional_record_identifier
-          }
-        }`;
-
-        const getUserPayload = JSON.stringify({ query: getUserQuery });
-        healthieGQL(getUserPayload).then((response) => {
-          debugLog(`tampermonkey get user response`, response);
-          mishaID = response.data.user.additional_record_identifier;
-          debugLog(`tampermonkey mishaID`, mishaID);
-
-          if (mishaID === "" || mishaID === null) {
-            const iframeMsgExists = $(".vori-iframe-message").length > 0;
-            if (!iframeMsgExists) {
-              debugLog(`tampermonkey mishaID iFrame missing`, mishaID);
-              $("<div>", {
-                class: "vori-iframe-message",
-                text: "This patient's account has not been linked. \r\n Please contact Vori Health tech team to set it up!",
-                css: {
-                  whiteSpace: "pre-line",
-                  color: "#333",
-                  fontSize: "18px",
-                  letterSpacing: "0.3px",
-                  lineHeight: "1.5",
-                },
-              }).appendTo(parent.empty());
-            }
-          } else {
-            debugLog(`tampermonkey mishaID iFrame missing else`, mishaID);
-            let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, { className: "cp-tab-contents" });
+            let iframe = generateIframe(`${patientNumber}/${routeURLs.careplan}`, { className: "cp-tab-contents" });
             createTimeout(() => {
               parent.empty();
               parent.append(iframe);
@@ -945,9 +857,6 @@ function waitCarePlan() {
             carePlanLoopLock = carePlanLoopLock + 1;
             //remove styling of healthie tab element
             // document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
-          }
-        });
-      }
     } else {
       //wait for content load
       debugLog(`tampermonkey waiting for careplan tab`);
