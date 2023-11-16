@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.70
+// @version      0.71
 // @description  Injecting care plan components into Healthie
-// @author       Don, Tonye
+// @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
 // @match        https://vorihealth.gethealthie.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
@@ -68,6 +68,7 @@ const routeURLs = {
   patientStatus: "patientStatusStandalone",
   providerSchedule: "provider-schedule",
   otpVerify: "otpVerifyStandalone",
+  createPatientDialog: "createPatientDialog",
 };
 
 const styles = {
@@ -79,6 +80,16 @@ const styles = {
     width: "100vw",
     height: "90vh", // fallback for browsers that don't support svh
     height: "90svh",
+    overflow: "hidden",
+  },
+  patientDialogOverlay: {
+    display: "inline-block",
+    background: "rgb(255, 255, 255)",
+    maxWidth: "30vw", // fallback for browsers that don't support svw
+    maxWidth: "60svw",
+    width: "30vw",
+    height: "80vh", // fallback for browsers that don't support svh
+    height: "80svh",
     overflow: "hidden",
   },
   appointmentDetailsOverlay: {
@@ -266,6 +277,46 @@ function initBookAppointmentButton() {
   }
 }
 
+function createPatientDialogIframe() {
+  if (!$) {
+    debugLog(`tampermonkey waiting for jQuery to load`);
+    setTimeout(createPatientDialogIframe, 200);
+    return;
+  } else {
+    let addPatientBtn = $(
+      ".add-client-container button:contains('Add Client')"
+    )[0];
+    if (addPatientBtn) {
+      debugLog(`'Add Client' button found, proceeding to clone`);
+      let clonedBtn = $(addPatientBtn).clone();
+      $(addPatientBtn).replaceWith(clonedBtn);
+      clonedBtn.on("click", function (e) {
+        debugLog(`Cloned 'Add Client' button clicked`);
+        e.stopPropagation();
+        showOverlay(
+          `${routeURLs.createPatientDialog}`,
+          styles.patientDialogOverlay
+        );
+      });
+    } else {
+      debugLog(`'Add Client' button not found, retrying...`);
+      setTimeout(createPatientDialogIframe, 200);
+    }
+  }
+}
+
+function waitForAddPatientButton() {
+  const $ = initJQuery();
+  if ($(".add-client-container button:contains('Add Client')").length > 0) {
+    debugLog("Add Client Button found");
+    createPatientDialogIframe();
+    // Execute actions after button is found
+  } else {
+    debugLog("Waiting for 'Add Client' button");
+    setTimeout(waitForAddPatientButton, 200); // Check again after 200 ms
+  }
+}
+
 function waitAppointmentsProfile() {
   const $ = initJQuery();
   if (!$) {
@@ -421,7 +472,7 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
           .rbc-time-content>.rbc-time-gutter {
             display: none;
           }
-          #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.cloned-calendar > div:nth-child(2), 
+          #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.cloned-calendar > div:nth-child(2),
           #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.cloned-calendar > div:nth-child(8),
           #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.og-calendar > div:nth-child(2),
           #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.og-calendar > div:nth-child(8) {
@@ -626,10 +677,10 @@ function initCalendar(replaceCalendar) {
             top: 64px;
             width: 100.8%;
             background: #fff;
-          }     
+          }
           .cloned-calendar.rbc-month-view {
             top: 60px;
-          }     
+          }
         `;
     let cssRuleToCheck = ".cloned-calendar";
     let styleElementExists =
@@ -1699,6 +1750,7 @@ function observeDOMChanges(mutations, observer) {
     if (urlValidation.clientList.test(location.href)) {
       debugLog("tampermonkey calls waitClientList");
       waitClientList();
+      waitForAddPatientButton();
     }
     isAPIconnected();
   } else {
