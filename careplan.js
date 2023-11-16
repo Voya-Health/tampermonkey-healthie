@@ -24,24 +24,16 @@ let timeoutIds = [];
 // Check for Healthie environment
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
-let healthieURL = isStagingEnv
-  ? "securestaging.gethealthie.com"
-  : "vorihealth.gethealthie.com";
-let healthieAPIKey = GM_getValue(
-  isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey",
-  ""
-);
+let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "vorihealth.gethealthie.com";
+let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey","");
 let auth = `Basic ${healthieAPIKey}`;
 const urlValidation = {
   apiKeys: /\/settings\/api_keys$/,
   appointments: /\/appointments|\/organization|\/providers\//,
   appointmentsHome: /^https?:\/\/[^/]+\.com(\/overview|\/)?$/,
-  appointmentsProfile:
-    /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview))?\/?$/,
-  membership:
-    /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
-  verifyEmailPhone:
-    /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions))\/?$/,
+  appointmentsProfile:/^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview))?\/?$/,
+  membership:/^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
+  verifyEmailPhone:/^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions))\/?$/,
   carePlan: /\/all_plans$/,
   clientList: /\/clients\/active/,
   conversations: /\/conversations/,
@@ -279,47 +271,38 @@ function initBookAppointmentButton() {
 }
 
 function createPatientDialogIframe() {
-  debugLog("createPatientDialogIframe function called"); // Initial log to confirm function execution
-
   if (!$) {
     debugLog(`tampermonkey waiting for jQuery to load`);
     setTimeout(createPatientDialogIframe, 200);
     return;
+  }
+  debugLog(`jQuery is loaded, attempting to find 'Add Client' button`);
+  let addPatientBtn = $(".add-client-container button:contains('Add Client')")[0];
+  if (addPatientBtn) {
+    debugLog(`'Add Client' button found, proceeding to clone`);
+    let clonedBtn = $(addPatientBtn).clone();
+    $(addPatientBtn).replaceWith(clonedBtn);
+    clonedBtn.on("click", (e) => {
+      debugLog(`Cloned 'Add Client' button clicked`);
+      e.stopPropagation();
+      showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
+    });
   } else {
-    debugLog(`jQuery is loaded, attempting to find 'Add Client' button`);
-    let addPatientBtn = $(".add-client-container button:contains('Add Client')")[0];
-
-    if (addPatientBtn) {
-      debugLog(`'Add Client' button found, proceeding to clone`);
-      let clonedBtn = $(addPatientBtn).clone();
-      $(addPatientBtn).replaceWith(clonedBtn);
-      clonedBtn.on("click", function (e) {
-        debugLog(`Cloned 'Add Client' button clicked`);
-        e.stopPropagation();
-        showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
-      });
-    } else {
-      debugLog(`'Add Client' button not found, retrying...`);
-      setTimeout(createPatientDialogIframe, 200);
-    }
+    debugLog(`'Add Client' button not found, retrying...`);
+    setTimeout(createPatientDialogIframe, 200);
   }
 }
 
-
-
 function waitForAddPatientButton() {
-   const $ = initJQuery();
+  const $ = initJQuery();
   if ($(".add-client-container button:contains('Add Client')").length > 0) {
     debugLog("Add Client Button found");
     createPatientDialogIframe();
-    // Execute actions after button is found
   } else {
     debugLog("Waiting for 'Add Client' button");
-    setTimeout(waitForAddPatientButton, 200); // Check again after 200 ms
+    setTimeout(waitForAddPatientButton, 200);
   }
 }
-
-
 
 function waitAppointmentsProfile() {
   const $ = initJQuery();
