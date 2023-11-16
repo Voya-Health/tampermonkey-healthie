@@ -251,6 +251,7 @@ function waitAppointmentsHome() {
 }
 
 function initBookAppointmentButton() {
+
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(showOverlay, 200);
@@ -278,14 +279,16 @@ function initBookAppointmentButton() {
 }
 
 function createPatientDialogIframe() {
+  debugLog("createPatientDialogIframe function called"); // Initial log to confirm function execution
+
   if (!$) {
     debugLog(`tampermonkey waiting for jQuery to load`);
     setTimeout(createPatientDialogIframe, 200);
     return;
   } else {
-    let addPatientBtn = $(
-      ".add-client-container button:contains('Add Client')"
-    )[0];
+    debugLog(`jQuery is loaded, attempting to find 'Add Client' button`);
+    let addPatientBtn = $(".add-client-container button:contains('Add Client')")[0];
+
     if (addPatientBtn) {
       debugLog(`'Add Client' button found, proceeding to clone`);
       let clonedBtn = $(addPatientBtn).clone();
@@ -293,10 +296,7 @@ function createPatientDialogIframe() {
       clonedBtn.on("click", function (e) {
         debugLog(`Cloned 'Add Client' button clicked`);
         e.stopPropagation();
-        showOverlay(
-          `${routeURLs.createPatientDialog}`,
-          styles.patientDialogOverlay
-        );
+        showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
       });
     } else {
       debugLog(`'Add Client' button not found, retrying...`);
@@ -305,8 +305,10 @@ function createPatientDialogIframe() {
   }
 }
 
+
+
 function waitForAddPatientButton() {
-  const $ = initJQuery();
+   const $ = initJQuery();
   if ($(".add-client-container button:contains('Add Client')").length > 0) {
     debugLog("Add Client Button found");
     createPatientDialogIframe();
@@ -316,6 +318,8 @@ function waitForAddPatientButton() {
     setTimeout(waitForAddPatientButton, 200); // Check again after 200 ms
   }
 }
+
+
 
 function waitAppointmentsProfile() {
   const $ = initJQuery();
