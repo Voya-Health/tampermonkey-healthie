@@ -1558,7 +1558,7 @@ function verifyEmailPhoneButtons(isEmail) {
   let button = isEmail ? document.getElementById("verify-email-button"): document.getElementById("verify-phone-button");
   if(field.value != ''){
     let verifyOverlayURL = routeURLs.otpVerify + `?id=${mishaID}`;
-    verifyOverlayURL += isEmail ? `&email=${field.value}` : `&phone=${field.value}`;
+    verifyOverlayURL += isEmail ? `&email=${field.value}` : `&phone=${encodeURIComponent(field.value)}`;
     if(!button && field){
       const buttonStyle = {
         background: "#026460",
