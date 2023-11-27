@@ -1623,20 +1623,12 @@ function verifyEmailPhone() {
 }
 
 function verifyEmailPhoneButtons(isEmail) {
-  let field = isEmail
-    ? document.getElementById("email")
-    : document.getElementById("phone_number");
-  let button = isEmail
-    ? document.getElementById("verify-email-button")
-    : document.getElementById("verify-phone-button");
-  if (field.value != "") {
-    patientNumber =
-      location.href.split("/")[location.href.split("/").length - 2];
-    let verifyOverlayURL = routeURLs.otpVerify + `?id=${patientNumber}`;
-    verifyOverlayURL += isEmail
-      ? `&email=${field.value}`
-      : `&phone=${field.value}`;
-    if (!button && field) {
+  let field = isEmail ? document.getElementById("email"): document.getElementById("phone_number");
+  let button = isEmail ? document.getElementById("verify-email-button"): document.getElementById("verify-phone-button");
+  if(field.value != ''){
+    let verifyOverlayURL = routeURLs.otpVerify + `?id=${mishaID}`;
+    verifyOverlayURL += isEmail ? `&email=${encodeURIComponent(field.value)}` : `&phone=${encodeURIComponent(field.value)}`;
+    if(!button && field){
       const buttonStyle = {
         background: "#026460",
         color: "white",
