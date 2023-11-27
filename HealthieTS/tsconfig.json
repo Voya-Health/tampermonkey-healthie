@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/", // Directory for output files
+    "sourceMap": true, // Enable source map for debugging
+    "noImplicitAny": true, // Raise error on expressions and declarations with an implied 'any' type
+    "module": "es6", // Specify module code generation
+    "target": "es5", // Specify ECMAScript target version
+    "allowJs": true, // Allow JavaScript files to be compiled
+    "allowSyntheticDefaultImports": true
+  },
+  "include": [
+    "careplan.ts" // Replace with the correct path to your TS files
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
+
