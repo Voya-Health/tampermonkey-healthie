@@ -1635,7 +1635,7 @@ function verifyEmailPhoneButtons(isEmail) {
     let verifyOverlayURL = routeURLs.otpVerify + `?id=${patientNumber}`;
     verifyOverlayURL += isEmail
       ? `&email=${field.value}`
-      : `&phone=${field.value}`;
+      : `&phone=${encodeURIComponent(field.value)}`;
     if (!button && field) {
       const buttonStyle = {
         background: "#026460",
