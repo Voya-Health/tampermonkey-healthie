@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.72
+// @version      0.73
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -1626,7 +1626,9 @@ function verifyEmailPhoneButtons(isEmail) {
   let field = isEmail ? document.getElementById("email"): document.getElementById("phone_number");
   let button = isEmail ? document.getElementById("verify-email-button"): document.getElementById("verify-phone-button");
   if(field.value != ''){
-    let verifyOverlayURL = routeURLs.otpVerify + `?id=${mishaID}`;
+    patientNumber =
+      location.href.split("/")[location.href.split("/").length - 2];
+    let verifyOverlayURL = routeURLs.otpVerify + `?id=${patientNumber}`;
     verifyOverlayURL += isEmail ? `&email=${encodeURIComponent(field.value)}` : `&phone=${encodeURIComponent(field.value)}`;
     if(!button && field){
       const buttonStyle = {
