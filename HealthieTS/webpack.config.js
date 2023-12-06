@@ -6,8 +6,8 @@ const headerStaging = fs.readFileSync(path.resolve(__dirname, 'headers/headerSta
 module.exports = [
   {
     // Your existing configuration for careplan.js
-    mode: 'development', // or 'production'
-    entry: './careplan.ts',
+    mode: 'development',
+    entry: './index.ts',
     output: {
       path: path.resolve(__dirname, 'TM files'),
       filename: 'careplan.js'
@@ -26,8 +26,8 @@ module.exports = [
   },
   {
     // Configuration for careplanstaging.js
-    mode: 'development', // or 'production'
-    entry: './careplan.ts',
+    mode: 'development',
+    entry: './index.ts',
     output: {
       path: path.resolve(__dirname, 'TM files'),
       filename: 'careplanstaging.js'

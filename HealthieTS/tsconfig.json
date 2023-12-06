@@ -9,7 +9,7 @@
     "allowSyntheticDefaultImports": true
   },
   "include": [
-    "careplan.ts" // Replace with the correct path to your TS files
+    "index.ts" // Replace with the correct path to your TS files
   ],
   "exclude": [
     "node_modules"
