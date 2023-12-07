@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.70
+// @version      0.73
 // @description  Injecting care plan components into Healthie
-// @author       Don, Tonye
+// @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
 // @match        https://vorihealth.gethealthie.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vori.health
@@ -25,15 +25,15 @@ let timeoutIds = [];
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
 let healthieURL = isStagingEnv ? "securestaging.gethealthie.com" : "vorihealth.gethealthie.com";
-let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
+let healthieAPIKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey","");
 let auth = `Basic ${healthieAPIKey}`;
 const urlValidation = {
   apiKeys: /\/settings\/api_keys$/,
   appointments: /\/appointments|\/organization|\/providers\//,
   appointmentsHome: /^https?:\/\/[^/]+\.com(\/overview|\/)?$/,
-  appointmentsProfile: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview))?\/?$/,
-  membership: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
-  verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions))\/?$/,
+  appointmentsProfile:/^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview))?\/?$/,
+  membership:/^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
+  verifyEmailPhone:/^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions))\/?$/,
   carePlan: /\/all_plans$/,
   clientList: /\/clients\/active/,
   conversations: /\/conversations/,
@@ -45,7 +45,6 @@ let replaceCalendar = false;
 let isEmailVerified = true;
 let isPhoneNumberVerified = true;
 let isLoadingEmailPhone = true;
-let mishaID = "";
 
 function debugLog(...messages) {
   if (isStagingEnv || debug) {
@@ -60,7 +59,8 @@ const routeURLs = {
   appointments: "appointments",
   patientStatus: "patientStatusStandalone",
   providerSchedule: "provider-schedule",
-  otpVerify: "otpVerifyStandalone"
+  otpVerify: "otpVerifyStandalone",
+  createPatientDialog: "createPatientDialog",
 };
 
 const styles = {
@@ -74,6 +74,16 @@ const styles = {
     height: "90svh",
     overflow: "hidden",
   },
+  patientDialogOverlay: {
+    display: "inline-block",
+    background: "rgb(255, 255, 255)",
+    maxWidth: "30vw", // fallback for browsers that don't support svw
+    maxWidth: "60svw",
+    width: "30vw",
+    height: "80vh", // fallback for browsers that don't support svh
+    height: "80svh",
+    overflow: "hidden",
+  },
   appointmentDetailsOverlay: {
     height: "350px",
     width: "100%",
@@ -81,8 +91,8 @@ const styles = {
   },
   otpOverlay: {
     width: "500px",
-    height: "500px"
-  }
+    height: "500px",
+  },
 };
 
 function createTimeout(timeoutFunction, delay) {
@@ -157,7 +167,9 @@ function generateIframe(routeURL, options = {}) {
     }, 200);
     return;
   } else {
-    const iframeElement = $("<div>").css({ padding: "0", ...options }).addClass(className);
+    const iframeElement = $("<div>")
+      .css({ padding: "0", ...options })
+      .addClass(className);
 
     const iframeContent = $("<iframe>", {
       id: "MishaFrame",
@@ -178,7 +190,9 @@ function waitAppointmentsHome() {
     return;
   } else {
     //check to see if the appointment view contents has loaded
-    let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
+    let appointmentWindow = document.getElementsByClassName(
+      "provider-home-appointments"
+    );
     if (appointmentWindow.length > 0) {
       debugLog(`tampermonkey found appointment view`, appointmentWindow.length);
       let appointmentWindowObj = appointmentWindow[0];
@@ -190,7 +204,8 @@ function waitAppointmentsHome() {
       }
 
       // get the patient number from the URL
-      patientNumber = location.href.split("/")[location.href.split("/").length - 1];
+      patientNumber =
+        location.href.split("/")[location.href.split("/").length - 1];
 
       // get the user data for provider id
       const getCurrentUserQuery = `query user{
@@ -199,17 +214,23 @@ function waitAppointmentsHome() {
        }
        }`;
 
-      const getCurrentUserPayload = JSON.stringify({ query: getCurrentUserQuery });
+      const getCurrentUserPayload = JSON.stringify({
+        query: getCurrentUserQuery,
+      });
       healthieGQL(getCurrentUserPayload).then((response) => {
         const userId = response.data.user.id;
         //provider-schedule/id
         const iframeSrc = `https://${mishaURL}${routeURLs.providerSchedule}/${userId}`;
 
         // Check if the iframe already exists
-        let existingIframe = document.querySelector(`iframe[src="${iframeSrc}"]`);
+        let existingIframe = document.querySelector(
+          `iframe[src="${iframeSrc}"]`
+        );
         // If the iframe doesn't exist, create a new one
         if (!existingIframe) {
-          const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
+          const iframe = generateIframe(
+            `${routeURLs.providerSchedule}/${userId}`
+          );
           $(appointmentWindowObj).append(iframe);
         }
       });
@@ -222,24 +243,64 @@ function waitAppointmentsHome() {
 }
 
 function initBookAppointmentButton() {
+
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(showOverlay, 200);
     return;
   } else {
-    let bookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
+    let bookAppointmentBtn = $(".insurance-authorization-section").find(
+      "button:contains('Book Appointment')"
+    )[0];
     if (bookAppointmentBtn) {
       let patientNumber = location.href.split("/")[4];
       let clonedBtn = $(bookAppointmentBtn).clone();
       $(bookAppointmentBtn).replaceWith(clonedBtn);
       clonedBtn.on("click", function (e) {
         e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
+        showOverlay(
+          `${routeURLs.schedule}/${patientNumber}`,
+          styles.scheduleOverlay
+        );
       });
     } else {
       debugLog(`tampermonkey waiting for book appointment button`);
       createTimeout(initBookAppointmentButton, 200);
     }
+  }
+}
+
+function createPatientDialogIframe() {
+  if (!$) {
+    debugLog(`tampermonkey waiting for jQuery to load`);
+    setTimeout(createPatientDialogIframe, 200);
+    return;
+  }
+  debugLog(`jQuery is loaded, attempting to find 'Add Client' button`);
+  let addPatientBtn = $(".add-client-container button:contains('Add Client')")[0];
+  if (addPatientBtn) {
+    debugLog(`'Add Client' button found, proceeding to clone`);
+    let clonedBtn = $(addPatientBtn).clone();
+    $(addPatientBtn).replaceWith(clonedBtn);
+    clonedBtn.on("click", (e) => {
+      debugLog(`Cloned 'Add Client' button clicked`);
+      e.stopPropagation();
+      showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
+    });
+  } else {
+    debugLog(`'Add Client' button not found, retrying...`);
+    setTimeout(createPatientDialogIframe, 200);
+  }
+}
+
+function waitForAddPatientButton() {
+  const $ = initJQuery();
+  if ($(".add-client-container button:contains('Add Client')").length > 0) {
+    debugLog("Add Client Button found");
+    createPatientDialogIframe();
+  } else {
+    debugLog("Waiting for 'Add Client' button");
+    setTimeout(waitForAddPatientButton, 200);
   }
 }
 
@@ -252,9 +313,11 @@ function waitAppointmentsProfile() {
   } else {
     initBookAppointmentButton();
     // check to see if the appointment view contents have loaded
-    let appointmentWindow = $(".insurance-authorization-section div").filter(function () {
-      return $(this).find(".tabs.apps-tabs").length > 0;
-    })[0];
+    let appointmentWindow = $(".insurance-authorization-section div").filter(
+      function () {
+        return $(this).find(".tabs.apps-tabs").length > 0;
+      }
+    )[0];
     if (appointmentWindow) {
       debugLog(`tampermonkey found appointment view on user profile`);
       $(appointmentWindow).css({ margin: "0", padding: "3px" });
@@ -276,7 +339,9 @@ function waitAppointmentsProfile() {
         });
 
       // also adjust width of packages section
-      $(".insurance-authorization-section.cp-section.with-dropdown-menus-for-packgs")
+      $(
+        ".insurance-authorization-section.cp-section.with-dropdown-menus-for-packgs"
+      )
         .closest(".column.is-6")
         .css("width", "100%");
 
@@ -290,7 +355,9 @@ function waitAppointmentsProfile() {
       // example of url to load - https://securestaging.gethealthie.com/users/388687
       // can also be - https://securestaging.gethealthie.com/users/388687/Overview
       const patientID = location.href.split("/")[4];
-      const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
+      const iframe = generateIframe(
+        `${routeURLs.appointments}/patient/${patientID}`
+      );
       $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
@@ -392,7 +459,7 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
           .rbc-time-content>.rbc-time-gutter {
             display: none;
           }
-          #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.cloned-calendar > div:nth-child(2), 
+          #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.cloned-calendar > div:nth-child(2),
           #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.cloned-calendar > div:nth-child(8),
           #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.og-calendar > div:nth-child(2),
           #big-calendar-container-id > div > div.rbc-time-view > div.rbc-time-content.og-calendar > div:nth-child(8) {
@@ -522,14 +589,17 @@ function initCalendar(replaceCalendar) {
     let calendarHeaderBtns = $(".rbc-btn-group");
     let activeBtn = calendarHeaderBtns.find(".rbc-active");
     let activeTab = $(".calendar-tabs").find(".tab-item.active");
-    let calendarTab = activeTab && activeTab.text().toLowerCase().includes("calendar");
-    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
+    let calendarTab =
+      activeTab && activeTab.text().toLowerCase().includes("calendar");
+    let availabilitiesTab =
+      activeTab && activeTab.text().toLowerCase().includes("availability");
 
     debugLog(`Tampermonkey copyComplete`, copyComplete);
     // Check if we're on availabilities tab, or if  calendar is loaded and cloned
     if (
       availabilitiesTab ||
-      (!replaceCalendar && $(".main-calendar-column").find(".cloned-calendar").length > 0) ||
+      (!replaceCalendar &&
+        $(".main-calendar-column").find(".cloned-calendar").length > 0) ||
       copyComplete > 500 ||
       copyComplete < 0
     ) {
@@ -558,11 +628,15 @@ function initCalendar(replaceCalendar) {
     initCalendarHeaderBtns();
 
     // check if calendar is loading
-    const calendarLoading = $(".day-view.is-loading, .week-view.is-loading, .month-view.is-loading");
+    const calendarLoading = $(
+      ".day-view.is-loading, .week-view.is-loading, .month-view.is-loading"
+    );
     if (calendarLoading.length > 0) {
       debugLog(`Tampermonkey waiting for calendar to load`);
       if (!$(".main-calendar-column").find(".overlay-vori").length > 0) {
-        $(".main-calendar-column").css({ position: "relative" }).append(overlay);
+        $(".main-calendar-column")
+          .css({ position: "relative" })
+          .append(overlay);
         debugLog(`Tampermonkey added overlay to calendar`);
       }
       initCalTimeout = createTimeout(function () {
@@ -590,10 +664,10 @@ function initCalendar(replaceCalendar) {
             top: 64px;
             width: 100.8%;
             background: #fff;
-          }     
+          }
           .cloned-calendar.rbc-month-view {
             top: 60px;
-          }     
+          }
         `;
     let cssRuleToCheck = ".cloned-calendar";
     let styleElementExists =
@@ -610,23 +684,38 @@ function initCalendar(replaceCalendar) {
       initSidebarCalendar();
       if (
         activeBtn &&
-        (activeBtn.text().toLowerCase().includes("day") || activeBtn.text().toLowerCase().includes("week")) &&
+        (activeBtn.text().toLowerCase().includes("day") ||
+          activeBtn.text().toLowerCase().includes("week")) &&
         copyComplete > 0
       ) {
         debugLog(`Tampermonkey calendar is on day or week view`);
         calendar = $(".rbc-time-content");
         let ogCalendar = calendar && calendar.first().addClass("og-calendar");
         let clonedCalendar = ogCalendar.clone(true);
-        clonedCalendar.addClass("cloned-calendar").removeClass("og-calendar").removeAttr("style");
+        clonedCalendar
+          .addClass("cloned-calendar")
+          .removeClass("og-calendar")
+          .removeAttr("style");
 
         // debug mode - set to True for quick debugging
         debug && showBothCalendars(clonedCalendar, ogCalendar);
 
         // instead of replacing the original calendar, we'll hide it, and append the cloned calendar
-        !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
+        !debug &&
+          ogCalendar.css({
+            display: "none",
+            position: "absolute",
+            transform: "translateX(68%)",
+          });
         ogCalendar.parent().append(clonedCalendar);
-        debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
-      } else if (activeBtn && activeBtn.text().toLowerCase().includes("month") && copyComplete > 0) {
+        debugLog(
+          `Tampermonkey hid original calendar and appended cloned calendar - day/week view`
+        );
+      } else if (
+        activeBtn &&
+        activeBtn.text().toLowerCase().includes("month") &&
+        copyComplete > 0
+      ) {
         debugLog(`Tampermonkey calendar is on month view`);
         calendar = $(".rbc-month-view");
         let ogCalendar = calendar && calendar.first().addClass("og-calendar");
@@ -641,11 +730,21 @@ function initCalendar(replaceCalendar) {
             $(child).replaceWith(clone);
           });
 
-          clonedCalendar.addClass("cloned-calendar").removeClass("og-calendar").removeAttr("style");
+          clonedCalendar
+            .addClass("cloned-calendar")
+            .removeClass("og-calendar")
+            .removeAttr("style");
           debug && showBothCalendars(clonedCalendar, ogCalendar);
-          !debug && ogCalendar.css({ display: "none", position: "absolute", transform: "translateX(68%)" });
+          !debug &&
+            ogCalendar.css({
+              display: "none",
+              position: "absolute",
+              transform: "translateX(68%)",
+            });
           ogCalendar.parent().append(clonedCalendar);
-          debugLog(`Tampermonkey hid original calendar and appended cloned calendar - day/week view`);
+          debugLog(
+            `Tampermonkey hid original calendar and appended cloned calendar - day/week view`
+          );
         }
       }
     }
@@ -662,11 +761,17 @@ function initCalendar(replaceCalendar) {
         const dataForValue = $(this).attr("data-for");
         const apptUuid = dataForValue.split("__")[1].split("_")[0];
         //appointment/appointment id
-        showOverlay(`${routeURLs.appointment}/${apptUuid}`, styles.appointmentDetailsOverlay);
+        showOverlay(
+          `${routeURLs.appointment}/${apptUuid}`,
+          styles.appointmentDetailsOverlay
+        );
       });
       $(".cloned-calendar") && debugLog(`Tampermonkey calendar cloned`);
       copyComplete = -1;
-      debugLog(`reset copy complete in initCalendar after cloning`, copyComplete);
+      debugLog(
+        `reset copy complete in initCalendar after cloning`,
+        copyComplete
+      );
       let clonedCalendar = $(".cloned-calendar");
       clonedCalendar && clearMyTimeout(initCalTimeout);
       $(".overlay-vori").remove();
@@ -692,14 +797,19 @@ function initAddButton() {
     return;
   } else {
     let activeTab = $(".calendar-tabs").find(".tab-item.active");
-    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
+    let availabilitiesTab =
+      activeTab && activeTab.text().toLowerCase().includes("availability");
 
     if (availabilitiesTab) {
-      debugLog(`Tampermonkey calendar is on availability tab - nothing to do here`);
+      debugLog(
+        `Tampermonkey calendar is on availability tab - nothing to do here`
+      );
       return;
     }
 
-    let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find("button:contains('Add')")[0];
+    let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find(
+      "button:contains('Add')"
+    )[0];
     if (addAppointmentBtn) {
       let clonedBtn = $(addAppointmentBtn).clone();
       $(addAppointmentBtn).replaceWith(clonedBtn);
@@ -724,10 +834,13 @@ function initCalendarHeaderBtns() {
   } else {
     debugLog(`tampermonkey calendar initializing today, prev, next buttons`);
     let activeTab = $(".calendar-tabs").find(".tab-item.active");
-    let availabilitiesTab = activeTab && activeTab.text().toLowerCase().includes("availability");
+    let availabilitiesTab =
+      activeTab && activeTab.text().toLowerCase().includes("availability");
 
     if (availabilitiesTab) {
-      debugLog(`Tampermonkey calendar is on availability tab - nothing to do here`);
+      debugLog(
+        `Tampermonkey calendar is on availability tab - nothing to do here`
+      );
       return;
     }
 
@@ -754,7 +867,9 @@ function initCalendarHeaderBtns() {
         }, 1000);
       });
       $(monthBtn).on("click", function (e) {
-        debugLog(`tampermonkey - clicked on month. Removing cloned calendar...`);
+        debugLog(
+          `tampermonkey - clicked on month. Removing cloned calendar...`
+        );
         setTimeout(() => {
           $(".rbc-time-content").remove();
         }, 1000);
@@ -764,7 +879,9 @@ function initCalendarHeaderBtns() {
     if (todayBtn && prevBtn && nextBtn) {
       //add event listeners
       $(todayBtn).on("click", function (e) {
-        debugLog(`tampermonkey - clicked on today. Re-initializing calendar...`);
+        debugLog(
+          `tampermonkey - clicked on today. Re-initializing calendar...`
+        );
         copyComplete = 1;
         initCalendar(true);
       });
@@ -808,7 +925,9 @@ function waitGoalTab() {
   //check to see if the care plan tab contents has loaded
   if (document.querySelector('[data-testid="goals-tab-btn"]')) {
     debugLog(`tampermonkey found goals tab`);
-    document.querySelector('[data-testid="goals-tab-btn"]').parentElement.remove();
+    document
+      .querySelector('[data-testid="goals-tab-btn"]')
+      .parentElement.remove();
   } else {
     //wait for content load
     debugLog(`tampermonkey waiting goals tab`);
@@ -821,7 +940,6 @@ function waitCarePlan() {
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(waitCarePlan, 200);
-    return;
   } else {
     //check to see if the care plan tab contents has loaded
     const cpTabContents = $(".cp-tab-contents");
@@ -838,116 +956,32 @@ function waitCarePlan() {
           waitCarePlan();
         }
       }
-
-      //Locate and remove existing care plan tab content  - remove each child of .cp-tab-contents
-      //causing crash in prod Healthie
-      //cpTabContents.empty();
-
       const parent = cpTabContents.eq(0);
-
       // let's add a div with the text "Loading Careplan..."
-      const loadingDiv = $("<div>").addClass("vori-loading-message").text("Loading Careplan...").css({
-        textAlign: "center",
-        margin: "1.8rem",
-        fontSize: "18px",
-      });
+      const loadingDiv = $("<div>")
+        .addClass("vori-loading-message")
+        .text("Loading Careplan...")
+        .css({
+          textAlign: "center",
+          margin: "1.8rem",
+          fontSize: "18px",
+        });
       const loadingDivExists = $(".vori-loading-message");
       if (!loadingDivExists.length) {
         parent.append(loadingDiv);
       }
-
-      patientNumber = location.href.split("/")[location.href.split("/").length - 2];
-
-      //setup message divs and links
-      const iframeMsgDiv = $("<div>").addClass("vori-iframe-message").css({
-        display: "block",
-        position: "relative",
-        background: "rgb(227 229 50 / 21%)",
-        margin: "1.8rem",
-        textAlign: "center",
-        padding: "7rem 7vw",
+      patientNumber =
+        location.href.split("/")[location.href.split("/").length - 2];
+      let iframe = generateIframe(`${patientNumber}/${routeURLs.careplan}`, {
+        className: "cp-tab-contents",
       });
-
-      const iframeMsgLink = $("<a>").css({
-        color: "#333",
-        fontSize: "18px",
-        letterSpacing: "0.3px",
-        textDecoration: "none",
-      });
-
-      if (healthieAPIKey === "") {
-        const iframeMsgExists = $(".vori-iframe-message");
-        if (!iframeMsgExists.length) {
-          iframeMsgLink.text(
-            "You cannot view Care Plan's until you connect your Healthie Account to Vori Health. Set it up here!"
-          );
-          iframeMsgLink.attr("href", "/settings/api_keys");
-
-          function addHoverEffect() {
-            iframeMsgLink.css("textDecoration", "underline");
-          }
-
-          function removeHoverEffect() {
-            iframeMsgLink.css("textDecoration", "none");
-          }
-
-          iframeMsgDiv.append(iframeMsgLink);
-
-          if (healthieAPIKey === "") {
-            iframeMsgLink.on("mouseover", addHoverEffect);
-            iframeMsgLink.on("mouseout", removeHoverEffect);
-          } else {
-            iframeMsgLink.off("mouseover", addHoverEffect);
-            iframeMsgLink.off("mouseout", removeHoverEffect);
-          }
-
-          parent.empty();
-          parent.append(iframeMsgDiv);
-        }
-      } else if (healthieAPIKey !== "") {
-        // let's get the user data
-        const getUserQuery = `query {
-          user(id: "${patientNumber}") {
-            id
-            additional_record_identifier
-          }
-        }`;
-
-        const getUserPayload = JSON.stringify({ query: getUserQuery });
-        healthieGQL(getUserPayload).then((response) => {
-          debugLog(`tampermonkey get user response`, response);
-          mishaID = response.data.user.additional_record_identifier;
-          debugLog(`tampermonkey mishaID`, mishaID);
-
-          if (mishaID === "" || mishaID === null) {
-            const iframeMsgExists = $(".vori-iframe-message").length > 0;
-            if (!iframeMsgExists) {
-              debugLog(`tampermonkey mishaID iFrame missing`, mishaID);
-              $("<div>", {
-                class: "vori-iframe-message",
-                text: "This patient's account has not been linked. \r\n Please contact Vori Health tech team to set it up!",
-                css: {
-                  whiteSpace: "pre-line",
-                  color: "#333",
-                  fontSize: "18px",
-                  letterSpacing: "0.3px",
-                  lineHeight: "1.5",
-                },
-              }).appendTo(parent.empty());
-            }
-          } else {
-            debugLog(`tampermonkey mishaID iFrame missing else`, mishaID);
-            let iframe = generateIframe(`${mishaID}/${routeURLs.careplan}`, { className: "cp-tab-contents" });
-            createTimeout(() => {
-              parent.empty();
-              parent.append(iframe);
-            }, 50);
-            carePlanLoopLock = carePlanLoopLock + 1;
-            //remove styling of healthie tab element
-            // document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
-          }
-        });
-      }
+      createTimeout(() => {
+        parent.empty();
+        parent.append(iframe);
+      }, 50);
+      carePlanLoopLock = carePlanLoopLock + 1;
+      //remove styling of healthie tab element
+      // document.getElementsByClassName("column is-12 is-12-mobile")[0].style = "";
     } else {
       //wait for content load
       debugLog(`tampermonkey waiting for careplan tab`);
@@ -1002,7 +1036,11 @@ function waitForMishaMessages() {
         });
 
         const carePlan = event.data.tmInput;
-        debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
+        debugLog(
+          `tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(
+            carePlan
+          )}`
+        );
         const goal = carePlan.goal.title;
         debugLog("tampermokey goal title ", goal);
 
@@ -1111,7 +1149,10 @@ function waitForMishaMessages() {
         });
       });
     }
-    if (event.data.reschedule !== undefined || event.data.reload !== undefined) {
+    if (
+      event.data.reschedule !== undefined ||
+      event.data.reload !== undefined
+    ) {
       rescheduleAppointment(event.data.reschedule);
     }
     if (event.data.reload !== undefined) {
@@ -1121,21 +1162,30 @@ function waitForMishaMessages() {
       hideOverlay();
     }
     if (event.data.patientProfile !== undefined) {
-      debugLog("tampermonkey navigating to patient profile", event.data.patientProfile);
-      window.open(`https://${healthieURL}/users/${event.data.patientProfile}`, "_top");
+      debugLog(
+        "tampermonkey navigating to patient profile",
+        event.data.patientProfile
+      );
+      window.open(
+        `https://${healthieURL}/users/${event.data.patientProfile}`,
+        "_top"
+      );
     }
     if (event.data.isEmailVerified !== undefined) {
-      debugLog('tampermonkey is email verified', event.data.isEmailVerified);
+      debugLog("tampermonkey is email verified", event.data.isEmailVerified);
       isEmailVerified = event.data.isEmailVerified;
       !isEmailVerified && verifyEmailPhoneButtons(true);
     }
     if (event.data.isPhoneNumberVerified !== undefined) {
-      debugLog('tampermonkey is phone verified', event.data.isPhoneNumberVerified);
+      debugLog(
+        "tampermonkey is phone verified",
+        event.data.isPhoneNumberVerified
+      );
       isPhoneNumberVerified = event.data.isPhoneNumberVerified;
       !isPhoneNumberVerified && verifyEmailPhoneButtons(false);
     }
     if (event.data.loading !== undefined) {
-      debugLog('tampermonkey loading', event.data.loading);
+      debugLog("tampermonkey loading", event.data.loading);
       isLoadingEmailPhone = event.data.loading ? true : false;
     }
   };
@@ -1215,7 +1265,10 @@ function waitSettingsAPIpage() {
       newInput = existingWrapper.querySelector("input");
     }
 
-    let storedApiKey = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", ""); // Retrieve the stored API key using GM_getValue
+    let storedApiKey = GM_getValue(
+      isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey",
+      ""
+    ); // Retrieve the stored API key using GM_getValue
 
     if (storedApiKey === "") {
       newInput.value = storedApiKey; // Set the initial value of the input
@@ -1229,7 +1282,8 @@ function waitSettingsAPIpage() {
       if (apiKey === "") {
         alert("Please enter a valid API key!");
       } else {
-        const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+        const patientNumber =
+          location.href.split("/")[location.href.split("/").length - 2];
         healthieAPIKey = apiKey;
         auth = `Basic ${healthieAPIKey}`;
 
@@ -1243,12 +1297,19 @@ function waitSettingsAPIpage() {
                             `;
         const getGoalPayload = JSON.stringify({ query: getGoalQuery });
         healthieGQL(getGoalPayload).then((response) => {
-          debugLog(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
+          debugLog(
+            `tampermonkey api key goals response: ${JSON.stringify(response)}`
+          );
 
           if (response.errors) {
-            alert("That is not a valid API key. Please verify the key and try again.");
+            alert(
+              "That is not a valid API key. Please verify the key and try again."
+            );
           } else {
-            GM_setValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", apiKey);
+            GM_setValue(
+              isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey",
+              apiKey
+            );
             alert("API key saved successfully!");
             createTimeout(null, 2000);
             window.location.reload();
@@ -1280,7 +1341,8 @@ function isAPIconnected() {
       apiMsgDiv.style.padding = "10px";
 
       const apiMsgLink = document.createElement("a");
-      apiMsgLink.textContent = "You have not connected your Healthie Account to Vori Health. Set it up here!";
+      apiMsgLink.textContent =
+        "You have not connected your Healthie Account to Vori Health. Set it up here!";
       apiMsgLink.href = "/settings/api_keys";
       apiMsgLink.style.color = "#333";
       apiMsgLink.style.fontSize = "15px";
@@ -1317,8 +1379,13 @@ function isAPIconnected() {
 }
 
 function showInstructions() {
-  if (document.querySelector(".api-keys-wrapper") && document.querySelector(".api-keys-input-button-wrapper")) {
-    const apiKeyInputContainer = document.querySelector(".api-keys-input-button-wrapper");
+  if (
+    document.querySelector(".api-keys-wrapper") &&
+    document.querySelector(".api-keys-input-button-wrapper")
+  ) {
+    const apiKeyInputContainer = document.querySelector(
+      ".api-keys-input-button-wrapper"
+    );
 
     if (healthieAPIKey === "") {
       const instructions = document.createElement("p");
@@ -1365,13 +1432,19 @@ function setGeneralTab() {
 }
 
 function setAppointmentCollapse() {
-  let appointmentSectionTitle = document.querySelector('[data-testid="cp-section-appointments"]');
+  let appointmentSectionTitle = document.querySelector(
+    '[data-testid="cp-section-appointments"]'
+  );
   appointmentSectionTitle &&
     appointmentSectionTitle.addEventListener(
       "click",
       function () {
-        debugLog(`tampermonkey clicked section title`, appointmentSectionTitle.className);
-        appointmentSectionTitle.className != "cp-sidebar-expandable-section undefined opened" &&
+        debugLog(
+          `tampermonkey clicked section title`,
+          appointmentSectionTitle.className
+        );
+        appointmentSectionTitle.className !=
+          "cp-sidebar-expandable-section undefined opened" &&
           waitAppointmentSidebar();
       },
       false
@@ -1379,7 +1452,9 @@ function setAppointmentCollapse() {
 }
 
 function waitInfo() {
-  let infoButton = document.getElementsByClassName("right-menu-trigger is-hidden-mobile")[0];
+  let infoButton = document.getElementsByClassName(
+    "right-menu-trigger is-hidden-mobile"
+  )[0];
   if (infoButton) {
     createTimeout(function () {
       setGeneralTab();
@@ -1389,7 +1464,9 @@ function waitInfo() {
       "click",
       function () {
         createTimeout(function () {
-          let appointmentWindow = document.querySelector('[data-testid="cp-section-appointments"]');
+          let appointmentWindow = document.querySelector(
+            '[data-testid="cp-section-appointments"]'
+          );
           debugLog(`tampermonkey info clicked`, appointmentWindow);
           setGeneralTab();
           setAppointmentCollapse();
@@ -1404,11 +1481,15 @@ function waitInfo() {
 }
 
 function waitAppointmentSidebar() {
-  let appointmentWindow = document.querySelector('[data-testid="cp-section-appointments"]');
+  let appointmentWindow = document.querySelector(
+    '[data-testid="cp-section-appointments"]'
+  );
   let goalsTab = document.querySelector('[data-testid="tab-goals"]');
   debugLog(`tampermonkey goals tab `, goalsTab);
   goalsTab && goalsTab.remove();
-  let actionLinks = Array.from(document.getElementsByClassName("healthie-action-link"));
+  let actionLinks = Array.from(
+    document.getElementsByClassName("healthie-action-link")
+  );
   if (appointmentWindow && actionLinks[0]) {
     goalsTab && goalsTab.remove();
     actionLinks.forEach((element) => {
@@ -1424,12 +1505,17 @@ function waitAppointmentSidebar() {
 
 function waitClientList() {
   const $ = initJQuery();
-  let bookLinks = Array.from(document.querySelectorAll("button")).filter((e) => e.textContent === "Book Session");
+  let bookLinks = Array.from(document.querySelectorAll("button")).filter(
+    (e) => e.textContent === "Book Session"
+  );
   debugLog(`tampermonkey waiting to update book link`, bookLinks);
   if (bookLinks.length > 0) {
     Array.from(bookLinks).forEach((element) => {
       debugLog("tampermonkey book link found", element);
-      let ID = element.parentElement.getAttribute("data-testid").split("-").at(-1);
+      let ID = element.parentElement
+        .getAttribute("data-testid")
+        .split("-")
+        .at(-1);
       let bookButton = $(element);
       let clonedButton = bookButton.clone(true);
       clonedButton.on("click", function (e) {
@@ -1470,37 +1556,29 @@ function healthieGQL(payload) {
 
 function addMembershipAndOnboarding() {
   //get phone icon and related column
-  const phoneColumn = document.querySelector(".col-12.col-sm-6:has(.telephone-icon)");
-  const iframeAdded = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
+  const phoneColumn = document.querySelector(
+    ".col-12.col-sm-6:has(.telephone-icon)"
+  );
+  const iframeAdded = phoneColumn
+    ? phoneColumn.parentNode.querySelector(".misha-iframe-container")
+    : null;
 
   if (phoneColumn && !iframeAdded) {
     // get the patient number from the URL
     patientNumber = location.href.split("/")[4];
     debugLog(`tampermonkey patient number`, patientNumber);
-
-    // get the user data
-    const getUserQuery = `query {
-        user(id: "${patientNumber}") {
-          id
-          additional_record_identifier
-        }
-      }`;
-
-    const getUserPayload = JSON.stringify({ query: getUserQuery });
-    healthieGQL(getUserPayload).then((response) => {
-      debugLog(`tampermonkey get user response`, response);
-      // load  mishaID
-      if (response.data.user) {
-        mishaID = response.data.user.additional_record_identifier;
-        debugLog(`tampermonkey mishaID`, mishaID);
-        // create iframe (generateIframe returns a jQuery object)
-        //Add custom height and width to avoid scrollbars because the material ui Select component
-        const iframe = generateIframe(`${routeURLs.patientStatus}/${mishaID}`, { height: "190px", width: "400px" });
-        const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
-        // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
-        !iframeExists && phoneColumn && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
-      }
-    });
+    // create iframe (generateIframe returns a jQuery object)
+    //Add custom height and width to avoid scrollbars because the material ui Select component
+    const iframe = generateIframe(
+      `${routeURLs.patientStatus}/${patientNumber}`,
+      { height: "190px", width: "400px" }
+    );
+    const iframeExists = phoneColumn.parentNode.querySelector(
+      ".misha-iframe-container"
+    );
+    // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
+    !iframeExists &&
+      phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
   } else {
     createTimeout(() => {
       addMembershipAndOnboarding();
@@ -1513,40 +1591,31 @@ function verifyEmailPhone() {
   let clientInfoPane = document.getElementsByClassName("client-info-pane");
   if (clientInfoPane.length > 0) {
     debugLog(`tampermonkey found client info pane`);
-    let saveButton = document.getElementsByClassName("client-profile-submit-button healthie-button primary-button small-button float-right");
+    let saveButton = document.getElementsByClassName(
+      "client-profile-submit-button healthie-button primary-button small-button float-right"
+    );
     debugLog(`tampermonkey save button`, saveButton);
     if (saveButton.length > 0) {
       debugLog(`tampermonkey found save button`, saveButton);
       saveButton[0].onclick = function () {
         createTimeout(() => {
-            window.location.reload();
-        }, 1000)
+          window.location.reload();
+        }, 1000);
       };
     }
     let clientInfoPaneObj = clientInfoPane[0];
     //load invisible iframe for getPatientInfo to determine verification status of phone/email
-    patientNumber = location.href.split("/")[location.href.split("/").length - 2];
-    const getUserQuery = `query {
-      user(id: "${patientNumber}") {
-        id
-        additional_record_identifier
-      }
-    }`;
-    const getUserPayload = JSON.stringify({ query: getUserQuery });
-    healthieGQL(getUserPayload).then((response) => {
-      debugLog(`tampermonkey get user response`, response);
-      mishaID = response.data.user.additional_record_identifier;
-      debugLog(`tampermonkey mishaID`, mishaID);
-      if (mishaID === "" || mishaID === null) {
-        //missing id
-      } else {
-        let iframe = generateIframe(`getPatientInfo?id=${mishaID}`,{ position: "absolute", height: "0px", width:'0px', border: "0px" });
-        // append to document body
-        $(clientInfoPaneObj).append(iframe);
-          //listen for message from iframe
-      }
-    })
-  }else{
+    patientNumber =
+      location.href.split("/")[location.href.split("/").length - 2];
+    let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
+      position: "absolute",
+      height: "0px",
+      width: "0px",
+      border: "0px",
+    });
+    // append to document body
+    $(clientInfoPaneObj).append(iframe);
+  } else {
     createTimeout(() => {
       verifyEmailPhone();
     }, 200);
@@ -1557,17 +1626,21 @@ function verifyEmailPhoneButtons(isEmail) {
   let field = isEmail ? document.getElementById("email"): document.getElementById("phone_number");
   let button = isEmail ? document.getElementById("verify-email-button"): document.getElementById("verify-phone-button");
   if(field.value != ''){
-    let verifyOverlayURL = routeURLs.otpVerify + `?id=${mishaID}`;
+    patientNumber =
+      location.href.split("/")[location.href.split("/").length - 2];
+    let verifyOverlayURL = routeURLs.otpVerify + `?id=${patientNumber}`;
     verifyOverlayURL += isEmail ? `&email=${encodeURIComponent(field.value)}` : `&phone=${encodeURIComponent(field.value)}`;
     if(!button && field){
       const buttonStyle = {
         background: "#026460",
         color: "white",
-        borderRadius: "2px"
+        borderRadius: "2px",
       };
       const buttonStyleString = Object.entries(buttonStyle)
-      .map(([property, value]) => `${convertToCSSProperty(property)}: ${value};`)
-      .join(" ");
+        .map(
+          ([property, value]) => `${convertToCSSProperty(property)}: ${value};`
+        )
+        .join(" ");
       const button = $("<button>", {
         id: isEmail ? "verify-email-button" : "verify-phone-button",
         text: "Verify",
@@ -1575,7 +1648,7 @@ function verifyEmailPhoneButtons(isEmail) {
         type: "button",
         click: function () {
           showOverlay(verifyOverlayURL, styles.otpOverlay);
-        }
+        },
       });
       field.parentNode.insertBefore(button[0], field.nextSibling);
       let containerStyle = field.parentElement.style;
@@ -1617,15 +1690,17 @@ function observeDOMChanges(mutations, observer) {
     }
 
     if (urlValidation.appointmentsProfile.test(location.href)) {
-      debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
+      debugLog(
+        "tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding"
+      );
       waitAppointmentsProfile();
     }
 
-    if (urlValidation.membership.test(location.href)){
+    if (urlValidation.membership.test(location.href)) {
       addMembershipAndOnboarding();
     }
 
-    if(urlValidation.verifyEmailPhone.test(location.href)){
+    if (urlValidation.verifyEmailPhone.test(location.href)) {
       verifyEmailPhone();
     }
 
@@ -1656,6 +1731,7 @@ function observeDOMChanges(mutations, observer) {
     if (urlValidation.clientList.test(location.href)) {
       debugLog("tampermonkey calls waitClientList");
       waitClientList();
+      waitForAddPatientButton();
     }
     isAPIconnected();
   } else {
@@ -1693,30 +1769,41 @@ function observeDOMChanges(mutations, observer) {
 
     // Check if the mutation target or any added/removed node has one of the target classes or if the children of these classes have changed
     if (
-      (target && calendarTargetClasses.some((className) => target.classList.contains(className))) ||
-      (addedNodes &&
-        [...addedNodes].some(
-          (addedNode) =>
-            addedNode.nodeType === Node.ELEMENT_NODE &&
-            calendarTargetClasses.some((className) => addedNode.classList.contains(className))
-        )) ||
-      (removedNodes &&
-        [...removedNodes].some(
-          (removedNode) =>
-            removedNode.nodeType === Node.ELEMENT_NODE &&
-            calendarTargetClasses.some((className) => removedNode.classList.contains(className))
+      (target &&
+        calendarTargetClasses.some((className) =>
+          target.classList.contains(className)
         )) ||
       (addedNodes &&
         [...addedNodes].some(
           (addedNode) =>
             addedNode.nodeType === Node.ELEMENT_NODE &&
-            calendarTargetClasses.some((className) => addedNode.querySelector(`.${className}`))
+            calendarTargetClasses.some((className) =>
+              addedNode.classList.contains(className)
+            )
         )) ||
       (removedNodes &&
         [...removedNodes].some(
           (removedNode) =>
             removedNode.nodeType === Node.ELEMENT_NODE &&
-            calendarTargetClasses.some((className) => removedNode.querySelector(`.${className}`))
+            calendarTargetClasses.some((className) =>
+              removedNode.classList.contains(className)
+            )
+        )) ||
+      (addedNodes &&
+        [...addedNodes].some(
+          (addedNode) =>
+            addedNode.nodeType === Node.ELEMENT_NODE &&
+            calendarTargetClasses.some((className) =>
+              addedNode.querySelector(`.${className}`)
+            )
+        )) ||
+      (removedNodes &&
+        [...removedNodes].some(
+          (removedNode) =>
+            removedNode.nodeType === Node.ELEMENT_NODE &&
+            calendarTargetClasses.some((className) =>
+              removedNode.querySelector(`.${className}`)
+            )
         ))
     ) {
       observer.disconnect();
@@ -1724,37 +1811,56 @@ function observeDOMChanges(mutations, observer) {
       !clonedCalendar && copyComplete++;
       debugLog(`increased copy complete in observer`, copyComplete);
       initCalendar();
-      observer.observe(document.documentElement, { childList: true, subtree: true });
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
       break;
     }
 
     if (
-      (target && homeTargetClasses.some((className) => target.classList.contains(className))) ||
+      (target &&
+        homeTargetClasses.some((className) =>
+          target.classList.contains(className)
+        )) ||
       (addedNodes &&
         [...addedNodes].some(
           (addedNode) =>
             addedNode.nodeType === Node.ELEMENT_NODE &&
-            homeTargetClasses.some((className) => addedNode.classList.contains(className))
+            homeTargetClasses.some((className) =>
+              addedNode.classList.contains(className)
+            )
         ))
     ) {
       observer.disconnect();
       waitAppointmentsHome();
-      observer.observe(document.documentElement, { childList: true, subtree: true });
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
       break;
     }
 
     if (
-      (target && basicInfoTargetClasses.some((className) => target.classList.contains(className))) ||
+      (target &&
+        basicInfoTargetClasses.some((className) =>
+          target.classList.contains(className)
+        )) ||
       (addedNodes &&
         [...addedNodes].some(
           (addedNode) =>
             addedNode.nodeType === Node.ELEMENT_NODE &&
-            basicInfoTargetClasses.some((className) => addedNode.classList.contains(className))
+            basicInfoTargetClasses.some((className) =>
+              addedNode.classList.contains(className)
+            )
         ))
     ) {
       observer.disconnect();
       addMembershipAndOnboarding();
-      observer.observe(document.documentElement, { childList: true, subtree: true });
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
       break;
     }
   }
