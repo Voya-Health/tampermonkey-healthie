@@ -1,0 +1,23 @@
+node_modules/
+TM files/
+.env
+.vscode/
+*.swp
+*.swo
+.DS_Store
+*.tsbuildinfo
+npm-debug.log*
+.yarn-integrity
+*.log
+lib-cov
+coverage
+.nyc_output
+.grunt
+bower_components
+tmp/
+temp/
+
+
+
+
+
