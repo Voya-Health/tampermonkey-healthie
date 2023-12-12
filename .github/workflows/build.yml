@@ -14,11 +14,8 @@ jobs:
         with:
           node-version: "20.9.0"
 
-      - name: Change to HealthieTS directory
-        run: cd HealthieTS
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run build
-        run: npm run build
+      - name: Install dependencies and run build
+        run: |
+          cd HealthieTS
+          npm install
+          npm run build
