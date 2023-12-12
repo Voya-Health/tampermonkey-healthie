@@ -9,7 +9,7 @@ module.exports = [
     mode: 'development',
     entry: './index.ts',
     output: {
-      path: path.resolve(__dirname, 'TM files'),
+      path: path.resolve(__dirname, '../'),
       filename: 'careplan.js'
     },
     plugins: [
@@ -29,7 +29,7 @@ module.exports = [
     mode: 'development',
     entry: './index.ts',
     output: {
-      path: path.resolve(__dirname, 'TM files'),
+      path: path.resolve(__dirname, '../'),
       filename: 'careplanstaging.js'
     },
     plugins: [
