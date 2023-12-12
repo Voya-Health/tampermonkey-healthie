@@ -5,7 +5,6 @@ const header = fs.readFileSync(path.resolve(__dirname, 'headers/header.js'), 'ut
 const headerStaging = fs.readFileSync(path.resolve(__dirname, 'headers/headerStaging.js'), 'utf8');
 module.exports = [
   {
-    // Your existing configuration for careplan.js
     mode: 'development',
     entry: './index.ts',
     output: {
@@ -25,7 +24,6 @@ module.exports = [
     resolve: { extensions: ['.tsx', '.ts', '.js'] },
   },
   {
-    // Configuration for careplanstaging.js
     mode: 'development',
     entry: './index.ts',
     output: {
