@@ -25,11 +25,13 @@ The main branch of the project to develop from is staging, after installation sw
 
 git checkout staging
 
-## Building the Project
+## Building and running the project
 
 This project uses Webpack for building. To build the Tampermonkey files after any changes has been made for production and staging, run:
 
 npm run build
+
+You can then copy the contents of the generated careplanstaging.js into a TM script file via the TM dashboard to test the script in staging Healthie
 
 ## Testing
 
