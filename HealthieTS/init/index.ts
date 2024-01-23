@@ -3,6 +3,8 @@ import { createTimeout} from '../helpers/timeoutHelpers';
 import { healthieGQL} from '../api/index';
 import { showOverlay, generateIframe, createPatientDialogIframe} from '../helpers/ui/index';
 import { setAppointmentCollapse} from '../helpers/calendar/index';
+import '@datadog/browser-logs/bundle/datadog-logs'
+import { DD_Window } from './datadog/datadog_models'
 
 declare function GM_getValue<T>(key: string, defaultValue: T): T;
 const isStagingEnv: boolean = location.href.includes("securestaging") ? true : false;
@@ -11,6 +13,7 @@ let healthieAPIKey: string = GM_getValue(isStagingEnv ? "healthieStagingApiKey" 
 let patientNumber: string = "";
 declare var unsafeWindow: Window & typeof globalThis & { [key: string]: any };
 let carePlanLoopLock: number = 0;
+let dataDogLogsInitialized = false;
 
 const routeURLs: { [key: string]: string } = {
   schedule: "schedule",
@@ -192,6 +195,44 @@ function initAddButton(): void {
     }
   }
   initJQuery();
+
+  function setupDatadogLogs() {     
+    const env = isStagingEnv ? 'qa' : 'prod';
+    const clientToken = 'pubdf55240f49807c01cd3ed2168506ced8';
+
+    // Datadog doesnt provide ts support, forcing typing to have an access to DD_LOGS object
+    const DD_LOGS = (window as DD_Window).DD_LOGS;
+
+    DD_LOGS.onReady(function() {
+      DD_LOGS.init({
+          clientToken,
+          env,
+          site: 'datadoghq.com',     
+          service: 'tampermonkey',   
+      })
+      dataDogLogsInitialized = true;
+      debugLog(`tampermonkey datadog logs loaded successfully`);
+      DD_LOGS.logger.info(' datadog logs are initialized');
+    })
+  }
+
+  function initDatadog(): any {
+    let $: any = unsafeWindow.datadogLogs;
+    if ($ && $ !== undefined && typeof $ === "function") {
+      return $;
+    } else {
+      let script: HTMLScriptElement = document.createElement("script");
+      script.src = "https://www.datadoghq-browser-agent.com/us1/v5/datadog-logs.js";
+      script.type = "text/javascript";    
+      script.onload = function () {
+        !dataDogLogsInitialized && setupDatadogLogs()
+      }
+      document.getElementsByTagName("head")[0].appendChild(script);
+      createTimeout(initDatadog, 200);
+    };
+  }
+  initDatadog();
+
   function verifyEmailPhoneButtons(isEmail: boolean): void {
     let field = isEmail ? (document.getElementById("email") as HTMLInputElement) : (document.getElementById("phone_number") as HTMLInputElement);
   
@@ -467,7 +508,6 @@ function initAddButton(): void {
   function waitGoalTab(): void {
     // Check to see if the care plan tab contents has loaded
     const goalsTabBtn = document.querySelector('[data-testid="goals-tab-btn"]');
-  
     if (goalsTabBtn && goalsTabBtn.parentElement) {
       debugLog(`tampermonkey found goals tab`);
       goalsTabBtn.parentElement.remove();
@@ -530,5 +570,6 @@ function initAddButton(): void {
     waitCarePlan,
     waitGoalTab,
     waitInfo,
-    waitForAddPatientButton
+    waitForAddPatientButton,
+    initDatadog
 };

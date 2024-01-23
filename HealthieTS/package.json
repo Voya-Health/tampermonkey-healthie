@@ -18,6 +18,8 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "@datadog/browser-logs": "^5.8.0",
+    "@datadog/browser-rum": "^5.8.0",
     "jquery": "^3.7.1",
     "puppeteer": "^21.6.1"
   }

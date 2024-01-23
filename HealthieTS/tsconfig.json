@@ -6,7 +6,12 @@
     "module": "es6", // Specify module code generation
     "target": "es5", // Specify ECMAScript target version
     "allowJs": true, // Allow JavaScript files to be compiled
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node",
+    "baseUrl": "./",
+    "paths": {
+      "@datadog/browser-logs": ["node_modules/@datadog/browser-logs"]
+    }
   },
   "include": [
     "index.ts" // Replace with the correct path to your TS files

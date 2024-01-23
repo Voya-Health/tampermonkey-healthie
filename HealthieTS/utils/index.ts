@@ -1,5 +1,5 @@
 import { healthieGQL} from '../api/index';
-import { rescheduleAppointment, verifyEmailPhoneButtons} from '../init/index';
+import { initDatadog, rescheduleAppointment, verifyEmailPhoneButtons} from '../init/index';
 import { hideOverlay} from '../helpers/ui/index';
 
 const isStagingEnv: boolean = location.href.includes("securestaging") ? true : false;
@@ -196,6 +196,10 @@ function convertToCSSProperty(jsProperty: string): string {
       if (event.data.loading !== undefined) {
         debugLog("tampermonkey loading", event.data.loading);
         isLoadingEmailPhone = event.data.loading ? true : false;
+      }
+      if (event.data.datadog !== undefined) {
+        debugLog("tampermonkey datadog token received");
+        initDatadog();
       }
     };
   }
