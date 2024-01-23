@@ -1,6 +1,7 @@
 import { healthieGQL} from '../api/index';
-import { rescheduleAppointment, verifyEmailPhoneButtons} from '../init/index';
+import { rescheduleAppointment, setupDatadogLogs, setupDatadogRum, verifyEmailPhoneButtons} from '../init/index';
 import { hideOverlay} from '../helpers/ui/index';
+import { DatadogConfig } from '../init/datadog/datadog_models';
 
 const isStagingEnv: boolean = location.href.includes("securestaging") ? true : false;
 declare var unsafeWindow: Window & typeof globalThis & { [key: string]: any };
@@ -196,6 +197,12 @@ function convertToCSSProperty(jsProperty: string): string {
       if (event.data.loading !== undefined) {
         debugLog("tampermonkey loading", event.data.loading);
         isLoadingEmailPhone = event.data.loading ? true : false;
+      }
+      if (event.data.datadog !== undefined) {
+        debugLog("tampermonkey datadog configs received");
+        const datadog: DatadogConfig = event.data.datadog
+        setupDatadogLogs(datadog.logs_clientToken);
+        setupDatadogRum(datadog.rum_clientToken, datadog.rum_appId)
       }
     };
   }

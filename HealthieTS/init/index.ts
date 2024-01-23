@@ -1,16 +1,23 @@
-import { debugLog, convertToCSSProperty } from '../utils/index';
+import { debugLog } from '../utils/index';
 import { createTimeout} from '../helpers/timeoutHelpers';
 import { healthieGQL} from '../api/index';
 import { showOverlay, generateIframe, createPatientDialogIframe} from '../helpers/ui/index';
 import { setAppointmentCollapse} from '../helpers/calendar/index';
+import '@datadog/browser-logs/bundle/datadog-logs'
+import '@datadog/browser-rum'
+import { DD_Window } from './datadog/datadog_models'
 
 declare function GM_getValue<T>(key: string, defaultValue: T): T;
 const isStagingEnv: boolean = location.href.includes("securestaging") ? true : false;
+const env = isStagingEnv ? 'qa' : 'prod';
 let mishaURL: string = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
 let healthieAPIKey: string = GM_getValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", "");
 let patientNumber: string = "";
 declare var unsafeWindow: Window & typeof globalThis & { [key: string]: any };
 let carePlanLoopLock: number = 0;
+let dataDogLogsInitialized = false;
+let dataDogRumInitialized = false;
+let jqueryLoaded = false;
 
 const routeURLs: { [key: string]: string } = {
   schedule: "schedule",
@@ -186,12 +193,95 @@ function initAddButton(): void {
       script.type = "text/javascript";
       script.onload = function () {
         debugLog(`tampermonkey jquery loaded successfully`);
+        jqueryLoaded = true;
       };
       document.getElementsByTagName("head")[0].appendChild(script);
       createTimeout(initJQuery, 200);
     }
   }
   initJQuery();
+
+  function setupDatadogLogs(clientToken?: string) {    
+    if (dataDogLogsInitialized) return 
+ 
+    const root: Element = document.getElementById('root');
+    // Load invisible iframe to get Datadog configs from misha
+    if(root && jqueryLoaded && !clientToken){
+      let iframe: JQuery<HTMLElement> = generateIframe(`datadog`, {
+        position: "absolute",
+        height: "0px",
+        width: "0px",
+        border: "0px",
+      });
+      $(root).append(iframe)
+    } 
+
+    if (!clientToken) return 
+    // Datadog doesnt provide ts support, forcing typing to have an access to DD_LOGS object
+    const DD_LOGS = (window as DD_Window).DD_LOGS;
+
+    DD_LOGS.onReady(function() {
+      DD_LOGS.init({
+          clientToken,
+          env,
+          site: 'datadoghq.com',     
+          service: 'tampermonkey',   
+      })
+      dataDogLogsInitialized = true;
+      DD_LOGS.logger.info('datadog logs are initialized');
+    })
+  }
+
+  function initDatadogLogs(): any {
+    if (dataDogLogsInitialized) {
+      return debugLog(`tampermonkey datadog logs are initialized`);
+    } else {
+      let script: HTMLScriptElement = document.createElement("script");
+      script.src = "https://www.datadoghq-browser-agent.com/us1/v5/datadog-logs.js";
+      script.type = "text/javascript";    
+      script.onload = function () {
+        !dataDogLogsInitialized && setupDatadogLogs();
+      }
+      document.getElementsByTagName("head")[0].appendChild(script);
+      createTimeout(initDatadogLogs, 200);
+    };
+  }
+  initDatadogLogs();
+
+  function setupDatadogRum(clientToken?: string, applicationId?: string) {     
+    // Datadog configs should come from iframe created in setupDatadogLogs method
+    if (dataDogRumInitialized || !clientToken || !applicationId) return
+    // Datadog doesnt provide ts support, forcing typing to have an access to DD_RUM object
+    const DD_RUM = (window as DD_Window).DD_RUM;
+
+    DD_RUM.onReady(function() {
+      DD_RUM.init({
+          clientToken,
+          applicationId,
+          env,
+          site: 'datadoghq.com',     
+          service: 'tampermonkey',   
+      })
+      dataDogRumInitialized = true;
+    })
+  }
+
+  function initDatadogRum(): any {  
+    if (dataDogRumInitialized) {
+      return debugLog(`tampermonkey datadog rum is initialized`);
+    } else {
+      let script: HTMLScriptElement = document.createElement("script");
+      script.src = "https://www.datadoghq-browser-agent.com/us1/v5/datadog-rum.js";
+      script.type = "text/javascript";    
+      script.onload = function () {
+        !dataDogRumInitialized && setupDatadogRum();
+      }
+      document.getElementsByTagName("head")[0].appendChild(script);
+      createTimeout(initDatadogRum, 200);
+    };
+  }
+  initDatadogRum();
+
   function verifyEmailPhoneButtons(isEmail: boolean): void {
     let field = isEmail ? (document.getElementById("email") as HTMLInputElement) : (document.getElementById("phone_number") as HTMLInputElement);
   
@@ -467,7 +557,6 @@ function initAddButton(): void {
   function waitGoalTab(): void {
     // Check to see if the care plan tab contents has loaded
     const goalsTabBtn = document.querySelector('[data-testid="goals-tab-btn"]');
-  
     if (goalsTabBtn && goalsTabBtn.parentElement) {
       debugLog(`tampermonkey found goals tab`);
       goalsTabBtn.parentElement.remove();
@@ -530,5 +619,7 @@ function initAddButton(): void {
     waitCarePlan,
     waitGoalTab,
     waitInfo,
-    waitForAddPatientButton
+    waitForAddPatientButton,
+    setupDatadogLogs,
+    setupDatadogRum
 };
