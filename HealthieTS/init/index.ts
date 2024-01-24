@@ -5,7 +5,7 @@ import { showOverlay, generateIframe, createPatientDialogIframe} from '../helper
 import { setAppointmentCollapse} from '../helpers/calendar/index';
 import '@datadog/browser-logs/bundle/datadog-logs'
 import '@datadog/browser-rum'
-import { DD_Window } from './datadog/datadog_models'
+import { DD_Window, DatadogConfig } from './datadog/datadog_models'
 
 declare function GM_getValue<T>(key: string, defaultValue: T): T;
 const isStagingEnv: boolean = location.href.includes("securestaging") ? true : false;
@@ -201,11 +201,14 @@ function initAddButton(): void {
   }
   initJQuery();
 
-  function setupDatadogLogs(clientToken?: string) {    
+  function setupDatadogLogs() {    
     if (dataDogLogsInitialized) return 
- 
-    const root: Element = document.getElementById('root');
+
+    const datadogConfig: DatadogConfig = GM_getValue('datadog', undefined);
+    const clientToken = datadogConfig?.logs_clientToken;
+
     // Load invisible iframe to get Datadog configs from misha
+    const root: Element = document.getElementById('root');
     if(root && jqueryLoaded && !clientToken){
       let iframe: JQuery<HTMLElement> = generateIframe(`datadog`, {
         position: "absolute",
@@ -248,9 +251,16 @@ function initAddButton(): void {
   }
   initDatadogLogs();
 
-  function setupDatadogRum(clientToken?: string, applicationId?: string) {     
+  function setupDatadogRum() {     
+    if (dataDogRumInitialized)  return;
+
     // Datadog configs should come from iframe created in setupDatadogLogs method
-    if (dataDogRumInitialized || !clientToken || !applicationId) return
+    const datadogConfig: DatadogConfig = GM_getValue('datadog', undefined);
+    const clientToken = datadogConfig.rum_clientToken;
+    const applicationId = datadogConfig.rum_appId;
+
+    if (!clientToken || !applicationId) return
+
     // Datadog doesnt provide ts support, forcing typing to have an access to DD_RUM object
     const DD_RUM = (window as DD_Window).DD_RUM;
 
@@ -619,7 +629,5 @@ function initAddButton(): void {
     waitCarePlan,
     waitGoalTab,
     waitInfo,
-    waitForAddPatientButton,
-    setupDatadogLogs,
-    setupDatadogRum
+    waitForAddPatientButton
 };
