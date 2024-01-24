@@ -1,8 +1,10 @@
 import { healthieGQL} from '../api/index';
 import { rescheduleAppointment, verifyEmailPhoneButtons} from '../init/index';
 import { hideOverlay} from '../helpers/ui/index';
+import { DatadogConfig } from '../init/datadog/datadog_models';
 
 const isStagingEnv: boolean = location.href.includes("securestaging") ? true : false;
+declare function GM_setValue(key: string, value: string | number | boolean | object | null | undefined): void;
 declare var unsafeWindow: Window & typeof globalThis & { [key: string]: any };
 let healthieURL: string = isStagingEnv ? "securestaging.gethealthie.com" : "vorihealth.gethealthie.com";
 let debug: boolean = false;
@@ -197,7 +199,12 @@ function convertToCSSProperty(jsProperty: string): string {
         debugLog("tampermonkey loading", event.data.loading);
         isLoadingEmailPhone = event.data.loading ? true : false;
       }
+      if (event.data.datadog !== undefined) {
+        debugLog("tampermonkey datadog configs received");
+        GM_setValue('datadog', event.data.datadog)
+      }
     };
   }
 
   export { convertToCSSProperty, debugLog, waitForMishaMessages };
+
