@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.74
+// @version      0.75
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -11,6 +11,7 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_openInTab
+// @grant        GM_addStyle
 // ==/UserScript==
 
 /* globals contentful */
@@ -366,6 +367,18 @@ function waitAppointmentsProfile() {
       createTimeout(waitAppointmentsProfile, 200);
     }
   }
+}
+
+function homeScreenCSS() {
+    //hide duration selection
+    GM_addStyle(".client-profile-sidebar .appointments-section > .healthie-action-link, .appointment-details-container>form.duration-selection {display: none;}");
+    //hide add new appointment button
+    GM_addStyle(".client-profile-sidebar .appointments-section > .healthie-action-link, .appointment-details-container>form.duration-selection, .provider-home-appointments__empty-state > button {	display: none;}");
+    //hide edit button for healthie appointment and cancel appointment for meatballs menu on appointment card
+    GM_addStyle(".client-appoitnment-actions .healthie-dropdown-content > :not(a[href]):not(div), .client-appoitnment-actions .healthie-dropdown-content > div[data-for=\"cancel_appt__tooltip\"] {display: none;}")
+    //hide edit and cancel appointment icons for healthie appointment sidebar view
+    GM_addStyle(".appointment-detail-drawer .aside-tab-content__header .header-text>div .action-icons div[data-for=\"updating-appointment-tooltip\"]{display: none;}")
+    debugLog(`Tampermonkey: Added styles for dashboard appointment views`)
 }
 
 function hideOverlay() {
@@ -1718,7 +1731,9 @@ function observeDOMChanges(mutations, observer) {
 
     if (urlValidation.appointmentsHome.test(location.href)) {
       debugLog("tampermonkey calls waitAppointmentsHome");
-      waitAppointmentsHome();
+      //waitAppointmentsHome();
+      //inject CSS to disable home screen appointment buttons
+      homeScreenCSS()
     }
 
     if (urlValidation.conversations.test(location.href)) {
@@ -1831,7 +1846,7 @@ function observeDOMChanges(mutations, observer) {
         ))
     ) {
       observer.disconnect();
-      waitAppointmentsHome();
+      //waitAppointmentsHome();
       observer.observe(document.documentElement, {
         childList: true,
         subtree: true,
