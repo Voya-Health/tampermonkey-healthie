@@ -1571,7 +1571,7 @@ function observeDOMChanges(mutations, observer) {
       debugLog(`tampermonkey waiting to reload page`);
       // reload every 5 minutes to avoid session timeout/missed appointments on homepage and calendar
       let countdown = 300; // 300 seconds is equal to 5 minutes
-      const intervalId = createInterval(() => {
+      createInterval(() => {
         countdown--;
         if (countdown % 60 === 0) {
           debugLog(`tampermonkey will reload page in ${countdown / 60} minutes`);
@@ -1581,7 +1581,7 @@ function observeDOMChanges(mutations, observer) {
         if (countdown <= 0) {
           debugLog(`tampermonkey automatically reloading page`);
           window.location.reload();
-          clearInterval(intervalId);
+          clearAllIntervals();
         }
       }, 1000);
     }
