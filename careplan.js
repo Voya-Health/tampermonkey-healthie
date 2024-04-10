@@ -1567,8 +1567,8 @@ function observeDOMChanges(mutations, observer) {
 
     //Care plans URL
     //if (location.href.includes("/all_plans")) {
-    if (urlValidation.landingPage.test(location.href)) {
-      // reload every 5 minutes to avoid session timeout
+    if (urlValidation.landingPage.test(location.href) || urlValidation.appointments.test(location.href)) {
+      // reload every 5 minutes to avoid session timeout on homepage and calendar
       createTimeout(() => {
         debugLog(`tampermonkey automatically reloading page`);
         window.location.reload();
