@@ -1567,6 +1567,14 @@ function observeDOMChanges(mutations, observer) {
 
     //Care plans URL
     //if (location.href.includes("/all_plans")) {
+    if (urlValidation.landingPage.test(location.href)) {
+      // reload every 5 minutes to avoid session timeout
+      createTimeout(() => {
+        debugLog(`tampermonkey automatically reloading page`);
+        window.location.reload();
+      }, 300000);
+    }
+
     if (urlValidation.carePlan.test(location.href)) {
       //Function that will check when care plan tab has loaded
       debugLog("tampermonkey calls waitCarePlan");
