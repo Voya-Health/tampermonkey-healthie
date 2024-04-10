@@ -1584,6 +1584,8 @@ function observeDOMChanges(mutations, observer) {
           clearAllIntervals();
         }
       }, 1000);
+    } else {
+      clearAllIntervals();
     }
 
     if (urlValidation.carePlan.test(location.href)) {
