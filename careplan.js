@@ -1573,10 +1573,13 @@ function observeDOMChanges(mutations, observer) {
       let countdown = 300; // 300 seconds is equal to 5 minutes
       createInterval(() => {
         countdown--;
-        if (countdown % 60 === 0) {
-          debugLog(`tampermonkey will reload page in ${countdown / 60} minutes`);
-        } else {
-          debugLog(`tampermonkey will reload page in ${countdown} seconds`);
+        if (countdown % 5 === 0) {
+          // log every 5 seconds
+          if (countdown >= 60) {
+            debugLog(`tampermonkey will reload page in ${Math.floor(countdown / 60)} minutes`);
+          } else {
+            debugLog(`tampermonkey will reload page in ${countdown} seconds`);
+          }
         }
         if (countdown <= 0) {
           debugLog(`tampermonkey automatically reloading page`);
