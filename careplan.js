@@ -1568,11 +1568,22 @@ function observeDOMChanges(mutations, observer) {
     //Care plans URL
     //if (location.href.includes("/all_plans")) {
     if (urlValidation.landingPage.test(location.href) || urlValidation.appointments.test(location.href)) {
-      // reload every 5 minutes to avoid session timeout on homepage and calendar
-      createTimeout(() => {
-        debugLog(`tampermonkey automatically reloading page`);
-        window.location.reload();
-      }, 300000);
+      debugLog(`tampermonkey waiting to reload page`);
+      // reload every 5 minutes to avoid session timeout/missed appointments on homepage and calendar
+      let countdown = 300; // 300 seconds is equal to 5 minutes
+      const intervalId = createInterval(() => {
+        countdown--;
+        if (countdown % 60 === 0) {
+          debugLog(`tampermonkey will reload page in ${countdown / 60} minutes`);
+        } else {
+          debugLog(`tampermonkey will reload page in ${countdown} seconds`);
+        }
+        if (countdown <= 0) {
+          debugLog(`tampermonkey automatically reloading page`);
+          window.location.reload();
+          clearInterval(intervalId);
+        }
+      }, 1000);
     }
 
     if (urlValidation.carePlan.test(location.href)) {
