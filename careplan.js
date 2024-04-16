@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.75
+// @version      0.76
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -127,16 +127,32 @@ function clearMyTimeout(timeoutId) {
   timeoutIds = timeoutIds.filter((id) => id !== timeoutId);
 }
 
+class WorkerInterval {
+  worker = null;
+  constructor(callback, interval) {
+    const blob = new Blob([`setInterval(() => postMessage(0), ${interval});`]);
+    const workerScript = URL.createObjectURL(blob);
+    this.worker = new Worker(workerScript);
+    this.worker.onmessage = callback;
+  }
+
+  stop() {
+    this.worker.terminate();
+  }
+}
+
 function createInterval(intervalFunction, delay) {
-  let intervalId = window.setInterval(intervalFunction, delay);
-  intervalIds.push(intervalId);
-  return intervalId;
+  let workerInterval = new WorkerInterval(() => {
+    intervalFunction();
+  }, delay);
+  intervalIds.push(workerInterval);
+  return workerInterval;
 }
 
 function clearAllIntervals() {
   debugLog(`tampermonkey clear all intervals`);
   for (let i = 0; i < intervalIds.length; i++) {
-    window.clearInterval(intervalIds[i]);
+    intervalIds[i].stop();
   }
   intervalIds = [];
 }
