@@ -152,7 +152,7 @@ function createInterval(intervalFunction, delay) {
 function clearAllIntervals() {
   debugLog(`tampermonkey clear all intervals`);
   for (let i = 0; i < intervalIds.length; i++) {
-    window.clearInterval(intervalIds[i]);
+    intervalIds[i].stop();
   }
   intervalIds = [];
 }
