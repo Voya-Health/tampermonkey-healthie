@@ -127,10 +127,26 @@ function clearMyTimeout(timeoutId) {
   timeoutIds = timeoutIds.filter((id) => id !== timeoutId);
 }
 
+class WorkerInterval {
+  worker = null;
+  constructor(callback, interval) {
+    const blob = new Blob([`setInterval(() => postMessage(0), ${interval});`]);
+    const workerScript = URL.createObjectURL(blob);
+    this.worker = new Worker(workerScript);
+    this.worker.onmessage = callback;
+  }
+
+  stop() {
+    this.worker.terminate();
+  }
+}
+
 function createInterval(intervalFunction, delay) {
-  let intervalId = window.setInterval(intervalFunction, delay);
-  intervalIds.push(intervalId);
-  return intervalId;
+  let workerInterval = new WorkerInterval(() => {
+    intervalFunction();
+  }, delay);
+  intervalIds.push(workerInterval);
+  return workerInterval;
 }
 
 function clearAllIntervals() {
