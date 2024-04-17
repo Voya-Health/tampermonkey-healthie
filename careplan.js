@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.76
+// @version      0.77
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -33,9 +33,9 @@ const urlValidation = {
   apiKeys: /\/settings\/api_keys$/,
   appointments: /\/appointments|\/organization|\/providers\//,
   appointmentsHome: /^https?:\/\/[^/]+\.com(\/overview|\/)?$/,
-  appointmentsProfile: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview))?\/?$/,
-  membership: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions))?\/?$/,
-  verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions))\/?$/,
+  appointmentsProfile: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|overview))?\/?$/,
+  membership: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions|overview|actions))?\/?$/,
+  verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions|actions))\/?$/,
   carePlan: /\/all_plans$/,
   clientList: /\/clients\/active/,
   conversations: /\/conversations/,
