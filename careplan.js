@@ -1583,30 +1583,6 @@ function observeDOMChanges(mutations, observer) {
 
     //Care plans URL
     //if (location.href.includes("/all_plans")) {
-    if (urlValidation.landingPage.test(location.href) || urlValidation.appointments.test(location.href)) {
-      debugLog(`tampermonkey waiting to reload page`);
-      // reload every 5 minutes to avoid session timeout/missed appointments on homepage and calendar
-      let countdown = 300; // 300 seconds is equal to 5 minutes
-      createInterval(() => {
-        countdown--;
-        if (countdown % 10 === 0) {
-          let minutes = Math.floor(countdown / 60);
-          let seconds = countdown % 60;
-          if (countdown >= 60) {
-            debugLog(`tampermonkey will reload page in ${minutes} minutes and ${seconds} seconds`);
-          } else {
-            debugLog(`tampermonkey will reload page in ${countdown} seconds`);
-          }
-        }
-        if (countdown <= 0) {
-          debugLog(`tampermonkey automatically reloading page`);
-          window.location.reload();
-          clearAllIntervals();
-        }
-      }, 1000);
-    } else {
-      clearAllIntervals();
-    }
 
     if (urlValidation.carePlan.test(location.href)) {
       //Function that will check when care plan tab has loaded
