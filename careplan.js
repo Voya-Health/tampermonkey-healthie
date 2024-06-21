@@ -994,9 +994,6 @@ function waitCarePlan() {
 
       function handleCarePlanTabClick() {
         if (location.href.includes("all_plans")) {
-          if (healthieAPIKey !== "") {
-            //cpTabContents && cpTabContents.empty();
-          }
           waitCarePlan();
         }
       }
