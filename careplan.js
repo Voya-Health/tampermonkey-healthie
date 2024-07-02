@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.82
+// @version      0.83
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -803,7 +803,7 @@ function initCalendar(replaceCalendar) {
       });
       $(".rbc-event.calendar-event").on("click", function (e) {
         e.stopPropagation();
-        const dataForValue = $(this).attr("data-for");
+        const dataForValue = $(this).attr("data-tooltip-id");
         const apptUuid = dataForValue.split("__")[1].split("_")[0];
         //appointment/appointment id
         showOverlay(
@@ -994,6 +994,9 @@ function waitCarePlan() {
 
       function handleCarePlanTabClick() {
         if (location.href.includes("all_plans")) {
+          if (healthieAPIKey !== "") {
+            //cpTabContents && cpTabContents.empty();
+          }
           waitCarePlan();
         }
       }
@@ -1025,11 +1028,15 @@ function removeCareplan() {
     const careplan_sec2 = document.querySelector(
       '[class^="AllCarePlans_carePlansWrapper"]',
     );
+    console.log("TM section is ", careplan_sec);
+    console.log("TM section 2 is ", careplan_sec2);
     let to_remove = careplan_sec;
     if (!careplan_sec) {
       to_remove = careplan_sec2;
+      console.log("TM to remove section 2");
     }
     if (to_remove) {
+      console.log("TM to remove section ", to_remove);
       to_remove.remove();
       parent.append(iframe);
       carePlanLoopLock = carePlanLoopLock + 1;
