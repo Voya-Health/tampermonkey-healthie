@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Healthie Care Plan Integration
+// @name         Healthie Care Plan Integration (Dev)
 // @namespace    http://tampermonkey.net/
 // @version      0.84
 // @description  Injecting care plan components into Healthie
@@ -1512,6 +1512,10 @@ function verifyEmailPhone() {
           window.location.reload();
         }, 1000);
       };
+    } else {
+      createTimeout(() => {
+        verifyEmailPhone();
+      }, 200);
     }
     let clientInfoPaneObj = clientInfoPane[0];
     //load invisible iframe for getPatientInfo to determine verification status of phone/email
