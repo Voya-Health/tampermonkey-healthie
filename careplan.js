@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Healthie Care Plan Integration (Dev)
+// @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
 // @version      0.84
 // @description  Injecting care plan components into Healthie
@@ -968,7 +968,7 @@ function rescheduleAppointment(appointmentID) {
 
 function waitForMishaMessages() {
   window.onmessage = function (event) {
-    debugLog("tampermonkey received misha event", event);
+    debugLog("tampermonkey received misha event", event, "event.data", event.data);
     //check event to see if is care plan message
     if (event.data.tmInput !== undefined && patientNumber !== "") {
       // let's get all user goals and delete them before adding new ones
@@ -1507,7 +1507,7 @@ function verifyEmailPhone() {
     debugLog(`tampermonkey save button`, saveButton);
     if (saveButton) {
       debugLog(`tampermonkey found save button`, saveButton);
-      saveButton[0].onclick = function () {
+      saveButton.onclick = function () {
         createTimeout(() => {
           window.location.reload();
         }, 1000);
