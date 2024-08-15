@@ -1500,14 +1500,12 @@ function addMembershipAndOnboarding() {
 
 function verifyEmailPhone() {
   debugLog(`tampermonkey verifyEmailPhone`);
-  let clientInfoPane = document.getElementsByClassName("client-info-pane");
-  if (clientInfoPane.length > 0) {
+  let clientInfoPane = document.querySelector('[data-testid="personal-information-form"]');
+  if (clientInfoPane) {
     debugLog(`tampermonkey found client info pane`);
-    let saveButton = document.getElementsByClassName(
-      "client-profile-submit-button healthie-button primary-button small-button float-right"
-    );
+    let saveButton = document.querySelector('[data-testid="personal-information-form-submit"]');
     debugLog(`tampermonkey save button`, saveButton);
-    if (saveButton.length > 0) {
+    if (saveButton) {
       debugLog(`tampermonkey found save button`, saveButton);
       saveButton[0].onclick = function () {
         createTimeout(() => {
