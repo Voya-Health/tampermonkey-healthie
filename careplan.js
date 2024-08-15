@@ -1534,7 +1534,7 @@ function verifyEmailPhone() {
 }
 
 function verifyEmailPhoneButtons(isEmail) {
-  let field = isEmail ? document.getElementById("email") : document.getElementById("phone_number");
+  let field = isEmail ? document.querySelector('[data-testid="email-input"]') : document.getElementById("phone_number");
   let button = isEmail
     ? document.getElementById("verify-email-button")
     : document.getElementById("verify-phone-button");
