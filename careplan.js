@@ -211,6 +211,7 @@ function generateIframe(routeURL, options = {}) {
       src: `https://${mishaURL}${routeURL}`,
     });
     iframeElement.append(iframeContent);
+    debugLog(`tampermonkey generated iframe for ${routeURL}`);
     return iframeElement;
   }
 }
@@ -1517,9 +1518,10 @@ function verifyEmailPhone() {
         verifyEmailPhone();
       }, 200);
     }
-    let clientInfoPaneObj = clientInfoPane[0];
+    let clientInfoPaneObj = clientInfoPane;
     //load invisible iframe for getPatientInfo to determine verification status of phone/email
     patientNumber = location.href.split("/")[location.href.split("/").length - 2];
+    debugLog(`tampermonkey patient number`, patientNumber);
     let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
       position: "absolute",
       height: "0px",
