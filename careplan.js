@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.83
+// @version      0.84
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -284,18 +284,19 @@ function waitAppointmentsHome() {
 }
 
 function initBookAppointmentButton() {
-  if (!$) {
-    debugLog(`tampermonkey waiting for jquery to load`);
-    createTimeout(showOverlay, 200);
-    return;
-  } else {
     let bookAppointmentBtn = $(".insurance-authorization-section").find(
-      "button:contains('Book Appointment')",
-    )[0];
+      "button:contains('Book Appointment')",)[0];
     if (bookAppointmentBtn) {
       let patientNumber = location.href.split("/")[4];
-      let clonedBtn = $(bookAppointmentBtn).clone();
-      $(bookAppointmentBtn).replaceWith(clonedBtn);
+      let clonedSec = $(bookAppointmentBtn).parent().clone();
+      let appointmentSec = $(bookAppointmentBtn).parent().parent();
+      $(bookAppointmentBtn).remove();
+      debugLog(`tampermonkey parent element is `, $(appointmentSec).children()[0])
+      clonedSec.insertAfter($(appointmentSec).children()[0]);
+      let newBookAppointmentBtn = $(".insurance-authorization-section").find(
+          "button:contains('Book Appointment')",)[0];
+      let clonedBtn = $(newBookAppointmentBtn).clone();
+      $(newBookAppointmentBtn).replaceWith(clonedBtn);
       clonedBtn.on("click", function (e) {
         e.stopPropagation();
         showOverlay(
@@ -307,7 +308,6 @@ function initBookAppointmentButton() {
       debugLog(`tampermonkey waiting for book appointment button`);
       createTimeout(initBookAppointmentButton, 200);
     }
-  }
 }
 
 function createPatientDialogIframe() {
@@ -356,7 +356,6 @@ function waitAppointmentsProfile() {
     createTimeout(waitAppointmentsProfile, 200);
     return;
   } else {
-    initBookAppointmentButton();
     // check to see if the appointment view contents have loaded
     let appointmentWindow = $(".insurance-authorization-section div").filter(
       function () {
@@ -364,6 +363,7 @@ function waitAppointmentsProfile() {
       },
     )[0];
     if (appointmentWindow) {
+      initBookAppointmentButton();
       debugLog(`tampermonkey found appointment view on user profile`);
       $(appointmentWindow).css({ margin: "0", padding: "3px" });
       // get the parent with class .column.is-6 and change the width to 100%
