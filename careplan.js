@@ -412,6 +412,36 @@ function waitAppointmentsProfile() {
   }
 }
 
+function hideGroupNameOccurrences() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    createTimeout(hideGroupNameOccurrences, 200);
+    return;
+  } else {
+    // selectors to hide group name occurrences for:  section[data-testid="cp-section-basic-information"] .row > .col-12:nth-child(3) , div[data-testid="collapsible-section-body"] .row > .col-6:nth-of-type(1), div#tab-groups, .all-users table.table.users-table.users-list tr > *:nth-child(6)
+    let selectors = [
+      'section[data-testid="cp-section-basic-information"] .row > .col-12:nth-child(3)', // sidebar group name
+      'div[data-testid="collapsible-section-body"] .row > .col-6:nth-of-type(1)', // client info group name
+      "div#tab-groups", // group name in client profile
+      ".all-users table.table.users-table.users-list tr > *:nth-child(6)", // group name table columns
+    ];
+    let isHidden = false;
+    selectors.forEach((selector) => {
+      if ($(selector).length > 0) {
+        $(selector).hide();
+        isHidden = true;
+      }
+    });
+    if (isHidden) {
+      debugLog(`tampermonkey hidden group name occurrences`);
+    } else {
+      debugLog(`tampermonkey waiting for group name occurrences`);
+      createTimeout(hideGroupNameOccurrences, 200);
+    }
+  }
+}
+
 function hideOverlay() {
   const $ = initJQuery();
   if (!$) {
