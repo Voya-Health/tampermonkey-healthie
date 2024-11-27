@@ -1674,6 +1674,7 @@ function observeDOMChanges(mutations, observer) {
       debugLog("tampermonkey calls waitClientList");
       waitClientList();
       waitForAddPatientButton();
+      hideGroupNameOccurrences();
     }
     isAPIconnected();
   } else {
