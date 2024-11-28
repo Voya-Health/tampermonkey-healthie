@@ -417,7 +417,7 @@ function hideGroupNameOccurrences() {
   }
 
   let numFound = 0;
-  let maxAttempts = 50; // 5 seconds total wait time
+  let maxAttempts = 25;
   let attempts = 0;
 
   function checkElements() {
