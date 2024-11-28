@@ -414,6 +414,7 @@ function hideGroupNameOccurrences() {
     let styleElement = document.createElement("style");
     styleElement.appendChild(document.createTextNode(cssRules));
     $("head").append(styleElement);
+    debugLog(`tampermonkey added style element to hide group name occurrences`);
   }
 
   let numFound = 0;
