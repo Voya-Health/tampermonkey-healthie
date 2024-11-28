@@ -387,28 +387,46 @@ function hideGroupNameOccurrences() {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(hideGroupNameOccurrences, 200);
     return;
-  } else {
-    // selectors to hide group name occurrences for:  section[data-testid="cp-section-basic-information"] .row > .col-12:nth-child(3) , div[data-testid="collapsible-section-body"] .row > .col-6:nth-of-type(1), div#tab-groups, .all-users table.table.users-table.users-list tr > *:nth-child(6)
-    let selectors = [
-      'section[data-testid="cp-section-basic-information"] .row > .col-12:nth-child(3)', // sidebar group name
-      'div[data-testid="collapsible-section-body"] .row > .col-6:nth-of-type(1)', // client info group name
-      "div#tab-groups", // group name in client profile
-      ".all-users table.table.users-table.users-list tr > *:nth-child(6)", // group name table columns
-    ];
-    let isHidden = false;
-    selectors.forEach((selector) => {
-      if ($(selector).length > 0) {
-        $(selector).hide();
-        isHidden = true;
+  }
+
+  const selectors = {
+    sidebarGroup: 'section[data-testid="cp-section-basic-information"] .row > .col-12:nth-child(3)',
+    clientInfoGroup: 'div[data-testid="collapsible-section-body"] .row > .col-6:nth-of-type(1)',
+    groupTab: "div#tab-groups",
+    tableColumns: ".all-users table.table.users-table.users-list tr > *:nth-child(6)",
+  };
+
+  let numFound = 0;
+  let maxAttempts = 25; // 5 seconds total wait time
+  let attempts = 0;
+
+  function checkElements() {
+    attempts++;
+    numFound = 0;
+
+    for (const [key, selector] of Object.entries(selectors)) {
+      const elements = $(selector);
+      if (elements.length > 0) {
+        elements.each(function () {
+          this.style.setProperty("display", "none", "important");
+          this.style.setProperty("visibility", "hidden", "important");
+          this.style.setProperty("opacity", "0", "important");
+        });
+        debugLog(`tampermonkey ${key} hidden with inline styles`);
+        numFound++;
+      } else {
+        debugLog(`tampermonkey couldn't find ${key}`);
       }
-    });
-    if (isHidden) {
-      debugLog(`tampermonkey hidden group name occurrences`);
-    } else {
-      debugLog(`tampermonkey waiting for group name occurrences`);
-      createTimeout(hideGroupNameOccurrences, 200);
+    }
+
+    if (numFound < Object.keys(selectors).length && attempts < maxAttempts) {
+      createTimeout(checkElements, 200);
+    } else if (attempts >= maxAttempts) {
+      debugLog(`tampermonkey stopped checking for group elements after ${attempts} attempts`);
     }
   }
+
+  checkElements();
 }
 
 function hideOverlay() {
@@ -1616,6 +1634,7 @@ function observeDOMChanges(mutations, observer) {
     timeoutIds = [];
 
     waitForMishaMessages();
+    hideGroupNameOccurrences();
 
     //Care plans URL
     //if (location.href.includes("/all_plans")) {
@@ -1635,7 +1654,6 @@ function observeDOMChanges(mutations, observer) {
     if (urlValidation.appointmentsProfile.test(location.href)) {
       debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
       waitAppointmentsProfile();
-      hideGroupNameOccurrences();
     }
 
     if (urlValidation.membership.test(location.href)) {
@@ -1674,7 +1692,6 @@ function observeDOMChanges(mutations, observer) {
       debugLog("tampermonkey calls waitClientList");
       waitClientList();
       waitForAddPatientButton();
-      hideGroupNameOccurrences();
     }
     isAPIconnected();
   } else {
