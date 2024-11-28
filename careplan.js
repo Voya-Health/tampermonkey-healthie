@@ -1556,7 +1556,7 @@ function addMembershipAndOnboarding() {
     debugLog(`tampermonkey patient number`, patientNumber);
     // create iframe (generateIframe returns a jQuery object)
     //Add custom height and width to avoid scrollbars because the material ui Select component
-    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, { height: "190px", width: "400px" });
+    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, { height: "190px", width: "100%" });
     const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
     // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
     !iframeExists && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
