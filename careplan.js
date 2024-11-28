@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Healthie Care Plan Integration (DEV)
+// @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
 // @version      0.85
 // @description  Injecting care plan components into Healthie
