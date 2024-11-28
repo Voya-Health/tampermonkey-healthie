@@ -396,8 +396,28 @@ function hideGroupNameOccurrences() {
     tableColumns: ".all-users table.table.users-table.users-list tr > *:nth-child(6)",
   };
 
+  // let's also add a style element to hide the group name occurrences
+  let cssRules = `
+    ${selectors.sidebarGroup},
+    ${selectors.clientInfoGroup},
+    ${selectors.groupTab},
+    ${selectors.tableColumns} {
+      display: none !important;
+    }
+  `;
+  let cssRuleToCheck = `${selectors.sidebarGroup}`;
+  let styleElementExists =
+    $("style").filter(function () {
+      return $(this).text().indexOf(cssRuleToCheck) !== -1;
+    }).length > 0;
+  if (!styleElementExists) {
+    let styleElement = document.createElement("style");
+    styleElement.appendChild(document.createTextNode(cssRules));
+    $("head").append(styleElement);
+  }
+
   let numFound = 0;
-  let maxAttempts = 25; // 5 seconds total wait time
+  let maxAttempts = 50; // 5 seconds total wait time
   let attempts = 0;
 
   function checkElements() {
