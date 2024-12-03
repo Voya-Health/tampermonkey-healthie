@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.84
+// @version      0.85
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -359,7 +359,7 @@ function waitAppointmentsProfile() {
     // check to see if the appointment view contents have loaded
     let appointmentWindow = $(".insurance-authorization-section div").filter(
       function () {
-        return $(this).find(".tabs.apps-tabs").length > 0;
+        return $(this).find('[data-testid="tab-container"]').length > 0;
       },
     )[0];
     if (appointmentWindow) {
