@@ -332,9 +332,11 @@ function waitAppointmentsProfile() {
     return;
   } else {
     // check to see if the appointment view contents have loaded
-    let appointmentWindow = $(".insurance-authorization-section div").filter(function () {
-      return $(this).find(".tabs.apps-tabs").length > 0;
-    })[0];
+    let appointmentWindow = $(".insurance-authorization-section div").filter(
+      function () {
+        return $(this).find('[data-testid="tab-container"]').length > 0;
+      },
+    )[0];
     if (appointmentWindow) {
       initBookAppointmentButton();
       debugLog(`tampermonkey found appointment view on user profile`);
