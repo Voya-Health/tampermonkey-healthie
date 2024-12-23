@@ -211,6 +211,7 @@ function generateIframe(routeURL, options = {}) {
       src: `https://${mishaURL}${routeURL}`,
     });
     iframeElement.append(iframeContent);
+    debugLog(`tampermonkey generated iframe for ${routeURL}`);
     return iframeElement;
   }
 }
@@ -269,25 +270,28 @@ function waitAppointmentsHome() {
 }
 
 function initBookAppointmentButton() {
-  let bookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
-  if (bookAppointmentBtn) {
-    let patientNumber = location.href.split("/")[4];
-    let clonedSec = $(bookAppointmentBtn).parent().clone();
-    let appointmentSec = $(bookAppointmentBtn).parent().parent();
-    $(bookAppointmentBtn).remove();
-    debugLog(`tampermonkey parent element is `, $(appointmentSec).children()[0]);
-    clonedSec.insertAfter($(appointmentSec).children()[0]);
-    let newBookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
-    let clonedBtn = $(newBookAppointmentBtn).clone();
-    $(newBookAppointmentBtn).replaceWith(clonedBtn);
-    clonedBtn.on("click", function (e) {
-      e.stopPropagation();
-      showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
-    });
-  } else {
-    debugLog(`tampermonkey waiting for book appointment button`);
-    createTimeout(initBookAppointmentButton, 200);
-  }
+    let bookAppointmentBtn = $(".insurance-authorization-section").find(
+      "button:contains('Book Appointment')",)[0];
+
+    if (bookAppointmentBtn) {
+      let patientNumber = location.href.split("/")[4];
+      let clonedSec = $(bookAppointmentBtn).parent().clone();
+      let appointmentSec = $(bookAppointmentBtn).parent().parent();
+      $(bookAppointmentBtn).remove();
+      debugLog(`tampermonkey parent element is `, $(appointmentSec).children()[0])
+      clonedSec.insertAfter($(appointmentSec).children()[0]);
+      let newBookAppointmentBtn = $(".insurance-authorization-section").find(
+          "button:contains('Book Appointment')",)[0];
+      let clonedBtn = $(newBookAppointmentBtn).clone();
+      $(newBookAppointmentBtn).replaceWith(clonedBtn);
+      clonedBtn.on("click", function (e) {
+        e.stopPropagation();
+        showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
+      });
+    } else {
+      debugLog(`tampermonkey waiting for book appointment button`);
+      createTimeout(initBookAppointmentButton, 200);
+    }
 }
 
 function createPatientDialogIframe() {
@@ -1039,7 +1043,7 @@ function rescheduleAppointment(appointmentID) {
 
 function waitForMishaMessages() {
   window.onmessage = function (event) {
-    debugLog("tampermonkey received misha event", event);
+    debugLog("tampermonkey received misha event", event, "event.data", event.data);
     //check event to see if is care plan message
     if (event.data.tmInput !== undefined && patientNumber !== "") {
       // let's get all user goals and delete them before adding new ones
@@ -1558,7 +1562,7 @@ function addMembershipAndOnboarding() {
     debugLog(`tampermonkey patient number`, patientNumber);
     // create iframe (generateIframe returns a jQuery object)
     //Add custom height and width to avoid scrollbars because the material ui Select component
-    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, { height: "190px", width: "100%" });
+    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, { height: "190px", width: "400px" });
     const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
     // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
     !iframeExists && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
@@ -1571,22 +1575,24 @@ function addMembershipAndOnboarding() {
 
 function verifyEmailPhone() {
   debugLog(`tampermonkey verifyEmailPhone`);
-  let clientInfoPane = document.getElementsByClassName("client-info-pane");
-  if (clientInfoPane.length > 0) {
+  let clientInfoPane = document.querySelector('[data-testid="personal-information-form"]');
+  if (clientInfoPane) {
     debugLog(`tampermonkey found client info pane`);
-    let saveButton = document.getElementsByClassName(
-      "client-profile-submit-button healthie-button primary-button small-button float-right"
-    );
+    let saveButton = document.querySelector('[data-testid="personal-information-form-submit"]');
     debugLog(`tampermonkey save button`, saveButton);
-    if (saveButton.length > 0) {
+    if (saveButton) {
       debugLog(`tampermonkey found save button`, saveButton);
-      saveButton[0].onclick = function () {
+      saveButton.onclick = function () {
         createTimeout(() => {
           window.location.reload();
         }, 1000);
       };
+    } else {
+      createTimeout(() => {
+        verifyEmailPhone();
+      }, 200);
     }
-    let clientInfoPaneObj = clientInfoPane[0];
+    let clientInfoPaneObj = clientInfoPane;
     //load invisible iframe for getPatientInfo to determine verification status of phone/email
     patientNumber = location.href.split("/")[location.href.split("/").length - 2];
     let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
@@ -1605,7 +1611,7 @@ function verifyEmailPhone() {
 }
 
 function verifyEmailPhoneButtons(isEmail) {
-  let field = isEmail ? document.getElementById("email") : document.getElementById("phone_number");
+  let field = isEmail ? document.querySelector('[data-testid="email-input"]') : document.getElementById("phone_number");
   let button = isEmail
     ? document.getElementById("verify-email-button")
     : document.getElementById("verify-phone-button");
