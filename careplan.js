@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.86
+// @version      0.87
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -385,6 +385,75 @@ function waitAppointmentsProfile() {
       createTimeout(waitAppointmentsProfile, 200);
     }
   }
+}
+
+function hideGroupNameOccurrences() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    createTimeout(hideGroupNameOccurrences, 200);
+    return;
+  }
+
+  const selectors = {
+    sidebarGroup: 'section[data-testid="cp-section-basic-information"] .row > .col-12:nth-child(3)',
+    clientInfoGroup: 'div[data-testid="collapsible-section-body"] .row > .col-6:nth-of-type(1)',
+    groupTab: "div#tab-groups",
+    tableColumns: ".all-users table.table.users-table.users-list tr > *:nth-child(6)",
+  };
+
+  // let's also add a style element to hide the group name occurrences
+  let cssRules = `
+    ${selectors.sidebarGroup},
+    ${selectors.clientInfoGroup},
+    ${selectors.groupTab},
+    ${selectors.tableColumns} {
+      display: none !important;
+    }
+  `;
+  let cssRuleToCheck = `${selectors.sidebarGroup}`;
+  let styleElementExists =
+    $("style").filter(function () {
+      return $(this).text().indexOf(cssRuleToCheck) !== -1;
+    }).length > 0;
+  if (!styleElementExists) {
+    let styleElement = document.createElement("style");
+    styleElement.appendChild(document.createTextNode(cssRules));
+    $("head").append(styleElement);
+    debugLog(`tampermonkey added style element to hide group name occurrences`);
+  }
+
+  let numFound = 0;
+  let maxAttempts = 25;
+  let attempts = 0;
+
+  function checkElements() {
+    attempts++;
+    numFound = 0;
+
+    for (const [key, selector] of Object.entries(selectors)) {
+      const elements = $(selector);
+      if (elements.length > 0) {
+        elements.each(function () {
+          this.style.setProperty("display", "none", "important");
+          this.style.setProperty("visibility", "hidden", "important");
+          this.style.setProperty("opacity", "0", "important");
+        });
+        debugLog(`tampermonkey ${key} hidden with inline styles`);
+        numFound++;
+      } else {
+        debugLog(`tampermonkey couldn't find ${key}`);
+      }
+    }
+
+    if (numFound < Object.keys(selectors).length && attempts < maxAttempts) {
+      createTimeout(checkElements, 200);
+    } else if (attempts >= maxAttempts) {
+      debugLog(`tampermonkey stopped checking for group elements after ${attempts} attempts`);
+    }
+  }
+
+  checkElements();
 }
 
 function hideOverlay() {
@@ -1526,7 +1595,6 @@ function verifyEmailPhone() {
     let clientInfoPaneObj = clientInfoPane;
     //load invisible iframe for getPatientInfo to determine verification status of phone/email
     patientNumber = location.href.split("/")[location.href.split("/").length - 2];
-    debugLog(`tampermonkey patient number`, patientNumber);
     let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
       position: "absolute",
       height: "0px",
@@ -1595,6 +1663,7 @@ function observeDOMChanges(mutations, observer) {
     timeoutIds = [];
 
     waitForMishaMessages();
+    hideGroupNameOccurrences();
 
     //Care plans URL
     //if (location.href.includes("/all_plans")) {
