@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.88
+// @version      0.89
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -396,7 +396,7 @@ function hideGroupNameOccurrences() {
   }
 
   const selectors = {
-    sidebarGroup: 'section[data-testid="cp-section-basic-information"] .row > .col-12:nth-child(3)',
+    sidebarGroup: '#main-section-container > div > div > div > div.col-3.col-sm-12.client-profile-sidebar > div:nth-child(1) > div:nth-child(1) > div > section:nth-child(2) > div.BasicInfo_basicInfo__Ks2nG > div > div:nth-child(2) > div',
     clientInfoGroup: '#main-section-container > div > div > div > div.col-9.col-sm-12 > div.cp-tab-contents > div.ActionsTabClientForms_formsContainer__3qLl5 > div:nth-child(1) > div.CollapsibleSection_healthieCollapsibleSection__2qKEm.CollapsibleSection_clipContent__uYSyD > div.CollapsibleSection_sectionBody__5VeiC > form > div:nth-child(7) > div:nth-child(2)',
     groupTab: "div#tab-groups",
     tableColumns: ".all-users table.table.users-table.users-list tr > *:nth-child(6)",
