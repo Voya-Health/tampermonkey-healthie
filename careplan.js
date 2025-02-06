@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.90
+// @version      0.91
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -41,6 +41,7 @@ const urlValidation = {
   conversations: /\/conversations/,
   goals: /\/users/,
   landingPage: /\/$/,
+  editChartingNote: /private_notes\/edit/
 };
 let copyComplete = -1;
 let delayedRun = 0;
@@ -1010,6 +1011,37 @@ function waitCarePlan() {
   }
 }
 
+function waitEditChartingNote() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    createTimeout(waitEditChartingNote, 200);
+  } else {
+    // Wait for side bar patient profile to load
+    const quickProfileTabContent = $(".quick-profile__tab-content.with-portal");
+    if (quickProfileTabContent.length) {
+      // load invisible iframe for getPatientInfo to determine group name
+      const url = location.href;
+      patientNumber = url.split("/")[url.split("/").indexOf("users") + 1];
+      let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
+          position: "absolute",
+          height: "0px",
+          width: "0px",
+          border: "0px",
+      });
+      // append to document body
+      $(quickProfileTabContent).append(iframe);
+    } else {
+        createTimeout(waitEditChartingNote, 200);
+    }
+  }
+}
+
+function addGroupNameContent(groupName) {
+  const groupNameSpan = document.querySelector('[data-tooltip-id="quick-profile-user-group__tooltip"]');
+  groupNameSpan.textContent = groupName;
+}
+
 function removeCareplan() {
   const $ = initJQuery();
   const parent = $(".cp-tab-contents");
@@ -1208,6 +1240,10 @@ function waitForMishaMessages() {
     if (event.data.newChartNoteId !== undefined) {
       debugLog("tampermonkey navigating to new charting note", event.data.newChartNoteId);
       window.open(`https://${healthieURL}/users/${event.data.newChartNoteId.split("-")[1]}/private_notes/edit/${event.data.newChartNoteId.split("-")[0]}`, "_top");
+    }
+    if (event.data.patientGroupName !== undefined) {
+      debugLog("tampermonkey replace patientGroupName content", event.data.patientGroupName);
+      addGroupNameContent(event.data.patientGroupName);
     }
     if (event.data.isEmailVerified !== undefined) {
       debugLog("tampermonkey is email verified", event.data.isEmailVerified);
@@ -1671,6 +1707,12 @@ function observeDOMChanges(mutations, observer) {
 
     //Care plans URL
     //if (location.href.includes("/all_plans")) {
+
+    if (urlValidation.editChartingNote.test(location.href)) {
+      //Function that will check when care plan tab has loaded
+      debugLog("tampermonkey calls waitEditChartingNote");
+      waitEditChartingNote();
+    }
 
     if (urlValidation.carePlan.test(location.href)) {
       //Function that will check when care plan tab has loaded
