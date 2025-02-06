@@ -1709,7 +1709,7 @@ function observeDOMChanges(mutations, observer) {
     //if (location.href.includes("/all_plans")) {
 
     if (urlValidation.editChartingNote.test(location.href)) {
-      //Function that will check when care plan tab has loaded
+      //Function that will check when edit Charting Note screen has loaded
       debugLog("tampermonkey calls waitEditChartingNote");
       waitEditChartingNote();
     }
