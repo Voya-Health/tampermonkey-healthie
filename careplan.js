@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.93
+// @version      0.92
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -1021,9 +1021,10 @@ function waitEditChartingNote() {
     // Wait for side bar patient profile to load
     const quickProfileTabContent = $(".quick-profile__tab-content.with-portal");
     if (quickProfileTabContent.length) {
+      const groupNameSpan = document.querySelector('[data-tooltip-id="quick-profile-user-group__tooltip"]');
       if (patientGroupName === "") {
           // Add loading text until group name is loaded
-          addGroupNameContent("Loading...");
+          groupNameSpan.textContent = "Loading...";
           // load invisible iframe for getPatientInfo to determine group name
           const url = location.href;
           patientNumber = url.split("/")[url.split("/").indexOf("users") + 1];
@@ -1041,7 +1042,7 @@ function waitEditChartingNote() {
               createTimeout(waitEditChartingNote, 0);
           });
       } else {
-          addGroupNameContent(patientGroupName);
+          groupNameSpan.textContent = patientGroupName;
       }
     } else {
         createTimeout(waitEditChartingNote, 200);
@@ -1722,14 +1723,9 @@ function observeDOMChanges(mutations, observer) {
     //if (location.href.includes("/all_plans")) {
 
     if (urlValidation.editChartingNote.test(location.href)) {
-      //Function that will check when EditChartingNote tab has loaded
+      //Function that will check when care plan tab has loaded
       debugLog("tampermonkey calls waitEditChartingNote");
       waitEditChartingNote();
-    }
-
-    if (!urlValidation.editChartingNote.test(location.href) && patientGroupName !== "") {
-        // Clean up patient group name when navigating off EditChartingNote tab
-        patientGroupName = ""
     }
 
     if (urlValidation.carePlan.test(location.href)) {
