@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.94
+// @version      0.95
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -49,6 +49,7 @@ let replaceCalendar = false;
 let isEmailVerified = true;
 let isPhoneNumberVerified = true;
 let isLoadingEmailPhone = true;
+let patientGroupName = "";
 
 function debugLog(...messages) {
   if (isStagingEnv || debug) {
@@ -1020,17 +1021,28 @@ function waitEditChartingNote() {
     // Wait for side bar patient profile to load
     const quickProfileTabContent = $(".quick-profile__tab-content.with-portal");
     if (quickProfileTabContent.length) {
-      // load invisible iframe for getPatientInfo to determine group name
-      const url = location.href;
-      patientNumber = url.split("/")[url.split("/").indexOf("users") + 1];
-      let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
-          position: "absolute",
-          height: "0px",
-          width: "0px",
-          border: "0px",
-      });
-      // append to document body
-      $(quickProfileTabContent).append(iframe);
+      if (patientGroupName === "") {
+          // Add loading text until group name is loaded
+          addGroupNameContent("Loading...");
+          // load invisible iframe for getPatientInfo to determine group name
+          const url = location.href;
+          patientNumber = url.split("/")[url.split("/").indexOf("users") + 1];
+          let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
+              position: "absolute",
+              height: "0px",
+              width: "0px",
+              border: "0px",
+          });
+          // append to document body
+          $(quickProfileTabContent).append(iframe);
+          // add onclick even to QuickProfile btn
+          const quickProfileBtn = $(".PrivateNotesHeader_quickProfile__kRq1v");
+          quickProfileBtn.on("click", function(e) {
+              createTimeout(waitEditChartingNote, 0);
+          });
+      } else {
+          addGroupNameContent(patientGroupName);
+      }
     } else {
         createTimeout(waitEditChartingNote, 200);
     }
@@ -1243,6 +1255,7 @@ function waitForMishaMessages() {
     }
     if (event.data.patientGroupName !== undefined) {
       debugLog("tampermonkey replace patientGroupName content", event.data.patientGroupName);
+      patientGroupName = event.data.patientGroupName
       addGroupNameContent(event.data.patientGroupName);
     }
     if (event.data.isEmailVerified !== undefined) {
@@ -1709,9 +1722,14 @@ function observeDOMChanges(mutations, observer) {
     //if (location.href.includes("/all_plans")) {
 
     if (urlValidation.editChartingNote.test(location.href)) {
-      //Function that will check when edit Charting Note screen has loaded
+      //Function that will check when EditChartingNote tab has loaded
       debugLog("tampermonkey calls waitEditChartingNote");
       waitEditChartingNote();
+    }
+
+    if (!urlValidation.editChartingNote.test(location.href) && patientGroupName !== "") {
+        // Clean up patient group name when navigating off EditChartingNote tab
+        patientGroupName = ""
     }
 
     if (urlValidation.carePlan.test(location.href)) {
