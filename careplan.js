@@ -1668,7 +1668,7 @@ function verifyEmailPhoneButtons(isEmail) {
   let button = isEmail
     ? document.getElementById("verify-email-button")
     : document.getElementById("verify-phone-button");
-  if (field?.value != "") {
+  if (field && field.value != "") {
     patientNumber = location.href.split("/")[location.href.split("/").length - 2];
     let verifyOverlayURL = routeURLs.otpVerify + `?id=${patientNumber}`;
     verifyOverlayURL += isEmail
