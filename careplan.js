@@ -1021,6 +1021,16 @@ function waitEditChartingNote() {
     // Wait for side bar patient profile to load
     const quickProfileTabContent = $(".quick-profile__tab-content.with-portal");
     if (quickProfileTabContent.length) {
+      // add onclick event to General tab
+      const generalTabBtn = $(".TabsComponent_tab__2x4Tz");
+      generalTabBtn.on("click", function(e) {
+         createTimeout(waitEditChartingNote, 0);
+      });
+      // add onclick event to QuickProfile btn
+      const quickProfileBtn = $(".PrivateNotesHeader_quickProfile__kRq1v");
+      quickProfileBtn.on("click", function(e) {
+         createTimeout(waitEditChartingNote, 0);
+      });
       if (patientGroupName === "") {
           // Add loading text until group name is loaded
           addGroupNameContent("Loading...");
@@ -1035,11 +1045,6 @@ function waitEditChartingNote() {
           });
           // append to document body
           $(quickProfileTabContent).append(iframe);
-          // add onclick even to QuickProfile btn
-          const quickProfileBtn = $(".PrivateNotesHeader_quickProfile__kRq1v");
-          quickProfileBtn.on("click", function(e) {
-              createTimeout(waitEditChartingNote, 0);
-          });
       } else {
           addGroupNameContent(patientGroupName);
       }
