@@ -1626,7 +1626,7 @@ function addMembershipAndOnboarding() {
     const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
       height: "322px",
       width: "105%",
-      minWidth: "280px",
+      minWidth: "210px",
     });
     const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
     // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
