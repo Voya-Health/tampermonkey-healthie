@@ -1624,7 +1624,7 @@ function addMembershipAndOnboarding() {
     // create iframe (generateIframe returns a jQuery object)
     //Add custom height and width to avoid scrollbars because the material ui Select component
     const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
-      height: "322px",
+      height: "490px",
       width: "105%",
       minWidth: "210px",
     });
