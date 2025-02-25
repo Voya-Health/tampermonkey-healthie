@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.95
+// @version      0.96
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -41,7 +41,7 @@ const urlValidation = {
   conversations: /\/conversations/,
   goals: /\/users/,
   landingPage: /\/$/,
-  editChartingNote: /private_notes\/edit/
+  editChartingNote: /private_notes\/edit/,
 };
 let copyComplete = -1;
 let delayedRun = 0;
@@ -272,28 +272,26 @@ function waitAppointmentsHome() {
 }
 
 function initBookAppointmentButton() {
-    let bookAppointmentBtn = $(".insurance-authorization-section").find(
-      "button:contains('Book Appointment')",)[0];
+  let bookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
 
-    if (bookAppointmentBtn) {
-      let patientNumber = location.href.split("/")[4];
-      let clonedSec = $(bookAppointmentBtn).parent().clone();
-      let appointmentSec = $(bookAppointmentBtn).parent().parent();
-      $(bookAppointmentBtn).remove();
-      debugLog(`tampermonkey parent element is `, $(appointmentSec).children()[0])
-      clonedSec.insertAfter($(appointmentSec).children()[0]);
-      let newBookAppointmentBtn = $(".insurance-authorization-section").find(
-          "button:contains('Book Appointment')",)[0];
-      let clonedBtn = $(newBookAppointmentBtn).clone();
-      $(newBookAppointmentBtn).replaceWith(clonedBtn);
-      clonedBtn.on("click", function (e) {
-        e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
-      });
-    } else {
-      debugLog(`tampermonkey waiting for book appointment button`);
-      createTimeout(initBookAppointmentButton, 200);
-    }
+  if (bookAppointmentBtn) {
+    let patientNumber = location.href.split("/")[4];
+    let clonedSec = $(bookAppointmentBtn).parent().clone();
+    let appointmentSec = $(bookAppointmentBtn).parent().parent();
+    $(bookAppointmentBtn).remove();
+    debugLog(`tampermonkey parent element is `, $(appointmentSec).children()[0]);
+    clonedSec.insertAfter($(appointmentSec).children()[0]);
+    let newBookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
+    let clonedBtn = $(newBookAppointmentBtn).clone();
+    $(newBookAppointmentBtn).replaceWith(clonedBtn);
+    clonedBtn.on("click", function (e) {
+      e.stopPropagation();
+      showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
+    });
+  } else {
+    debugLog(`tampermonkey waiting for book appointment button`);
+    createTimeout(initBookAppointmentButton, 200);
+  }
 }
 
 function createPatientDialogIframe() {
@@ -338,11 +336,9 @@ function waitAppointmentsProfile() {
     return;
   } else {
     // check to see if the appointment view contents have loaded
-    let appointmentWindow = $(".insurance-authorization-section div").filter(
-      function () {
-        return $(this).find('[data-testid="tab-container"]').length > 0;
-      },
-    )[0];
+    let appointmentWindow = $(".insurance-authorization-section div").filter(function () {
+      return $(this).find('[data-testid="tab-container"]').length > 0;
+    })[0];
     if (appointmentWindow) {
       initBookAppointmentButton();
       debugLog(`tampermonkey found appointment view on user profile`);
@@ -398,8 +394,10 @@ function hideGroupNameOccurrences() {
   }
 
   const selectors = {
-    sidebarGroup: '#main-section-container > div > div > div > div.col-3.col-sm-12.client-profile-sidebar > div:nth-child(1) > div:nth-child(1) > div > section:nth-child(2) > div.BasicInfo_basicInfo__Ks2nG > div > div:nth-child(2) > div',
-    clientInfoGroup: '#main-section-container > div > div > div > div.col-9.col-sm-12 > div.cp-tab-contents > div.ActionsTabClientForms_formsContainer__3qLl5 > div:nth-child(1) > div.CollapsibleSection_healthieCollapsibleSection__2qKEm.CollapsibleSection_clipContent__uYSyD > div.CollapsibleSection_sectionBody__5VeiC > form > div:nth-child(7) > div:nth-child(2)',
+    sidebarGroup:
+      "#main-section-container > div > div > div > div.col-3.col-sm-12.client-profile-sidebar > div:nth-child(1) > div:nth-child(1) > div > section:nth-child(2) > div.BasicInfo_basicInfo__Ks2nG > div > div:nth-child(2) > div",
+    clientInfoGroup:
+      "#main-section-container > div > div > div > div.col-9.col-sm-12 > div.cp-tab-contents > div.ActionsTabClientForms_formsContainer__3qLl5 > div:nth-child(1) > div.CollapsibleSection_healthieCollapsibleSection__2qKEm.CollapsibleSection_clipContent__uYSyD > div.CollapsibleSection_sectionBody__5VeiC > form > div:nth-child(7) > div:nth-child(2)",
     groupTab: "div#tab-groups",
     tableColumns: ".all-users table.table.users-table.users-list tr > *:nth-child(6)",
   };
@@ -1023,33 +1021,33 @@ function waitEditChartingNote() {
     if (quickProfileTabContent.length) {
       // add onclick event to General tab
       const generalTabBtn = $(".TabsComponent_tab__2x4Tz");
-      generalTabBtn.on("click", function(e) {
-         createTimeout(waitEditChartingNote, 0);
+      generalTabBtn.on("click", function (e) {
+        createTimeout(waitEditChartingNote, 0);
       });
       // add onclick event to QuickProfile btn
       const quickProfileBtn = $(".PrivateNotesHeader_quickProfile__kRq1v");
-      quickProfileBtn.on("click", function(e) {
-         createTimeout(waitEditChartingNote, 0);
+      quickProfileBtn.on("click", function (e) {
+        createTimeout(waitEditChartingNote, 0);
       });
       if (patientGroupName === "") {
-          // Add loading text until group name is loaded
-          addGroupNameContent("Loading...");
-          // load invisible iframe for getPatientInfo to determine group name
-          const url = location.href;
-          patientNumber = url.split("/")[url.split("/").indexOf("users") + 1];
-          let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
-              position: "absolute",
-              height: "0px",
-              width: "0px",
-              border: "0px",
-          });
-          // append to document body
-          $(quickProfileTabContent).append(iframe);
+        // Add loading text until group name is loaded
+        addGroupNameContent("Loading...");
+        // load invisible iframe for getPatientInfo to determine group name
+        const url = location.href;
+        patientNumber = url.split("/")[url.split("/").indexOf("users") + 1];
+        let iframe = generateIframe(`getPatientInfo?id=${patientNumber}`, {
+          position: "absolute",
+          height: "0px",
+          width: "0px",
+          border: "0px",
+        });
+        // append to document body
+        $(quickProfileTabContent).append(iframe);
       } else {
-          addGroupNameContent(patientGroupName);
+        addGroupNameContent(patientGroupName);
       }
     } else {
-        createTimeout(waitEditChartingNote, 200);
+      createTimeout(waitEditChartingNote, 200);
     }
   }
 }
@@ -1256,11 +1254,16 @@ function waitForMishaMessages() {
     }
     if (event.data.newChartNoteId !== undefined) {
       debugLog("tampermonkey navigating to new charting note", event.data.newChartNoteId);
-      window.open(`https://${healthieURL}/users/${event.data.newChartNoteId.split("-")[1]}/private_notes/edit/${event.data.newChartNoteId.split("-")[0]}`, "_top");
+      window.open(
+        `https://${healthieURL}/users/${event.data.newChartNoteId.split("-")[1]}/private_notes/edit/${
+          event.data.newChartNoteId.split("-")[0]
+        }`,
+        "_top"
+      );
     }
     if (event.data.patientGroupName !== undefined) {
       debugLog("tampermonkey replace patientGroupName content", event.data.patientGroupName);
-      patientGroupName = event.data.patientGroupName
+      patientGroupName = event.data.patientGroupName;
       addGroupNameContent(event.data.patientGroupName);
     }
     if (event.data.isEmailVerified !== undefined) {
@@ -1620,7 +1623,11 @@ function addMembershipAndOnboarding() {
     debugLog(`tampermonkey patient number`, patientNumber);
     // create iframe (generateIframe returns a jQuery object)
     //Add custom height and width to avoid scrollbars because the material ui Select component
-    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, { height: "190px", width: "400px" });
+    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
+      height: "520px",
+      width: "105%",
+      minWidth: "210px",
+    });
     const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
     // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
     !iframeExists && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
@@ -1733,8 +1740,8 @@ function observeDOMChanges(mutations, observer) {
     }
 
     if (!urlValidation.editChartingNote.test(location.href) && patientGroupName !== "") {
-        // Clean up patient group name when navigating off EditChartingNote tab
-        patientGroupName = ""
+      // Clean up patient group name when navigating off EditChartingNote tab
+      patientGroupName = "";
     }
 
     if (urlValidation.carePlan.test(location.href)) {
