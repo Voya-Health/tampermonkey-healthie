@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.97
+// @version      0.98
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -1362,12 +1362,18 @@ function waitForMishaMessages() {
         "tampermonkey navigating to new charting note",
         event.data.newChartNoteId
       );
-      window.open(
-        `https://${healthieURL}/users/${
-          event.data.newChartNoteId.split("-")[1]
-        }/private_notes/edit/${event.data.newChartNoteId.split("-")[0]}`,
-        "_top"
-      );
+      const [newChartNoteId, userId, apptId, isGroupAppt] = event.data.newChartNoteId.split("-")
+      if (isGroupAppt) {
+        window.open(
+          `https://${healthieURL}/group_charting/${apptId}/${newChartNoteId}`,
+          "_top"
+        );
+      } else {
+        window.open(
+          `https://${healthieURL}/users/${userId}/private_notes/edit/${newChartNoteId}`,
+          "_top"
+        );
+      }
     }
     if (event.data.patientGroupName !== undefined) {
       debugLog(
