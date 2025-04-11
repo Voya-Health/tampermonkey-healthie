@@ -705,8 +705,6 @@ function initCalendar(replaceCalendar) {
       `Tampermonkey initializing calendar. maxWait: [${maxWaitForInit}, ${maxWaitForCalendarLoad}], delayedRun: ${delayedRun}, replaceCalendar: ${replaceCalendar}`
     );
 
-    console.log("INIT CALENDAR")
-
     maxWaitForInit--;
     maxWaitForCalendarLoad--;
     if (maxWaitForInit < 0 || maxWaitForCalendarLoad < 0) {
@@ -726,15 +724,12 @@ function initCalendar(replaceCalendar) {
         initCalendar(replaceCalendar);
       }, 200);
     } else {
-      console.log("CALENDAR HEADERS are located")
       debugLog(`Tampermonkey: check what Calendar Tab is active (Calendar VS Availability)`);
       let activeTab = $(".calendar-tabs .tab-item.active");
       let calendarTab =
           activeTab && activeTab.text().toLowerCase().includes("calendar");
       let availabilitiesTab =
           activeTab && activeTab.text().toLowerCase().includes("availability");
-
-      console.log("CALENDAR HEADERS are located")
 
       // Check if we're on availabilities tab, or if calendar is loaded and cloned
       if (availabilitiesTab ||
@@ -743,13 +738,10 @@ function initCalendar(replaceCalendar) {
         copyComplete > 500 ||
         copyComplete < 0
       ) {
-        console.log("Availability tab OR replaceCalendar is false")
-        console.log("replaceCalendar", replaceCalendar)
         return;
       }
 
       if (replaceCalendar) {
-        console.log("remove all instances of existing cloned calendar")
         debugLog(`Tampermonkey force re-init calendar`);
         $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
       }
@@ -824,7 +816,6 @@ function initCalendar(replaceCalendar) {
       }
 
       if (calendarTab) {
-        console.log("calendarTab is Active")
         initSidebarCalendar();
         if (!dayWeekMonthDropdown.length) {
           debugLog(`Tampermonkey: dayWeekMonthDropdown is not found`);
@@ -838,7 +829,6 @@ function initCalendar(replaceCalendar) {
             dropDownCalendarText.toLowerCase().includes("week")) &&
           copyComplete > 0
         ) {
-          console.log("calendarTab calendar is on day or week view")
           debugLog(`Tampermonkey calendar is on day or week view`);
           calendar = $(".rbc-time-content");
           let ogCalendar = calendar && calendar.first().addClass("og-calendar");
@@ -866,7 +856,6 @@ function initCalendar(replaceCalendar) {
           dropDownCalendarText.toLowerCase().includes("month") &&
           copyComplete > 0
         ) {
-          console.log("calendarTab calendar is Month view")
           debugLog(`Tampermonkey calendar is on month view`);
           calendar = $(".rbc-month-view");
           let ogCalendar = calendar && calendar.first().addClass("og-calendar");
@@ -901,7 +890,6 @@ function initCalendar(replaceCalendar) {
       }
 
       if (calendar) {
-        console.log("IF calendar")
         maxWaitForEvents = 500;
         // Event listeners
         $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
@@ -956,7 +944,6 @@ function initAddButton() {
       debugLog(`tampermonkey waiting for Main Calendar Container`);
       createTimeout(waitAddAppointmentsBtn, 200);
     } else {      
-      console.log("initAddButton: Locate Main container")
       let activeTab = $(".calendar-tabs .tab-item.active");
       let availabilitiesTab =
         activeTab && activeTab.text().toLowerCase().includes("availability");
@@ -965,7 +952,6 @@ function initAddButton() {
         debugLog(
           `Tampermonkey calendar is on availability tab - nothing to do here`
         );
-        console.log("initAddButton: calendar is on availability tab - nothing to do here")
         return;
       }
   
@@ -975,7 +961,6 @@ function initAddButton() {
       const addAppointmentBtn = addAppointmentBtnElements[0];
 
       if (addAppointmentBtn) {
-        console.log("initAddButton: Add overlay to +Add button")
         debugLog(`tampermonkey show overlay on +Add appointment btn`);
         let clonedBtn = $(addAppointmentBtn).clone();
         $(addAppointmentBtn).replaceWith(clonedBtn);
@@ -986,7 +971,6 @@ function initAddButton() {
         });
       } else {
         debugLog(`tampermonkey waiting for add appointment button`);
-        console.log("TEST-1")
         createTimeout(waitAddAppointmentsBtn, 200);
       } 
     }
@@ -1009,7 +993,6 @@ function initCalendarHeaderBtns() {
       debugLog(
         `Tampermonkey calendar is on availability tab - nothing to do here`
       );
-      console.log("initCalendarHeaderBtns:  calendar is on availability tab - nothing to do here")
       return;
     }
 
@@ -1024,23 +1007,19 @@ function initCalendarHeaderBtns() {
       const dayWeekMonthDropdown = $('[data-testid="calendar-format-dropdown"]');
       if (dayWeekMonthDropdown.length) {
         debugLog(`tampermonkey calendar dropdown is located`);
-        console.log("initCalendarHeaderBtns:  calendar dropdown is located")
         // Removing cloned calendar on dropdown change
         const dropDownText = dayWeekMonthDropdown[0].innerText
         if (dropDownText === "Day") {
-          console.log("Day")
           debugLog(`tampermonkey - clicked on day. Removing cloned calendar...`);
           setTimeout(() => {
             $(".rbc-month-view").remove();
           }, 1000);
         } else if (dropDownText === "Week") {
-          console.log("WEEK")
           debugLog(`tampermonkey - clicked on week. Removing cloned calendar...`);
           setTimeout(() => {
             $(".rbc-month-view").remove();
           }, 1000);
         } else if (dropDownText === "Month") {
-          console.log("MONTH")
           debugLog(`tampermonkey - clicked on month. Removing cloned calendar...`);
           setTimeout(() => {
             $(".rbc-time-content").remove();
@@ -1098,7 +1077,6 @@ function waitAddAppointmentsBtn() {
     createTimeout(waitAddAppointmentsBtn, 200);
     return;
   } else {
-    console.log("waitAddAppointmentsBtn")
     initAddButton();
   }
 }
@@ -2006,7 +1984,6 @@ function observeDOMChanges(mutations, observer) {
     if (urlValidation.appointments.test(location.href)) {
       //"/appointments" ||/organization ||/providers/
       debugLog("tampermonkey calls waitAddAppointmentsBtn and waitCalendar");
-      console.log("observeDOMChanges")
       waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
       waitCalendar(); //Function to handle clicking on empty appointment slots
     }
