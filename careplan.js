@@ -656,7 +656,7 @@ function showBothCalendars(clonedCalendar, ogCalendar) {
 function initSidebarCalendar() {
   let ogSdbrCalendar = $(".react-datepicker__month-container");
   let sidebarTimeout = null;
-  if (!ogSdbrCalendar) {
+  if (!ogSdbrCalendar.length) {
     debugLog(`Tampermonkey waiting for sidebar calendar`);
     sidebarTimeout = createTimeout(initSidebarCalendar, 200);
     return;
@@ -705,6 +705,8 @@ function initCalendar(replaceCalendar) {
       `Tampermonkey initializing calendar. maxWait: [${maxWaitForInit}, ${maxWaitForCalendarLoad}], delayedRun: ${delayedRun}, replaceCalendar: ${replaceCalendar}`
     );
 
+    console.log("INIT CALENDAR")
+
     maxWaitForInit--;
     maxWaitForCalendarLoad--;
     if (maxWaitForInit < 0 || maxWaitForCalendarLoad < 0) {
@@ -714,155 +716,142 @@ function initCalendar(replaceCalendar) {
 
     maxWaitForInit = 500;
     let calendar = null;
-    let calendarHeaderBtns = $(".rbc-btn-group");
-    let activeBtn = calendarHeaderBtns.find(".rbc-active");
-    let activeTab = $(".calendar-tabs").find(".tab-item.active");
-    let calendarTab =
-      activeTab && activeTab.text().toLowerCase().includes("calendar");
-    let availabilitiesTab =
-      activeTab && activeTab.text().toLowerCase().includes("availability");
+    let calendarHeaderBtns = $(".calendar-tabs");
+    let dayWeekMonthDropdown = $('[data-testid="calendar-format-dropdown"]');
 
-    debugLog(`Tampermonkey copyComplete`, copyComplete);
-    // Check if we're on availabilities tab, or if  calendar is loaded and cloned
-    if (
-      availabilitiesTab ||
-      (!replaceCalendar &&
-        $(".main-calendar-column").find(".cloned-calendar").length > 0) ||
-      copyComplete > 500 ||
-      copyComplete < 0
-    ) {
-      return;
-    }
-
-    if (replaceCalendar) {
-      debugLog(`Tampermonkey force re-init calendar`);
-      $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
-    }
-
-    // First overlay a transparent div on top of the calendar until cloning is done
-    const overlay = $("<div>").addClass("overlay-vori").css({
-      position: "absolute",
-      display: "block",
-      inset: "0px",
-      zIndex: "9999999",
-      background: "ffffff00",
-      backdropFilter: "blur(5px)",
-      pointerEvents: "none",
-      userSelect: "none",
-    });
-
-    // First init add button to make sure event gets overwritten
-    initAddButton();
-    initCalendarHeaderBtns();
-
-    // check if calendar is loading
-    const calendarLoading = $(
-      ".day-view.is-loading, .week-view.is-loading, .month-view.is-loading"
-    );
-    if (calendarLoading.length > 0) {
-      debugLog(`Tampermonkey waiting for calendar to load`);
-      if (!$(".main-calendar-column").find(".overlay-vori").length > 0) {
-        $(".main-calendar-column")
-          .css({ position: "relative" })
-          .append(overlay);
-        debugLog(`Tampermonkey added overlay to calendar`);
-      }
-      initCalTimeout = createTimeout(function () {
+    // Locate Calendar Tabs
+    if (!calendarHeaderBtns.length) {
+      debugLog(`Tampermonkey: Calendar Header is not found`);
+      createTimeout(function () {
         initCalendar(replaceCalendar);
-      }, 1000);
-      return;
+      }, 200);
     } else {
-      maxWaitForCalendarLoad = 1500;
-      $(".overlay-vori").remove();
-    }
+      console.log("CALENDAR HEADERS are located")
+      debugLog(`Tampermonkey: check what Calendar Tab is active (Calendar VS Availability)`);
+      let activeTab = $(".calendar-tabs .tab-item.active");
+      let calendarTab =
+          activeTab && activeTab.text().toLowerCase().includes("calendar");
+      let availabilitiesTab =
+          activeTab && activeTab.text().toLowerCase().includes("availability");
 
-    // wait 1 second then proceed to clone calendar
-    delayedRun++;
-    createTimeout(function () {
-      initCalendar(replaceCalendar);
-      copyComplete++;
-    }, 1000);
+      console.log("CALENDAR HEADERS are located")
 
-    let cssRules = `
-          .rbc-calendar {
-            position: relative;
-          }
-          .cloned-calendar {
-            position: absolute;
-            top: 64px;
-            width: 100.8%;
-            background: #fff;
-          }
-          .cloned-calendar.rbc-month-view {
-            top: 60px;
-          }
-        `;
-    let cssRuleToCheck = ".cloned-calendar";
-    let styleElementExists =
-      $("style").filter(function () {
-        return $(this).text().indexOf(cssRuleToCheck) !== -1;
-      }).length > 0;
-    if (!styleElementExists) {
-      let styleElement = document.createElement("style");
-      styleElement.appendChild(document.createTextNode(cssRules));
-      $("head").append(styleElement);
-    }
-
-    if (calendarTab) {
-      initSidebarCalendar();
-      if (
-        activeBtn &&
-        (activeBtn.text().toLowerCase().includes("day") ||
-          activeBtn.text().toLowerCase().includes("week")) &&
-        copyComplete > 0
+      // Check if we're on availabilities tab, or if calendar is loaded and cloned
+      if (availabilitiesTab ||
+        (!replaceCalendar &&
+          $(".main-calendar-column").find(".cloned-calendar").length > 0) ||
+        copyComplete > 500 ||
+        copyComplete < 0
       ) {
-        debugLog(`Tampermonkey calendar is on day or week view`);
-        calendar = $(".rbc-time-content");
-        let ogCalendar = calendar && calendar.first().addClass("og-calendar");
-        let clonedCalendar = ogCalendar.clone(true);
-        clonedCalendar
-          .addClass("cloned-calendar")
-          .removeClass("og-calendar")
-          .removeAttr("style");
+        console.log("Availability tab OR replaceCalendar is false")
+        console.log("replaceCalendar", replaceCalendar)
+        return;
+      }
 
-        // debug mode - set to True for quick debugging
-        debug && showBothCalendars(clonedCalendar, ogCalendar);
+      if (replaceCalendar) {
+        console.log("remove all instances of existing cloned calendar")
+        debugLog(`Tampermonkey force re-init calendar`);
+        $(".cloned-calendar").remove(); // remove all instances of existing cloned calendar
+      }
+  
+      // First overlay a transparent div on top of the calendar until cloning is done
+      const overlay = $("<div>").addClass("overlay-vori").css({
+        position: "absolute",
+        display: "block",
+        inset: "0px",
+        zIndex: "9999999",
+        background: "ffffff00",
+        backdropFilter: "blur(5px)",
+        pointerEvents: "none",
+        userSelect: "none",
+      });
 
-        // instead of replacing the original calendar, we'll hide it, and append the cloned calendar
-        !debug &&
-          ogCalendar.css({
-            display: "none",
-            position: "absolute",
-            transform: "translateX(68%)",
-          });
-        ogCalendar.parent().append(clonedCalendar);
-        debugLog(
-          `Tampermonkey hid original calendar and appended cloned calendar - day/week view`
-        );
-      } else if (
-        activeBtn &&
-        activeBtn.text().toLowerCase().includes("month") &&
-        copyComplete > 0
-      ) {
-        debugLog(`Tampermonkey calendar is on month view`);
-        calendar = $(".rbc-month-view");
-        let ogCalendar = calendar && calendar.first().addClass("og-calendar");
+      // First init add button to make sure event gets overwritten
+      initAddButton();
+      initCalendarHeaderBtns();
 
-        if (ogCalendar.length > 0) {
+      // check if calendar is loading
+      const calendarLoading = $(
+        ".day-view.is-loading, .week-view.is-loading, .month-view.is-loading"
+      );
+      if (calendarLoading.length > 0) {
+        debugLog(`Tampermonkey waiting for calendar to load`);
+        if (!$(".main-calendar-column").find(".overlay-vori").length > 0) {
+          $(".main-calendar-column")
+            .css({ position: "relative" })
+            .append(overlay);
+          debugLog(`Tampermonkey added overlay to calendar`);
+        }
+        initCalTimeout = createTimeout(function () {
+          initCalendar(replaceCalendar);
+        }, 1000);
+        return;
+      } else {
+        maxWaitForCalendarLoad = 1500;
+        $(".overlay-vori").remove();
+      }
+
+      // wait 1 second then proceed to clone calendar
+      delayedRun++;
+      createTimeout(function () {
+        initCalendar(replaceCalendar);
+        copyComplete++;
+      }, 1000);
+
+      let cssRules = `
+            .rbc-calendar {
+              position: relative;
+            }
+            .cloned-calendar {
+              position: absolute;
+              top: 64px;
+              width: 100.8%;
+              background: #fff;
+            }
+            .cloned-calendar.rbc-month-view {
+              top: 60px;
+            }
+          `;
+      let cssRuleToCheck = ".cloned-calendar";
+      let styleElementExists =
+        $("style").filter(function () {
+          return $(this).text().indexOf(cssRuleToCheck) !== -1;
+        }).length > 0;
+      if (!styleElementExists) {
+        let styleElement = document.createElement("style");
+        styleElement.appendChild(document.createTextNode(cssRules));
+        $("head").append(styleElement);
+      }
+
+      if (calendarTab) {
+        console.log("calendarTab is Active")
+        initSidebarCalendar();
+        if (!dayWeekMonthDropdown.length) {
+          debugLog(`Tampermonkey: dayWeekMonthDropdown is not found`);
+          createTimeout(function () {
+            initCalendar(replaceCalendar);
+          }, 200);
+        }
+        const dropDownCalendarText = dayWeekMonthDropdown[0].innerText
+        if (
+          (dropDownCalendarText.toLowerCase().includes("day") ||
+            dropDownCalendarText.toLowerCase().includes("week")) &&
+          copyComplete > 0
+        ) {
+          console.log("calendarTab calendar is on day or week view")
+          debugLog(`Tampermonkey calendar is on day or week view`);
+          calendar = $(".rbc-time-content");
+          let ogCalendar = calendar && calendar.first().addClass("og-calendar");
           let clonedCalendar = ogCalendar.clone(true);
-          let monthView = clonedCalendar[0].childNodes;
-          let children = Array.from(monthView);
-          children.forEach((child) => {
-            let clone = $(child).clone();
-            $(clone).addClass("cloned");
-            $(child).replaceWith(clone);
-          });
-
           clonedCalendar
             .addClass("cloned-calendar")
             .removeClass("og-calendar")
             .removeAttr("style");
+  
+          // debug mode - set to True for quick debugging
           debug && showBothCalendars(clonedCalendar, ogCalendar);
+  
+          // instead of replacing the original calendar, we'll hide it, and append the cloned calendar
           !debug &&
             ogCalendar.css({
               display: "none",
@@ -873,45 +862,81 @@ function initCalendar(replaceCalendar) {
           debugLog(
             `Tampermonkey hid original calendar and appended cloned calendar - day/week view`
           );
+        } else if (
+          dropDownCalendarText.toLowerCase().includes("month") &&
+          copyComplete > 0
+        ) {
+          console.log("calendarTab calendar is Month view")
+          debugLog(`Tampermonkey calendar is on month view`);
+          calendar = $(".rbc-month-view");
+          let ogCalendar = calendar && calendar.first().addClass("og-calendar");
+  
+          if (ogCalendar.length > 0) {
+            let clonedCalendar = ogCalendar.clone(true);
+            let monthView = clonedCalendar[0].childNodes;
+            let children = Array.from(monthView);
+            children.forEach((child) => {
+              let clone = $(child).clone();
+              $(clone).addClass("cloned");
+              $(child).replaceWith(clone);
+            });
+  
+            clonedCalendar
+              .addClass("cloned-calendar")
+              .removeClass("og-calendar")
+              .removeAttr("style");
+            debug && showBothCalendars(clonedCalendar, ogCalendar);
+            !debug &&
+              ogCalendar.css({
+                display: "none",
+                position: "absolute",
+                transform: "translateX(68%)",
+              });
+            ogCalendar.parent().append(clonedCalendar);
+            debugLog(
+              `Tampermonkey hid original calendar and appended cloned calendar - day/week view`
+            );
+          }
         }
       }
-    }
 
-    if (calendar) {
-      maxWaitForEvents = 500;
-      // Event listeners
-      $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
-        e.stopPropagation();
-        showOverlay(`${routeURLs.schedule}`, styles.scheduleOverlay);
-      });
-      $(".rbc-event.calendar-event").on("click", function (e) {
-        e.stopPropagation();
-        const dataForValue = $(this).attr("data-tooltip-id");
-        const apptUuid = dataForValue.split("__")[1].split("_")[0];
-        //appointment/appointment id
-        showOverlay(
-          `${routeURLs.appointment}/${apptUuid}`,
-          styles.appointmentDetailsOverlay
+      if (calendar) {
+        console.log("IF calendar")
+        maxWaitForEvents = 500;
+        // Event listeners
+        $(".rbc-time-slot, .rbc-day-bg").on("click", function (e) {
+          e.stopPropagation();
+          showOverlay(`${routeURLs.schedule}`, styles.scheduleOverlay);
+        });
+        $(".rbc-event.calendar-event").on("click", function (e) {
+          e.stopPropagation();
+          const dataForValue = $(this).attr("data-tooltip-id");
+          const apptUuid = dataForValue.split("__")[1].split("_")[0];
+          //appointment/appointment id
+          showOverlay(
+            `${routeURLs.appointment}/${apptUuid}`,
+            styles.appointmentDetailsOverlay
+          );
+        });
+        $(".cloned-calendar") && debugLog(`Tampermonkey calendar cloned`);
+        copyComplete = -1;
+        debugLog(
+          `reset copy complete in initCalendar after cloning`,
+          copyComplete
         );
-      });
-      $(".cloned-calendar") && debugLog(`Tampermonkey calendar cloned`);
-      copyComplete = -1;
-      debugLog(
-        `reset copy complete in initCalendar after cloning`,
-        copyComplete
-      );
-      let clonedCalendar = $(".cloned-calendar");
-      clonedCalendar && clearMyTimeout(initCalTimeout);
-      $(".overlay-vori").remove();
-    } else {
-      maxWaitForEvents--;
-      if (maxWaitForEvents === 0) {
-        window.location.reload();
+        let clonedCalendar = $(".cloned-calendar");
+        clonedCalendar && clearMyTimeout(initCalTimeout);
+        $(".overlay-vori").remove();
       } else {
-        debugLog(`Tampermonkey waiting for calendar and events`);
-        createTimeout(function () {
-          initCalendar(replaceCalendar);
-        }, 1000);
+        maxWaitForEvents--;
+        if (maxWaitForEvents === 0) {
+          window.location.reload();
+        } else {
+          debugLog(`Tampermonkey waiting for calendar and events`);
+          createTimeout(function () {
+            initCalendar(replaceCalendar);
+          }, 1000);
+        }
       }
     }
   }
@@ -924,31 +949,46 @@ function initAddButton() {
     createTimeout(showOverlay, 200);
     return;
   } else {
-    let activeTab = $(".calendar-tabs").find(".tab-item.active");
-    let availabilitiesTab =
-      activeTab && activeTab.text().toLowerCase().includes("availability");
+    // Locate main calendar container
+    const mainCalendarContainer = $(".main-calendar-container"); 
 
-    if (availabilitiesTab) {
-      debugLog(
-        `Tampermonkey calendar is on availability tab - nothing to do here`
-      );
-      return;
-    }
-
-    let addAppointmentBtn = $(".rbc-btn-group.last-btn-group").find(
-      "button:contains('Add')"
-    )[0];
-    if (addAppointmentBtn) {
-      let clonedBtn = $(addAppointmentBtn).clone();
-      $(addAppointmentBtn).replaceWith(clonedBtn);
-      clonedBtn.on("click", function (e) {
-        e.stopPropagation();
-        //https://qa.misha.vori.health/schedule/
-        showOverlay(`${routeURLs.schedule}`, styles.scheduleOverlay);
-      });
-    } else {
-      debugLog(`tampermonkey waiting for add appointment button`);
+    if (!mainCalendarContainer.length) {
+      debugLog(`tampermonkey waiting for Main Calendar Container`);
       createTimeout(waitAddAppointmentsBtn, 200);
+    } else {      
+      console.log("initAddButton: Locate Main container")
+      let activeTab = $(".calendar-tabs .tab-item.active");
+      let availabilitiesTab =
+        activeTab && activeTab.text().toLowerCase().includes("availability");
+  
+      if (availabilitiesTab) {
+        debugLog(
+          `Tampermonkey calendar is on availability tab - nothing to do here`
+        );
+        console.log("initAddButton: calendar is on availability tab - nothing to do here")
+        return;
+      }
+  
+      // Locate appointment button
+      debugLog(`tampermonkey locate +Add appointment btn`);
+      const addAppointmentBtnElements = $('.main-calendar-container [data-testid="primaryButton"]');
+      const addAppointmentBtn = addAppointmentBtnElements[0];
+
+      if (addAppointmentBtn) {
+        console.log("initAddButton: Add overlay to +Add button")
+        debugLog(`tampermonkey show overlay on +Add appointment btn`);
+        let clonedBtn = $(addAppointmentBtn).clone();
+        $(addAppointmentBtn).replaceWith(clonedBtn);
+        clonedBtn.on("click", function (e) {
+          e.stopPropagation();
+          //https://qa.misha.vori.health/schedule/
+          showOverlay(`${routeURLs.schedule}`, styles.scheduleOverlay);
+        });
+      } else {
+        debugLog(`tampermonkey waiting for add appointment button`);
+        console.log("TEST-1")
+        createTimeout(waitAddAppointmentsBtn, 200);
+      } 
     }
   }
 }
@@ -961,7 +1001,7 @@ function initCalendarHeaderBtns() {
     return;
   } else {
     debugLog(`tampermonkey calendar initializing today, prev, next buttons`);
-    let activeTab = $(".calendar-tabs").find(".tab-item.active");
+    let activeTab = $(".calendar-tabs .tab-item.active");
     let availabilitiesTab =
       activeTab && activeTab.text().toLowerCase().includes("availability");
 
@@ -969,63 +1009,76 @@ function initCalendarHeaderBtns() {
       debugLog(
         `Tampermonkey calendar is on availability tab - nothing to do here`
       );
+      console.log("initCalendarHeaderBtns:  calendar is on availability tab - nothing to do here")
       return;
     }
 
-    let dayBtn = $(".rbc-btn-group").find("button:contains('day')")[0];
-    let weekBtn = $(".rbc-btn-group").find("button:contains('week')")[0];
-    let monthBtn = $(".rbc-btn-group").find("button:contains('month')")[0];
+    // Locate main calendar container
+    const mainCalendarContainer = $(".main-calendar-container");
 
-    let todayBtn = $(".rbc-btn-group").find("button:contains('today')")[0];
-    let prevBtn = $(".rbc-btn-group").find("button:contains('<')")[0];
-    let nextBtn = $(".rbc-btn-group").find("button:contains('>')")[0];
-
-    if (dayBtn && weekBtn && monthBtn) {
-      //add event listeners
-      $(dayBtn).on("click", function (e) {
-        debugLog(`tampermonkey - clicked on day. Removing cloned calendar...`);
-        setTimeout(() => {
-          $(".rbc-month-view").remove();
-        }, 1000);
-      });
-      $(weekBtn).on("click", function (e) {
-        debugLog(`tampermonkey - clicked on week. Removing cloned calendar...`);
-        setTimeout(() => {
-          $(".rbc-month-view").remove();
-        }, 1000);
-      });
-      $(monthBtn).on("click", function (e) {
-        debugLog(
-          `tampermonkey - clicked on month. Removing cloned calendar...`
-        );
-        setTimeout(() => {
-          $(".rbc-time-content").remove();
-        }, 1000);
-      });
-    }
-
-    if (todayBtn && prevBtn && nextBtn) {
-      //add event listeners
-      $(todayBtn).on("click", function (e) {
-        debugLog(
-          `tampermonkey - clicked on today. Re-initializing calendar...`
-        );
-        copyComplete = 1;
-        initCalendar(true);
-      });
-      $(prevBtn).on("click", function (e) {
-        debugLog(`tampermonkey - clicked on prev. Re-initializing calendar...`);
-        copyComplete = 1;
-        initCalendar(true);
-      });
-      $(nextBtn).on("click", function (e) {
-        debugLog(`tampermonkey - clicked on next. Re-initializing calendar...`);
-        copyComplete = 1;
-        initCalendar(true);
-      });
+    if (!mainCalendarContainer.length) {
+      debugLog(`tampermonkey waiting for Main Calendar Container`);
+      createTimeout(waitAddAppointmentsBtn, 200);
     } else {
-      debugLog(`tampermonkey waiting for add today, <, > button`);
-      createTimeout(initCalendarHeaderBtns, 200);
+      // Locate Calendar Day-Week-Month Dropdown
+      const dayWeekMonthDropdown = $('[data-testid="calendar-format-dropdown"]');
+      if (dayWeekMonthDropdown.length) {
+        debugLog(`tampermonkey calendar dropdown is located`);
+        console.log("initCalendarHeaderBtns:  calendar dropdown is located")
+        // Removing cloned calendar on dropdown change
+        const dropDownText = dayWeekMonthDropdown[0].innerText
+        if (dropDownText === "Day") {
+          console.log("Day")
+          debugLog(`tampermonkey - clicked on day. Removing cloned calendar...`);
+          setTimeout(() => {
+            $(".rbc-month-view").remove();
+          }, 1000);
+        } else if (dropDownText === "Week") {
+          console.log("WEEK")
+          debugLog(`tampermonkey - clicked on week. Removing cloned calendar...`);
+          setTimeout(() => {
+            $(".rbc-month-view").remove();
+          }, 1000);
+        } else if (dropDownText === "Month") {
+          console.log("MONTH")
+          debugLog(`tampermonkey - clicked on month. Removing cloned calendar...`);
+          setTimeout(() => {
+            $(".rbc-time-content").remove();
+          }, 1000);
+        }    
+      } else {
+        debugLog(`tampermonkey waiting for Day-Week-Month Dropdown`);
+        createTimeout(initCalendarHeaderBtns, 200);
+      }
+
+      // Locate Today, prevBtn, nextBtn  group
+       let todayBtn = $('[data-testid="today"]')[0];
+       let prevBtn = $('[data-testid="goBack"]')[0];
+       let nextBtn = $('[data-testid="goNext"]')[0];
+
+       if (todayBtn && prevBtn && nextBtn) {
+        debugLog(`tampermonkey Today, prevBtn, nextBtn are located`);
+        $(todayBtn).on("click", function (e) {
+          debugLog(
+            `tampermonkey - clicked on today. Re-initializing calendar...`
+          );
+          copyComplete = 1;
+          initCalendar(true);
+        });
+        $(prevBtn).on("click", function (e) {
+          debugLog(`tampermonkey - clicked on prev. Re-initializing calendar...`);
+          copyComplete = 1;
+          initCalendar(true);
+        });
+        $(nextBtn).on("click", function (e) {
+          debugLog(`tampermonkey - clicked on next. Re-initializing calendar...`);
+          copyComplete = 1;
+          initCalendar(true);
+        });
+       } else {
+        debugLog(`tampermonkey waiting for add today, <, > button`);
+        createTimeout(initCalendarHeaderBtns, 200);
+       }
     }
   }
 }
@@ -1045,6 +1098,7 @@ function waitAddAppointmentsBtn() {
     createTimeout(waitAddAppointmentsBtn, 200);
     return;
   } else {
+    console.log("waitAddAppointmentsBtn")
     initAddButton();
   }
 }
@@ -1952,6 +2006,7 @@ function observeDOMChanges(mutations, observer) {
     if (urlValidation.appointments.test(location.href)) {
       //"/appointments" ||/organization ||/providers/
       debugLog("tampermonkey calls waitAddAppointmentsBtn and waitCalendar");
+      console.log("observeDOMChanges")
       waitAddAppointmentsBtn(); //Function to handle clicking the Add appointments button
       waitCalendar(); //Function to handle clicking on empty appointment slots
     }
