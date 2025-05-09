@@ -82,9 +82,9 @@ const styles = {
   patientDialogOverlay: {
     display: "inline-block",
     background: "rgb(255, 255, 255)",
-    maxWidth: "30vw", // fallback for browsers that don't support svw
+    maxWidth: "60vw", // fallback for browsers that don't support svw
     maxWidth: "60svw",
-    width: "30vw",
+    width: "462px",
     height: "80vh", // fallback for browsers that don't support svh
     height: "80svh",
     overflow: "hidden",
