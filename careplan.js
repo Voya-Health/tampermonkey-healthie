@@ -322,6 +322,11 @@ function createPatientDialogIframe() {
 
 function waitForAddPatientButton() {
   const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey jquery not loaded`);
+    createTimeout(waitForAddPatientButton, 200);
+    return;
+  }
   let addPatientBtn = $(".add-client-container button").filter(function () {
     return $(this).text().toLowerCase().includes("add client");
   })[0];
