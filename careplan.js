@@ -295,6 +295,7 @@ function initBookAppointmentButton() {
 }
 
 function createPatientDialogIframe() {
+  const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jQuery to load`);
     setTimeout(createPatientDialogIframe, 200);
@@ -321,7 +322,10 @@ function createPatientDialogIframe() {
 
 function waitForAddPatientButton() {
   const $ = initJQuery();
-  if ($(".add-client-container button:contains('Add Client')").length > 0) {
+  let addPatientBtn = $(".add-client-container button").filter(function () {
+    return $(this).text().toLowerCase().includes("add client");
+  })[0];
+  if (addPatientBtn) {
     debugLog("Add Client Button found");
     createPatientDialogIframe();
   } else {
