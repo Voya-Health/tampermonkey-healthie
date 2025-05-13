@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      0.99
+// @version      1.0
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -1618,8 +1618,9 @@ function waitAppointmentSidebar() {
 
 function waitClientList() {
   const $ = initJQuery();
-  let bookLinks = Array.from(document.querySelectorAll("button")).filter((e) => e.textContent === "Book Session");
-  debugLog(`tampermonkey waiting to update book link`, bookLinks);
+  let bookLinks = Array.from(document.querySelectorAll("button")).filter(
+    (e) => e.textContent.toLowerCase() === "book session"
+  );
   if (bookLinks.length > 0) {
     Array.from(bookLinks).forEach((element) => {
       debugLog("tampermonkey book link found", element);
