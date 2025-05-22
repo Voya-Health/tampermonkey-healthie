@@ -1057,18 +1057,15 @@ function loadPediatricBanner() {
   } else {
     const basicInfo = $('.BasicInfo_basicInfo__Ks2nG');
     if (basicInfo.length > 0) {
-        debugLog(`TEST _>>>> BASIC info loaded`);
         const dob = $('[data-testid="client-dob"]').text();
         if (dob.length > 0) {
-          debugLog(`TEST _>>>> dob loaded`, dob);
           const isPatientPediatric = isPediatric(dob);
-          //const pediatricBanner = $('.pediatric-banner');
-          debugLog(`TEST _>>>> isPatientPediatric`,isPatientPediatric);
-
-          if (isPatientPediatric) {
+          const pediatricBanner = $('.pediatric-banner');
+          
+          if (isPatientPediatric && !pediatricBanner.length) {
             // insert pediatric label
             const searchBarHeader = $('#main-layout__header');
-            $('<div>PEDIATRIC</div>').css({
+            $('<div class="pediatric-banner">PEDIATRIC</div>').css({
                 backgroundColor: '#EDF4FB',
                 color: '#457AC8',
                 fontWeight: '700',
@@ -1076,8 +1073,6 @@ function loadPediatricBanner() {
                 padding: '12px 24px'
               }).insertAfter(searchBarHeader);
           }
-
-
       } else {
         //wait for content load
         createTimeout(loadPediatricBanner, 200);
