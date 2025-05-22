@@ -1071,12 +1071,12 @@ function loadPediatricBanner() {
                 fontWeight: '700',
                 marginTop: '60px',
                 padding: '12px 24px'
-              }).insertAfter(searchBarHeader);
+            }).insertAfter(searchBarHeader);
           }
-      } else {
-        //wait for content load
-        createTimeout(loadPediatricBanner, 200);
-      }
+        } else {
+          //wait for content load
+          createTimeout(loadPediatricBanner, 200);
+        }
     } else {
       //wait for content load
       createTimeout(loadPediatricBanner, 200);
