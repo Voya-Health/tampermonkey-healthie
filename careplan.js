@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -1061,7 +1061,7 @@ function loadPediatricBanner() {
         if (dob.length > 0) {
           const isPatientPediatric = isPediatric(dob);
           const pediatricBanner = $('.pediatric-banner');
-          
+
           if (isPatientPediatric && !pediatricBanner.length) {
             // insert pediatric label
             const searchBarHeader = $('#main-layout__header');
