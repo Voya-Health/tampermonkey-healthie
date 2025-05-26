@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -1032,6 +1032,62 @@ function waitGoalTab() {
   }
 }
 
+function isPediatric(dobString) {
+  const dob = new Date(dobString);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+
+  // Adjust if birthday hasn't occurred yet this year
+  const hasBirthdayPassed = 
+    today.getMonth() > dob.getMonth() || 
+    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+
+  if (!hasBirthdayPassed) {
+    age--;
+  }
+  return age < 18;
+}
+
+function loadPediatricBanner() {
+  // find patient DOB
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    createTimeout(loadPediatricBanner, 200);
+  } else {
+    const basicInfo = $('.BasicInfo_basicInfo__Ks2nG');
+    if (basicInfo.length > 0) {
+        const dob = $('[data-testid="client-dob"]').text();
+        if (dob.length > 0) {
+          const isPatientPediatric = isPediatric(dob);
+          const pediatricBanner = $('.pediatric-banner');
+
+          if (isPatientPediatric && !pediatricBanner.length) {
+            // insert pediatric label
+            const searchBarHeader = $('#main-layout__header');
+            $('<div class="pediatric-banner">PEDIATRIC</div>').css({
+                backgroundColor: '#EDF4FB',
+                color: '#457AC8',
+                fontWeight: '700',
+                marginTop: '60px',
+                padding: '12px 24px'
+            }).insertAfter(searchBarHeader);
+
+            // adjust spacing of the next element, if Pediatric banner is inserted
+            const mainContent = $('.scrollbars');
+            mainContent.css({ marginTop: '0px' })
+          }
+        } else {
+          //wait for content load
+          createTimeout(loadPediatricBanner, 200);
+        }
+    } else {
+      //wait for content load
+      createTimeout(loadPediatricBanner, 200);
+    }
+  }
+}
+
 function waitCarePlan() {
   const $ = initJQuery();
   if (!$) {
@@ -1807,6 +1863,8 @@ function observeDOMChanges(mutations, observer) {
       //Function that will check when goal tab has loaded
       debugLog("tampermonkey calls waitGoalTab");
       waitGoalTab();
+      debugLog("tampermonkey calls loadPediatricBanner");
+      loadPediatricBanner();
     }
 
     if (urlValidation.appointmentsProfile.test(location.href)) {
