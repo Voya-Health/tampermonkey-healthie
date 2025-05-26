@@ -1072,12 +1072,11 @@ function loadPediatricBanner() {
                 marginTop: '60px',
                 padding: '12px 24px'
             }).insertAfter(searchBarHeader);
-          }
-          const mainContent = $('.scrollbars');
-          mainContent.css({
-            marginTop: '0px'
-          })
 
+            // adjust spacing of the next element, if Pediatric banner is inserted
+            const mainContent = $('.scrollbars');
+            mainContent.css({ marginTop: '0px' })
+          }
         } else {
           //wait for content load
           createTimeout(loadPediatricBanner, 200);
