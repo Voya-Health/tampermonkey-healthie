@@ -1038,7 +1038,7 @@ function isPediatric(dobString) {
   let age = today.getFullYear() - dob.getFullYear();
 
   // Adjust if birthday hasn't occurred yet this year
-  const hasBirthdayPassed = 
+  const hasBirthdayPassed =
     today.getMonth() > dob.getMonth() || 
     (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
 
@@ -1057,13 +1057,13 @@ function loadPediatricBanner() {
   } else {
     const basicInfo = $('.BasicInfo_basicInfo__Ks2nG');
     if (basicInfo.length > 0) {
-        const dob = $('[data-testid="client-dob"]').text();
-        if (dob.length > 0) {
-          const isPatientPediatric = isPediatric(dob);
+      const dob = $('[data-testid="client-dob"]').text();
+      if (dob.length > 0) {
+        const isPatientPediatric = isPediatric(dob);
           const pediatricBanner = $('.pediatric-banner');
 
-          if (isPatientPediatric && !pediatricBanner.length) {
-            // insert pediatric label
+        if (isPatientPediatric && !pediatricBanner.length) {
+          // insert pediatric label
             const searchBarHeader = $('#main-layout__header');
             $('<div class="pediatric-banner">PEDIATRIC</div>').css({
                 backgroundColor: '#EDF4FB',
@@ -1073,14 +1073,14 @@ function loadPediatricBanner() {
                 padding: '12px 24px'
             }).insertAfter(searchBarHeader);
 
-            // adjust spacing of the next element, if Pediatric banner is inserted
+          // adjust spacing of the next element, if Pediatric banner is inserted
             const mainContent = $('.scrollbars');
             mainContent.css({ marginTop: '0px' })
-          }
-        } else {
-          //wait for content load
-          createTimeout(loadPediatricBanner, 200);
         }
+      } else {
+        //wait for content load
+        createTimeout(loadPediatricBanner, 200);
+      }
     } else {
       //wait for content load
       createTimeout(loadPediatricBanner, 200);
@@ -1387,6 +1387,11 @@ function waitForMishaMessages() {
     if (event.data.loading !== undefined) {
       debugLog("tampermonkey loading", event.data.loading);
       isLoadingEmailPhone = event.data.loading ? true : false;
+    }
+    if (event.data.healthieActionsTab !== undefined) {
+      debugLog("tampermonkey navigating to patient actions tab", event.data.healthieActionsTab);
+      const patientId = event.data.healthieActionsTab;
+      window.open(`https://${healthieURL}/users/${patientId}/actions`, "_top");
     }
   };
 }
