@@ -1393,6 +1393,29 @@ function waitForMishaMessages() {
       const patientId = event.data.healthieActionsTab;
       window.open(`https://${healthieURL}/users/${patientId}/actions`, "_top");
     }
+
+    // Handle patient information height updates from misha iframe
+    if (event.data.patientInformationHeight !== undefined) {
+      debugLog("tampermonkey received patientInformationHeight event", event.data.patientInformationHeight);
+
+      // Convert string to number if needed
+      const height =
+        typeof event.data.patientInformationHeight === "string"
+          ? parseInt(event.data.patientInformationHeight, 10)
+          : event.data.patientInformationHeight;
+
+      // Get patient number from current URL
+      const currentPatientNumber = location.href.split("/")[4];
+
+      if (currentPatientNumber && !isNaN(height)) {
+        updatePatientStatusIframeHeight(currentPatientNumber, height);
+      } else {
+        debugLog("tampermonkey could not determine patient number or invalid height", {
+          patientNumber: currentPatientNumber,
+          height: height,
+        });
+      }
+    }
   };
 }
 
