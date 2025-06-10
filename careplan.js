@@ -2096,17 +2096,19 @@ function replaceBasicInformationSection() {
     // Create iframe for patient status
     const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
       height: "520px",
-      width: "95%",
+      width: "100%",
       border: "none",
     });
 
     // Append the iframe to the basic information section
     basicInfoSection.append(iframe);
 
-    // Add margin bottom to the section
-    basicInfoSection.css({
-      marginBottom: "2rem",
-    });
+    // Store reference to the iframe for height updates
+    const iframeElement = iframe.find("#MishaFrame");
+    if (iframeElement.length > 0) {
+      iframeElement.attr("data-patient-id", patientNumber);
+      iframeElement.addClass("dynamic-height-iframe");
+    }
 
     debugLog(`tampermonkey replaced basic information section with patient status iframe`);
   } else {
@@ -2119,3 +2121,42 @@ function replaceBasicInformationSection() {
 const config = { subtree: true, childList: true };
 const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
+
+function updatePatientStatusIframeHeight(patientId, contentHeight) {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load for height update`);
+    createTimeout(() => updatePatientStatusIframeHeight(patientId, contentHeight), 200);
+    return;
+  }
+
+  // Find the iframe for this specific patient
+  const targetIframe = $(`.dynamic-height-iframe[data-patient-id="${patientId}"]`);
+
+  if (targetIframe.length > 0) {
+    // Set minimum height to prevent content from being too small
+    const minHeight = 300;
+    const newHeight = Math.max(contentHeight + 20, minHeight); // Add 20px padding
+
+    debugLog(`tampermonkey updating iframe height from current to ${newHeight}px for patient ${patientId}`);
+
+    // Update iframe height
+    targetIframe.css("height", `${newHeight}px`);
+
+    // Also update the container div height
+    const iframeContainer = targetIframe.closest(".misha-iframe-container");
+    if (iframeContainer.length > 0) {
+      iframeContainer.css("height", `${newHeight}px`);
+    }
+
+    // Update the basic information section if needed
+    const basicInfoSection = targetIframe.closest('section[data-testid="cp-section-basic-information"]');
+    if (basicInfoSection.length > 0) {
+      basicInfoSection.css("min-height", `${newHeight + 40}px`); // Add extra padding for section
+    }
+
+    debugLog(`tampermonkey successfully updated heights for patient ${patientId}`);
+  } else {
+    debugLog(`tampermonkey could not find iframe for patient ${patientId}`);
+  }
+}
