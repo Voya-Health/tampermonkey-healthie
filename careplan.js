@@ -1879,6 +1879,7 @@ function observeDOMChanges(mutations, observer) {
 
     if (urlValidation.membership.test(location.href)) {
       addMembershipAndOnboarding();
+      replaceBasicInformationSection();
     }
 
     if (urlValidation.verifyEmailPhone.test(location.href)) {
@@ -2017,6 +2018,7 @@ function observeDOMChanges(mutations, observer) {
     ) {
       observer.disconnect();
       addMembershipAndOnboarding();
+      replaceBasicInformationSection();
       observer.observe(document.documentElement, {
         childList: true,
         subtree: true,
@@ -2037,6 +2039,56 @@ function hideChartingNotesAppointment() {
 
     $(`section[data-testid="cp-section-appointments"]`).hide();
     console.log(`Tampermonkey hideChartingNotesAppointment removed appointment tab`);
+  }
+}
+
+function replaceBasicInformationSection() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    createTimeout(replaceBasicInformationSection, 200);
+    return;
+  }
+
+  // Find the basic information section with the specified class and data-testid
+  const basicInfoSection = $('section.cp-sidebar-expandable-section[data-testid="cp-section-basic-information"]');
+
+  if (basicInfoSection.length > 0) {
+    debugLog(`tampermonkey found basic information section`);
+
+    // Get the patient number from the URL
+    patientNumber = location.href.split("/")[4];
+    debugLog(`tampermonkey patient number for basic info replacement`, patientNumber);
+
+    // Check if iframe already exists to avoid duplicates
+    const existingIframe = basicInfoSection.find(".misha-iframe-container");
+    if (existingIframe.length > 0) {
+      debugLog(`tampermonkey basic info iframe already exists`);
+      return;
+    }
+
+    // Clear the existing content of the basic information section
+    basicInfoSection.empty();
+
+    // Create iframe for patient status
+    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
+      height: "520px",
+      width: "95%",
+      border: "none",
+    });
+
+    // Append the iframe to the basic information section
+    basicInfoSection.append(iframe);
+
+    // Add margin bottom to the section
+    basicInfoSection.css({
+      marginBottom: "2rem",
+    });
+
+    debugLog(`tampermonkey replaced basic information section with patient status iframe`);
+  } else {
+    debugLog(`tampermonkey waiting for basic information section`);
+    createTimeout(replaceBasicInformationSection, 200);
   }
 }
 
