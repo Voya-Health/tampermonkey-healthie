@@ -1074,8 +1074,8 @@ function loadPediatricBanner() {
             }).insertAfter(searchBarHeader);
 
           // adjust spacing of the next element, if Pediatric banner is inserted
-            const mainContent = $('.scrollbars');
-            mainContent.css({ marginTop: '0px' })
+          const mainContent = $(".scrollbars");
+          mainContent.css({ marginTop: "0px" });
         }
       } else {
         //wait for content load
