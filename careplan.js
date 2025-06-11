@@ -2098,7 +2098,6 @@ function replaceBasicInformationSection() {
       height: "520px",
       width: "100%",
       border: "none",
-      transiton: "height 0.3s ease",
     });
 
     // Append the iframe to the basic information section
@@ -2136,24 +2135,31 @@ function updatePatientStatusIframeHeight(patientId, contentHeight) {
 
   if (targetIframe.length > 0) {
     // Set minimum height to prevent content from being too small
-    const minHeight = 300;
-    const newHeight = Math.max(contentHeight + 20, minHeight); // Add 20px padding
-
-    debugLog(`tampermonkey updating iframe height from current to ${newHeight}px for patient ${patientId}`);
+    const minHeight = 280;
+    const newHeight = Math.max(contentHeight, minHeight); 
 
     // Update iframe height
-    targetIframe.css("height", `${newHeight}px`);
+    targetIframe.css({
+      height: `${newHeight}px`,
+      transition: "height 0.2s ease-in-out",
+    });
 
     // Also update the container div height
     const iframeContainer = targetIframe.closest(".misha-iframe-container");
     if (iframeContainer.length > 0) {
-      iframeContainer.css("height", `${newHeight}px`);
+      iframeContainer.css({
+        height: `${newHeight}px`,
+        transition: "height 0.2s ease-in-out",
+      });
     }
 
-    // Update the basic information section if needed
+    // Update the basic information section
     const basicInfoSection = targetIframe.closest('section[data-testid="cp-section-basic-information"]');
     if (basicInfoSection.length > 0) {
-      basicInfoSection.css("min-height", `${newHeight + 40}px`); // Add extra padding for section
+      basicInfoSection.css({
+        "min-height": `${newHeight}px`,
+        transition: "min-height 0.3s ease-in-out",
+      });
     }
 
     debugLog(`tampermonkey successfully updated heights for patient ${patientId}`);
