@@ -2098,6 +2098,7 @@ function replaceBasicInformationSection() {
       height: "520px",
       width: "100%",
       border: "none",
+      transiton: "height 0.3s ease",
     });
 
     // Append the iframe to the basic information section
