@@ -1395,14 +1395,14 @@ function waitForMishaMessages() {
     }
 
     // Handle patient information height updates from misha iframe
-    if (event.data.patientInformationHeight !== undefined) {
-      debugLog("tampermonkey received patientInformationHeight event", event.data.patientInformationHeight);
+    if (event.data.basicInformationHeight !== undefined) {
+      debugLog("tampermonkey received basicInformationHeight event", event.data.basicInformationHeight);
 
       // Convert string to number if needed
       const height =
-        typeof event.data.patientInformationHeight === "string"
-          ? parseInt(event.data.patientInformationHeight, 10)
-          : event.data.patientInformationHeight;
+        typeof event.data.basicInformationHeight === "string"
+          ? parseInt(event.data.basicInformationHeight, 10)
+          : event.data.basicInformationHeight;
 
       // Get patient number from current URL
       const currentPatientNumber = location.href.split("/")[4];
