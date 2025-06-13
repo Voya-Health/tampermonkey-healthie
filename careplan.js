@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -1038,7 +1038,7 @@ function isPediatric(dobString) {
   let age = today.getFullYear() - dob.getFullYear();
 
   // Adjust if birthday hasn't occurred yet this year
-  const hasBirthdayPassed = 
+  const hasBirthdayPassed =
     today.getMonth() > dob.getMonth() || 
     (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
 
@@ -1057,13 +1057,14 @@ function loadPediatricBanner() {
   } else {
     const basicInfo = $('.BasicInfo_basicInfo__Ks2nG');
     if (basicInfo.length > 0) {
-        const dob = $('[data-testid="client-dob"]').text();
-        if (dob.length > 0) {
-          const isPatientPediatric = isPediatric(dob);
-          const pediatricBanner = $('.pediatric-banner');
+      const dob = $('[data-testid="client-dob"]').text();
+      if (dob.length > 0) {
+        const isPatientPediatric = isPediatric(dob);
+        const pediatricBanner = $('.pediatric-banner');
+        const mainContent = $(".scrollbars");
 
-          if (isPatientPediatric && !pediatricBanner.length) {
-            // insert pediatric label
+        if (isPatientPediatric && !pediatricBanner.length) {
+          // insert pediatric label
             const searchBarHeader = $('#main-layout__header');
             $('<div class="pediatric-banner">PEDIATRIC</div>').css({
                 backgroundColor: '#EDF4FB',
@@ -1073,14 +1074,16 @@ function loadPediatricBanner() {
                 padding: '12px 24px'
             }).insertAfter(searchBarHeader);
 
-            // adjust spacing of the next element, if Pediatric banner is inserted
-            const mainContent = $('.scrollbars');
-            mainContent.css({ marginTop: '0px' })
-          }
-        } else {
-          //wait for content load
-          createTimeout(loadPediatricBanner, 200);
+          // adjust spacing of the next element, if Pediatric banner is inserted
+          mainContent.css({ marginTop: "0px" });
+        } else if (!isPatientPediatric && pediatricBanner.length) {
+          pediatricBanner.remove();
+          mainContent.css({ marginTop: "60px" });
         }
+      } else {
+        //wait for content load
+        createTimeout(loadPediatricBanner, 200);
+      }
     } else {
       //wait for content load
       createTimeout(loadPediatricBanner, 200);
@@ -1387,6 +1390,34 @@ function waitForMishaMessages() {
     if (event.data.loading !== undefined) {
       debugLog("tampermonkey loading", event.data.loading);
       isLoadingEmailPhone = event.data.loading ? true : false;
+    }
+    if (event.data.healthieActionsTab !== undefined) {
+      debugLog("tampermonkey navigating to patient actions tab", event.data.healthieActionsTab);
+      const patientId = event.data.healthieActionsTab;
+      window.open(`https://${healthieURL}/users/${patientId}/actions`, "_top");
+    }
+
+    // Handle patient information height updates from misha iframe
+    if (event.data.basicInformationHeight !== undefined) {
+      debugLog("tampermonkey received basicInformationHeight event", event.data.basicInformationHeight);
+
+      // Convert string to number if needed
+      const height =
+        typeof event.data.basicInformationHeight === "string"
+          ? parseInt(event.data.basicInformationHeight, 10)
+          : event.data.basicInformationHeight;
+
+      // Get patient number from current URL
+      const currentPatientNumber = location.href.split("/")[4];
+
+      if (currentPatientNumber && !isNaN(height)) {
+        updatePatientStatusIframeHeight(currentPatientNumber, height);
+      } else {
+        debugLog("tampermonkey could not determine patient number or invalid height", {
+          patientNumber: currentPatientNumber,
+          height: height,
+        });
+      }
     }
   };
 }
@@ -1874,6 +1905,7 @@ function observeDOMChanges(mutations, observer) {
 
     if (urlValidation.membership.test(location.href)) {
       addMembershipAndOnboarding();
+      replaceBasicInformationSection();
     }
 
     if (urlValidation.verifyEmailPhone.test(location.href)) {
@@ -2012,6 +2044,7 @@ function observeDOMChanges(mutations, observer) {
     ) {
       observer.disconnect();
       addMembershipAndOnboarding();
+      replaceBasicInformationSection();
       observer.observe(document.documentElement, {
         childList: true,
         subtree: true,
@@ -2035,7 +2068,132 @@ function hideChartingNotesAppointment() {
   }
 }
 
+function validateIframeReplacement(basicInfoSection) {
+  // Check if iframe exists and is properly positioned
+  const existingIframe = basicInfoSection.find(".misha-iframe-container");
+  if (existingIframe.length > 0) {
+    const firstChild = basicInfoSection.children().first();
+    return firstChild.hasClass("misha-iframe-container");
+  }
+  return false;
+}
+
+function replaceBasicInformationSection(retryCount = 0) {
+  const $ = initJQuery();
+  const maxRetries = 3;
+  const currentPatientId = location.href.split("/")[4];
+
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    createTimeout(() => replaceBasicInformationSection(retryCount), 200);
+    return;
+  }
+
+  // Find the basic information section with the specified class and data-testid
+  const basicInfoSection = $('section.cp-sidebar-expandable-section[data-testid="cp-section-basic-information"]');
+
+  if (basicInfoSection.length > 0) {
+    debugLog(`tampermonkey found basic information section (attempt ${retryCount + 1}/${maxRetries + 1})`);
+
+    // Get the patient number from the URL
+    patientNumber = location.href.split("/")[4];
+    debugLog(`tampermonkey patient number for basic info replacement`, patientNumber); // Check if iframe already exists and is valid
+    if (validateIframeReplacement(basicInfoSection)) {
+      debugLog(`tampermonkey basic info iframe already exists and is valid`);
+      return;
+    } else if (basicInfoSection.find(".misha-iframe-container").length > 0) {
+      debugLog(`tampermonkey existing iframe found but not as first child, will replace`);
+    }
+
+    // Clear the existing content of the basic information section
+    basicInfoSection.empty();
+
+    // Create iframe for patient status
+    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
+      height: "520px",
+      width: "100%",
+      border: "none",
+    });
+
+    // Append the iframe to the basic information section
+    basicInfoSection.append(iframe);
+
+    // Store reference to the iframe for height updates
+    const iframeElement = iframe.find("#MishaFrame");
+    if (iframeElement.length > 0) {
+      iframeElement.attr("data-patient-id", patientNumber);
+      iframeElement.addClass("dynamic-height-iframe");
+    } // Validate the replacement was successful
+    if (validateIframeReplacement(basicInfoSection)) {
+      debugLog(`tampermonkey successfully replaced basic information section with patient status iframe`);
+    } else {
+      debugLog(`tampermonkey iframe replacement validation failed (attempt ${retryCount + 1})`);
+
+      if (retryCount < maxRetries && currentPatientId === location.href.split("/")[4]) {
+        // Only retry if we haven't exceeded max retries and patient hasn't changed
+        debugLog(`tampermonkey scheduling retry ${retryCount + 1} for basic info replacement`);
+        createTimeout(() => replaceBasicInformationSection(retryCount + 1), 300 * (retryCount + 1));
+      } else {
+        if (retryCount >= maxRetries) {
+          debugLog(`tampermonkey max retries (${maxRetries}) exceeded for basic info replacement`);
+        } else {
+          debugLog(`tampermonkey patient changed during retry, aborting basic info replacement`);
+        }
+      }
+    }
+  } else {
+    debugLog(`tampermonkey waiting for basic information section`);
+    createTimeout(() => replaceBasicInformationSection(retryCount), 200);
+  }
+}
+
 //observe changes to the DOM, check for URL changes
 const config = { subtree: true, childList: true };
 const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
+
+function updatePatientStatusIframeHeight(patientId, contentHeight) {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load for height update`);
+    createTimeout(() => updatePatientStatusIframeHeight(patientId, contentHeight), 200);
+    return;
+  }
+
+  // Find the iframe for this specific patient
+  const targetIframe = $(`.dynamic-height-iframe[data-patient-id="${patientId}"]`);
+
+  if (targetIframe.length > 0) {
+    // Set minimum height to prevent content from being too small
+    const minHeight = 280;
+    const newHeight = Math.max(contentHeight, minHeight);
+
+    // Update iframe height
+    targetIframe.css({
+      height: `${newHeight}px`,
+      transition: "height 0.2s ease-in-out",
+    });
+
+    // Also update the container div height
+    const iframeContainer = targetIframe.closest(".misha-iframe-container");
+    if (iframeContainer.length > 0) {
+      iframeContainer.css({
+        height: `${newHeight}px`,
+        transition: "height 0.2s ease-in-out",
+      });
+    }
+
+    // Update the basic information section
+    const basicInfoSection = targetIframe.closest('section[data-testid="cp-section-basic-information"]');
+    if (basicInfoSection.length > 0) {
+      basicInfoSection.css({
+        "min-height": `${newHeight}px`,
+        transition: "min-height 0.3s ease-in-out",
+      });
+    }
+
+    debugLog(`tampermonkey successfully updated heights for patient ${patientId}`);
+  } else {
+    debugLog(`tampermonkey could not find iframe for patient ${patientId}`);
+  }
+}
