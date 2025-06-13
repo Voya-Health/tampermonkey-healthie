@@ -1060,7 +1060,8 @@ function loadPediatricBanner() {
       const dob = $('[data-testid="client-dob"]').text();
       if (dob.length > 0) {
         const isPatientPediatric = isPediatric(dob);
-          const pediatricBanner = $('.pediatric-banner');
+        const pediatricBanner = $('.pediatric-banner');
+        const mainContent = $(".scrollbars");
 
         if (isPatientPediatric && !pediatricBanner.length) {
           // insert pediatric label
@@ -1074,8 +1075,10 @@ function loadPediatricBanner() {
             }).insertAfter(searchBarHeader);
 
           // adjust spacing of the next element, if Pediatric banner is inserted
-          const mainContent = $(".scrollbars");
           mainContent.css({ marginTop: "0px" });
+        } else if (!isPatientPediatric && pediatricBanner.length) {
+          pediatricBanner.remove();
+          mainContent.css({ marginTop: "60px" });
         }
       } else {
         //wait for content load
