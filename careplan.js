@@ -2065,11 +2065,14 @@ function hideChartingNotesAppointment() {
   }
 }
 
-function replaceBasicInformationSection() {
+function replaceBasicInformationSection(retryCount = 0) {
   const $ = initJQuery();
+  const maxRetries = 3;
+  const currentPatientId = location.href.split("/")[4];
+
   if (!$) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    createTimeout(replaceBasicInformationSection, 200);
+    createTimeout(() => replaceBasicInformationSection(retryCount), 200);
     return;
   }
 
@@ -2077,17 +2080,23 @@ function replaceBasicInformationSection() {
   const basicInfoSection = $('section.cp-sidebar-expandable-section[data-testid="cp-section-basic-information"]');
 
   if (basicInfoSection.length > 0) {
-    debugLog(`tampermonkey found basic information section`);
+    debugLog(`tampermonkey found basic information section (attempt ${retryCount + 1}/${maxRetries + 1})`);
 
     // Get the patient number from the URL
     patientNumber = location.href.split("/")[4];
     debugLog(`tampermonkey patient number for basic info replacement`, patientNumber);
 
-    // Check if iframe already exists to avoid duplicates
+    // Check if iframe already exists and is valid
     const existingIframe = basicInfoSection.find(".misha-iframe-container");
     if (existingIframe.length > 0) {
-      debugLog(`tampermonkey basic info iframe already exists`);
-      return;
+      // Validate that the existing iframe is properly set up
+      const firstChild = basicInfoSection.children().first();
+      if (firstChild.hasClass("misha-iframe-container")) {
+        debugLog(`tampermonkey basic info iframe already exists and is valid`);
+        return;
+      } else {
+        debugLog(`tampermonkey existing iframe found but not as first child, will replace`);
+      }
     }
 
     // Clear the existing content of the basic information section
@@ -2110,10 +2119,30 @@ function replaceBasicInformationSection() {
       iframeElement.addClass("dynamic-height-iframe");
     }
 
-    debugLog(`tampermonkey replaced basic information section with patient status iframe`);
+    // Validate the replacement was successful
+    const firstChild = basicInfoSection.children().first();
+    const isValidReplacement = firstChild.length > 0 && firstChild.hasClass("misha-iframe-container");
+
+    if (isValidReplacement) {
+      debugLog(`tampermonkey successfully replaced basic information section with patient status iframe`);
+    } else {
+      debugLog(`tampermonkey iframe replacement validation failed (attempt ${retryCount + 1})`);
+
+      if (retryCount < maxRetries && currentPatientId === location.href.split("/")[4]) {
+        // Only retry if we haven't exceeded max retries and patient hasn't changed
+        debugLog(`tampermonkey scheduling retry ${retryCount + 1} for basic info replacement`);
+        createTimeout(() => replaceBasicInformationSection(retryCount + 1), 300 * (retryCount + 1));
+      } else {
+        if (retryCount >= maxRetries) {
+          debugLog(`tampermonkey max retries (${maxRetries}) exceeded for basic info replacement`);
+        } else {
+          debugLog(`tampermonkey patient changed during retry, aborting basic info replacement`);
+        }
+      }
+    }
   } else {
     debugLog(`tampermonkey waiting for basic information section`);
-    createTimeout(replaceBasicInformationSection, 200);
+    createTimeout(() => replaceBasicInformationSection(retryCount), 200);
   }
 }
 
@@ -2136,7 +2165,7 @@ function updatePatientStatusIframeHeight(patientId, contentHeight) {
   if (targetIframe.length > 0) {
     // Set minimum height to prevent content from being too small
     const minHeight = 280;
-    const newHeight = Math.max(contentHeight, minHeight); 
+    const newHeight = Math.max(contentHeight, minHeight);
 
     // Update iframe height
     targetIframe.css({
