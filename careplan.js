@@ -2228,15 +2228,14 @@ function createLoadingScreen() {
     alignItems: "center",
     justifyContent: "center",
     padding: "40px 20px",
-    margin: "20px 0",
+    margin: "10px",
     backgroundColor: "#f8f9fa",
     borderRadius: "8px",
-    border: "2px solid #026460", // Made border thicker and colored for visibility
     minHeight: "200px",
-    width: "100%",
+    width: "calc(100% - 20px)",
     boxSizing: "border-box",
-    zIndex: "1000", // Added z-index to ensure it's visible
-    position: "relative", // Added position
+    zIndex: "1000",
+    position: "relative",
   });
 
   // Create the spinner
