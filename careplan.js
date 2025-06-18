@@ -1043,8 +1043,7 @@ function isPediatric(dobString) {
 
   // Adjust if birthday hasn't occurred yet this year
   const hasBirthdayPassed =
-    today.getMonth() > dob.getMonth() || 
-    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+    today.getMonth() > dob.getMonth() || (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
 
   if (!hasBirthdayPassed) {
     age--;
@@ -1059,24 +1058,26 @@ function loadPediatricBanner() {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(loadPediatricBanner, 200);
   } else {
-    const basicInfo = $('.BasicInfo_basicInfo__Ks2nG');
+    const basicInfo = $(".BasicInfo_basicInfo__Ks2nG");
     if (basicInfo.length > 0) {
       const dob = $('[data-testid="client-dob"]').text();
       if (dob.length > 0) {
         const isPatientPediatric = isPediatric(dob);
-        const pediatricBanner = $('.pediatric-banner');
+        const pediatricBanner = $(".pediatric-banner");
         const mainContent = $(".scrollbars");
 
         if (isPatientPediatric && !pediatricBanner.length) {
           // insert pediatric label
-            const searchBarHeader = $('#main-layout__header');
-            $('<div class="pediatric-banner">PEDIATRIC</div>').css({
-                backgroundColor: '#EDF4FB',
-                color: '#457AC8',
-                fontWeight: '700',
-                marginTop: '60px',
-                padding: '12px 24px'
-            }).insertAfter(searchBarHeader);
+          const searchBarHeader = $("#main-layout__header");
+          $('<div class="pediatric-banner">PEDIATRIC</div>')
+            .css({
+              backgroundColor: "#EDF4FB",
+              color: "#457AC8",
+              fontWeight: "700",
+              marginTop: "60px",
+              padding: "12px 24px",
+            })
+            .insertAfter(searchBarHeader);
 
           // adjust spacing of the next element, if Pediatric banner is inserted
           mainContent.css({ marginTop: "0px" });
@@ -1428,14 +1429,25 @@ function waitForMishaMessages() {
     if (event.data.enablePCPInformation !== undefined) {
       debugLog("tampermonkey received enablePCPInformation event", event.data.enablePCPInformation);
       const previousValue = enablePCPInformation;
+      const wasNotReceived = !enablePCPInformationReceived;
       enablePCPInformation = event.data.enablePCPInformation;
       enablePCPInformationReceived = true;
-      debugLog("tampermonkey enablePCPInformation status set to", enablePCPInformation); // If the value changed or this is the first time receiving it, trigger basic info section processing
-      if (!enablePCPInformationReceived || previousValue !== enablePCPInformation) {
+      debugLog("tampermonkey enablePCPInformation status set to", enablePCPInformation);
+
+      // Remove loading screen since we now have the value
+      const $ = initJQuery();
+      if ($) {
+        const basicInfoSection = $('section.cp-sidebar-expandable-section[data-testid="cp-section-basic-information"]');
+        if (basicInfoSection && basicInfoSection.length > 0) {
+          removeLoadingScreen(basicInfoSection);
+        }
+      }
+
+      // If the value changed or this is the first time receiving it, trigger basic info section processing
+      if (wasNotReceived || previousValue !== enablePCPInformation) {
         debugLog(
           "tampermonkey enablePCPInformation changed or first received, triggering basic info section processing"
         );
-        enablePCPInformationReceived = true;
         // Clear any existing timeouts to prevent conflicts
         clearAllTimeouts();
         // Trigger immediate re-processing
@@ -1883,6 +1895,12 @@ function observeDOMChanges(mutations, observer) {
     carePlanLoopLock = 0;
     debugLog(`tampermonkey URL changed to ${location.href}`);
 
+    // Reset basic info section variables when navigating to a new patient/page
+    enablePCPInformationReceived = false;
+    enablePCPInformation = false;
+    originalBasicInfoContent = null;
+    debugLog(`tampermonkey reset basic info variables for new URL`);
+
     // Clear all timeouts
     for (let i = 0; i < timeoutIds.length; i++) {
       //debugLog(`tampermonkey clear timeout ${timeoutIds[i]}`);
@@ -2195,7 +2213,126 @@ function cleanupExistingBasicInfoIframes(basicInfoSection) {
   return false;
 }
 
+function createLoadingScreen() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog("tampermonkey createLoadingScreen: jQuery not available");
+    return null;
+  }
+
+  debugLog("tampermonkey creating loading screen");
+  // Create the loading container
+  const loadingContainer = $("<div>").addClass("basic-info-loading-container").css({
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "40px 20px",
+    margin: "20px 0",
+    backgroundColor: "#f8f9fa",
+    borderRadius: "8px",
+    border: "2px solid #026460", // Made border thicker and colored for visibility
+    minHeight: "200px",
+    width: "100%",
+    boxSizing: "border-box",
+    zIndex: "1000", // Added z-index to ensure it's visible
+    position: "relative", // Added position
+  });
+
+  // Create the spinner
+  const spinner = $("<div>").addClass("loading-spinner").css({
+    width: "32px",
+    height: "32px",
+    border: "3px solid #f3f3f3",
+    borderTop: "3px solid #026460",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+    marginBottom: "16px",
+  });
+
+  // Create the loading text
+  const loadingText = $("<div>").addClass("loading-text").text("Loading patient information...").css({
+    fontSize: "14px",
+    color: "#6c757d",
+    fontWeight: "500",
+    textAlign: "center",
+    marginBottom: "8px",
+  });
+
+  // Create the subtext
+  const subText = $("<div>").addClass("loading-subtext").text("Please wait while we prepare your content").css({
+    fontSize: "12px",
+    color: "#adb5bd",
+    textAlign: "center",
+  });
+
+  // Add CSS animation for spinner if not already added
+  if (
+    !$("style").filter(function () {
+      return $(this).text().indexOf("@keyframes spin") !== -1;
+    }).length
+  ) {
+    const spinnerStyle = $("<style>").text(`
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .basic-info-loading-container {
+        transition: opacity 0.3s ease-in-out;
+      }
+    `);
+    $("head").append(spinnerStyle);
+  }
+  // Assemble the loading screen
+  loadingContainer.append(spinner, loadingText, subText);
+
+  debugLog("tampermonkey loading screen created successfully");
+  return loadingContainer;
+}
+
+function removeLoadingScreen(basicInfoSection) {
+  const $ = initJQuery();
+  if (!$ || !basicInfoSection) {
+    return;
+  }
+
+  const loadingContainer = basicInfoSection.find(".basic-info-loading-container");
+  if (loadingContainer.length > 0) {
+    loadingContainer.fadeOut(300, function () {
+      $(this).remove();
+    });
+    debugLog("tampermonkey removed loading screen from basic info section");
+  }
+}
+
+function showLoadingScreen(basicInfoSection) {
+  const $ = initJQuery();
+  if (!$ || !basicInfoSection) {
+    debugLog("tampermonkey showLoadingScreen: jQuery or basicInfoSection not available");
+    return;
+  }
+
+  // Check if loading screen already exists - if so, don't add another one
+  if (basicInfoSection.find(".basic-info-loading-container").length > 0) {
+    debugLog("tampermonkey loading screen already exists, skipping");
+    return;
+  }
+
+  // Create and show the loading screen
+  const loadingScreen = createLoadingScreen();
+  if (loadingScreen) {
+    debugLog("tampermonkey appending loading screen to basic info section");
+    basicInfoSection.append(loadingScreen);
+    debugLog("tampermonkey showed loading screen in basic info section");
+  } else {
+    debugLog("tampermonkey failed to create loading screen");
+  }
+}
 function replaceBasicInformationSection(retryCount = 0, startTime = null) {
+  debugLog(
+    `tampermonkey replaceBasicInformationSection called - retry: ${retryCount}, startTime: ${startTime}, enablePCPInformationReceived: ${enablePCPInformationReceived}`
+  );
+
   const $ = initJQuery();
   const maxRetries = 3;
   const currentPatientId = location.href.split("/")[4];
@@ -2209,11 +2346,30 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
   // Initialize start time if not provided
   if (startTime === null) {
     startTime = Date.now();
+  } // Find the basic information section first
+  const basicInfoSection = $('section.cp-sidebar-expandable-section[data-testid="cp-section-basic-information"]');
+  if (basicInfoSection.length === 0) {
+    debugLog(`tampermonkey waiting for basic information section`);
+    createTimeout(() => replaceBasicInformationSection(retryCount, startTime), 200);
+    return;
+  }
+
+  // Store original content if not already stored and we haven't received the flag yet
+  if (!enablePCPInformationReceived && originalBasicInfoContent === null) {
+    originalBasicInfoContent = basicInfoSection.html();
+    debugLog(`tampermonkey stored original basic info content`);
+
+    // Clear the section and show loading screen
+    basicInfoSection.empty();
+    showLoadingScreen(basicInfoSection);
+    debugLog(`tampermonkey cleared basic info section and showed loading screen`);
   }
 
   // Wait for enablePCPInformation event to be received before proceeding
   if (!enablePCPInformationReceived) {
     const waitTime = Date.now() - startTime;
+    debugLog(`tampermonkey enablePCPInformationReceived: ${enablePCPInformationReceived}, waitTime: ${waitTime}ms`);
+
     if (waitTime > enablePCPInformationTimeout) {
       debugLog(
         `tampermonkey timeout waiting for enablePCPInformation event (${waitTime}ms), proceeding with default mode (injection)`
@@ -2222,104 +2378,121 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
       enablePCPInformation = false; // Default to injection mode
     } else {
       debugLog(`tampermonkey waiting for enablePCPInformation event (${waitTime}ms/${enablePCPInformationTimeout}ms)`);
+
+      // Ensure loading screen is shown while waiting
+      if (basicInfoSection.find(".basic-info-loading-container").length === 0) {
+        debugLog(`tampermonkey loading screen missing, reshowing it`);
+        basicInfoSection.empty();
+        showLoadingScreen(basicInfoSection);
+      }
       createTimeout(() => replaceBasicInformationSection(retryCount, startTime), 300);
       return;
     }
   }
 
-  // Find the basic information section with the specified class and data-testid
-  const basicInfoSection = $('section.cp-sidebar-expandable-section[data-testid="cp-section-basic-information"]');
+  // Now we have the enablePCPInformation value, proceed with replacement
+  debugLog(`tampermonkey found basic information section (attempt ${retryCount + 1}/${maxRetries + 1})`);
+  debugLog(`tampermonkey enablePCPInformation status: ${enablePCPInformation}`);
+  // Remove loading screen and proceed with iframe replacement
+  removeLoadingScreen(basicInfoSection);
 
-  if (basicInfoSection.length > 0) {
-    debugLog(`tampermonkey found basic information section (attempt ${retryCount + 1}/${maxRetries + 1})`);
-    debugLog(`tampermonkey enablePCPInformation status: ${enablePCPInformation}`);
+  // Get the patient number from the URL
+  const patientNumber = location.href.split("/")[4];
+  debugLog(`tampermonkey patient number for basic info replacement`, patientNumber);
+  let success = false;
 
-    // Get the patient number from the URL
-    const patientNumber = location.href.split("/")[4];
-    debugLog(`tampermonkey patient number for basic info replacement`, patientNumber);
-    let success = false;
+  // First, check if we need to clean up existing iframes due to mode mismatch
+  const hasExistingIframes = basicInfoSection.find(".misha-iframe-container").length > 0;
+  if (hasExistingIframes) {
+    const isCurrentlyFullReplacement = validateIframeReplacement(basicInfoSection, true);
+    const isCurrentlyInjection = validateIframeReplacement(basicInfoSection, false);
 
-    // First, check if we need to clean up existing iframes due to mode mismatch
-    const hasExistingIframes = basicInfoSection.find(".misha-iframe-container").length > 0;
-    if (hasExistingIframes) {
-      const isCurrentlyFullReplacement = validateIframeReplacement(basicInfoSection, true);
-      const isCurrentlyInjection = validateIframeReplacement(basicInfoSection, false);
+    // Clean up if mode doesn't match current setup
+    if ((enablePCPInformation && !isCurrentlyFullReplacement) || (!enablePCPInformation && !isCurrentlyInjection)) {
+      debugLog(`tampermonkey mode mismatch detected, cleaning up existing iframes`);
+      cleanupExistingBasicInfoIframes(basicInfoSection);
+    }
+  }
 
-      // Clean up if mode doesn't match current setup
-      if ((enablePCPInformation && !isCurrentlyFullReplacement) || (!enablePCPInformation && !isCurrentlyInjection)) {
-        debugLog(`tampermonkey mode mismatch detected, cleaning up existing iframes`);
-        cleanupExistingBasicInfoIframes(basicInfoSection);
-      }
+  if (enablePCPInformation) {
+    // Full replacement mode - replace entire basic information section
+    debugLog(`tampermonkey using full replacement mode`);
+
+    // Check if iframe already exists and is valid for full replacement
+    if (validateIframeReplacement(basicInfoSection, true)) {
+      debugLog(`tampermonkey basic info iframe already exists and is valid (full replacement)`);
+      return;
     }
 
-    if (enablePCPInformation) {
-      // Full replacement mode - replace entire basic information section
-      debugLog(`tampermonkey using full replacement mode`);
+    // Clear the existing content of the basic information section
+    basicInfoSection.empty();
 
-      // Check if iframe already exists and is valid for full replacement
-      if (validateIframeReplacement(basicInfoSection, true)) {
-        debugLog(`tampermonkey basic info iframe already exists and is valid (full replacement)`);
-        return;
-      }
+    // Create iframe for patient status
+    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
+      height: "520px",
+      width: "100%",
+      border: "none",
+    });
 
-      // Clear the existing content of the basic information section
-      basicInfoSection.empty();
+    // Append the iframe to the basic information section
+    basicInfoSection.append(iframe);
 
-      // Create iframe for patient status
-      const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
-        height: "520px",
-        width: "100%",
-        border: "none",
-      });
-
-      // Append the iframe to the basic information section
-      basicInfoSection.append(iframe);
-
-      // Store reference to the iframe for height updates
-      const iframeElement = iframe.find("#MishaFrame");
-      if (iframeElement.length > 0) {
-        iframeElement.attr("data-patient-id", patientNumber);
-        iframeElement.addClass("dynamic-height-iframe");
-      }
-
-      // Validate the replacement was successful
-      success = validateIframeReplacement(basicInfoSection, true);
-      if (success) {
-        debugLog(`tampermonkey successfully replaced basic information section with patient status iframe`);
-      }
-    } else {
-      // Injection mode - inject iframe after first col-12
-      debugLog(`tampermonkey using injection mode (after first col-12)`);
-
-      // Check if iframe already exists and is valid for injection mode
-      if (validateIframeReplacement(basicInfoSection, false)) {
-        debugLog(`tampermonkey basic info iframe already exists and is valid (injection mode)`);
-        return;
-      }
-
-      // Inject iframe after first col-12
-      success = injectIframeAfterFirstCol12(basicInfoSection, patientNumber);
+    // Store reference to the iframe for height updates
+    const iframeElement = iframe.find("#MishaFrame");
+    if (iframeElement.length > 0) {
+      iframeElement.attr("data-patient-id", patientNumber);
+      iframeElement.addClass("dynamic-height-iframe");
     }
 
+    // Validate the replacement was successful
+    success = validateIframeReplacement(basicInfoSection, true);
     if (success) {
-      debugLog(`tampermonkey basic information section handling completed successfully`);
-    } else {
-      debugLog(`tampermonkey iframe handling failed (attempt ${retryCount + 1})`);
-      if (retryCount < maxRetries && currentPatientId === location.href.split("/")[4]) {
-        // Only retry if we haven't exceeded max retries and patient hasn't changed
-        debugLog(`tampermonkey scheduling retry ${retryCount + 1} for basic info handling`);
-        createTimeout(() => replaceBasicInformationSection(retryCount + 1, startTime), 300 * (retryCount + 1));
-      } else {
-        if (retryCount >= maxRetries) {
-          debugLog(`tampermonkey max retries (${maxRetries}) exceeded for basic info handling`);
-        } else {
-          debugLog(`tampermonkey patient changed during retry, aborting basic info handling`);
-        }
-      }
+      debugLog(`tampermonkey successfully replaced basic information section with patient status iframe`);
     }
   } else {
-    debugLog(`tampermonkey waiting for basic information section`);
+    // Injection mode - restore original content and inject iframe after first col-12
+    debugLog(`tampermonkey using injection mode (after first col-12)`);
+
+    // Restore original content if we have it stored
+    if (originalBasicInfoContent !== null) {
+      debugLog(`tampermonkey restoring original basic info content for injection mode`);
+      basicInfoSection.html(originalBasicInfoContent);
+      // Clear the stored content since we've used it
+      originalBasicInfoContent = null;
+    }
+
+    // Check if iframe already exists and is valid for injection mode
+    if (validateIframeReplacement(basicInfoSection, false)) {
+      debugLog(`tampermonkey basic info iframe already exists and is valid (injection mode)`);
+      return;
+    }
+
+    // Inject iframe after first col-12
+    success = injectIframeAfterFirstCol12(basicInfoSection, patientNumber);
+  }
+
+  if (success) {
+    debugLog(`tampermonkey basic information section handling completed successfully`);
+  } else {
+    debugLog(`tampermonkey iframe handling failed (attempt ${retryCount + 1})`);
+    if (retryCount < maxRetries && currentPatientId === location.href.split("/")[4]) {
+      // Only retry if we haven't exceeded max retries and patient hasn't changed
+      debugLog(`tampermonkey scheduling retry ${retryCount + 1} for basic info handling`);
+      createTimeout(() => replaceBasicInformationSection(retryCount + 1, startTime), 300 * (retryCount + 1));
+    } else {
+      if (retryCount >= maxRetries) {
+        debugLog(`tampermonkey max retries (${maxRetries}) exceeded for basic info handling`);
+      } else {
+        debugLog(`tampermonkey patient changed during retry, aborting basic info handling`);
+      }
+    }
+  }
+
+  // If we reach here but don't have basicInfoSection, wait for it
+  if (basicInfoSection.length === 0) {
+    debugLog(`tampermonkey basic information section not found, waiting...`);
     createTimeout(() => replaceBasicInformationSection(retryCount, startTime), 200);
+    return;
   }
 }
 
