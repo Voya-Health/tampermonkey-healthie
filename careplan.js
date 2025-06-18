@@ -2242,12 +2242,6 @@ function createLoadingScreen() {
     marginBottom: "8px",
   });
 
-  const subText = $("<div>").addClass("loading-subtext").text("Please wait while we prepare your content").css({
-    fontSize: "12px",
-    color: "#adb5bd",
-    textAlign: "center",
-  });
-
   if (
     !$("style").filter(function () {
       return $(this).text().indexOf("@keyframes spin") !== -1;
@@ -2265,7 +2259,7 @@ function createLoadingScreen() {
     $("head").append(spinnerStyle);
   }
 
-  loadingContainer.append(spinner, loadingText, subText);
+  loadingContainer.append(spinner, loadingText);
   debugLog("tampermonkey loading screen created successfully");
   return loadingContainer;
 }
