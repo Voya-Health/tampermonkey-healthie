@@ -1434,23 +1434,11 @@ function waitForMishaMessages() {
       enablePCPInformationReceived = true;
       debugLog("tampermonkey enablePCPInformation status set to", enablePCPInformation);
 
-      // Remove loading screen since we now have the value
-      const $ = initJQuery();
-      if ($) {
-        const basicInfoSection = $('section.cp-sidebar-expandable-section[data-testid="cp-section-basic-information"]');
-        if (basicInfoSection && basicInfoSection.length > 0) {
-          removeLoadingScreen(basicInfoSection);
-        }
-      }
-
-      // If the value changed or this is the first time receiving it, trigger basic info section processing
       if (wasNotReceived || previousValue !== enablePCPInformation) {
         debugLog(
           "tampermonkey enablePCPInformation changed or first received, triggering basic info section processing"
         );
-        // Clear any existing timeouts to prevent conflicts
         clearAllTimeouts();
-        // Trigger immediate re-processing
         createTimeout(() => replaceBasicInformationSection(0), 100);
       }
     }
@@ -2203,7 +2191,6 @@ function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
 }
 
 function cleanupExistingBasicInfoIframes(basicInfoSection) {
-  // Remove any existing Misha iframes from the basic information section
   const existingIframes = basicInfoSection.find(".misha-iframe-container");
   if (existingIframes.length > 0) {
     debugLog(`tampermonkey removing ${existingIframes.length} existing iframe(s) for mode change`);
@@ -2221,7 +2208,6 @@ function createLoadingScreen() {
   }
 
   debugLog("tampermonkey creating loading screen");
-  // Create the loading container
   const loadingContainer = $("<div>").addClass("basic-info-loading-container").css({
     display: "flex",
     flexDirection: "column",
@@ -2238,7 +2224,6 @@ function createLoadingScreen() {
     position: "relative",
   });
 
-  // Create the spinner
   const spinner = $("<div>").addClass("loading-spinner").css({
     width: "32px",
     height: "32px",
@@ -2249,7 +2234,6 @@ function createLoadingScreen() {
     marginBottom: "16px",
   });
 
-  // Create the loading text
   const loadingText = $("<div>").addClass("loading-text").text("Loading patient information...").css({
     fontSize: "14px",
     color: "#6c757d",
@@ -2258,14 +2242,12 @@ function createLoadingScreen() {
     marginBottom: "8px",
   });
 
-  // Create the subtext
   const subText = $("<div>").addClass("loading-subtext").text("Please wait while we prepare your content").css({
     fontSize: "12px",
     color: "#adb5bd",
     textAlign: "center",
   });
 
-  // Add CSS animation for spinner if not already added
   if (
     !$("style").filter(function () {
       return $(this).text().indexOf("@keyframes spin") !== -1;
@@ -2282,9 +2264,8 @@ function createLoadingScreen() {
     `);
     $("head").append(spinnerStyle);
   }
-  // Assemble the loading screen
-  loadingContainer.append(spinner, loadingText, subText);
 
+  loadingContainer.append(spinner, loadingText, subText);
   debugLog("tampermonkey loading screen created successfully");
   return loadingContainer;
 }
@@ -2311,13 +2292,11 @@ function showLoadingScreen(basicInfoSection) {
     return;
   }
 
-  // Check if loading screen already exists - if so, don't add another one
   if (basicInfoSection.find(".basic-info-loading-container").length > 0) {
     debugLog("tampermonkey loading screen already exists, skipping");
     return;
   }
 
-  // Create and show the loading screen
   const loadingScreen = createLoadingScreen();
   if (loadingScreen) {
     debugLog("tampermonkey appending loading screen to basic info section");
@@ -2341,11 +2320,10 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
     createTimeout(() => replaceBasicInformationSection(retryCount, startTime), 200);
     return;
   }
-
-  // Initialize start time if not provided
   if (startTime === null) {
     startTime = Date.now();
-  } // Find the basic information section first
+  }
+
   const basicInfoSection = $('section.cp-sidebar-expandable-section[data-testid="cp-section-basic-information"]');
   if (basicInfoSection.length === 0) {
     debugLog(`tampermonkey waiting for basic information section`);
@@ -2353,18 +2331,14 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
     return;
   }
 
-  // Store original content if not already stored and we haven't received the flag yet
   if (!enablePCPInformationReceived && originalBasicInfoContent === null) {
     originalBasicInfoContent = basicInfoSection.html();
     debugLog(`tampermonkey stored original basic info content`);
-
-    // Clear the section and show loading screen
     basicInfoSection.empty();
     showLoadingScreen(basicInfoSection);
     debugLog(`tampermonkey cleared basic info section and showed loading screen`);
   }
 
-  // Wait for enablePCPInformation event to be received before proceeding
   if (!enablePCPInformationReceived) {
     const waitTime = Date.now() - startTime;
     debugLog(`tampermonkey enablePCPInformationReceived: ${enablePCPInformationReceived}, waitTime: ${waitTime}ms`);
@@ -2374,11 +2348,10 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
         `tampermonkey timeout waiting for enablePCPInformation event (${waitTime}ms), proceeding with default mode (injection)`
       );
       enablePCPInformationReceived = true;
-      enablePCPInformation = false; // Default to injection mode
+      enablePCPInformation = false;
     } else {
       debugLog(`tampermonkey waiting for enablePCPInformation event (${waitTime}ms/${enablePCPInformationTimeout}ms)`);
 
-      // Ensure loading screen is shown while waiting
       if (basicInfoSection.find(".basic-info-loading-container").length === 0) {
         debugLog(`tampermonkey loading screen missing, reshowing it`);
         basicInfoSection.empty();
@@ -2388,25 +2361,19 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
       return;
     }
   }
-
-  // Now we have the enablePCPInformation value, proceed with replacement
   debugLog(`tampermonkey found basic information section (attempt ${retryCount + 1}/${maxRetries + 1})`);
   debugLog(`tampermonkey enablePCPInformation status: ${enablePCPInformation}`);
-  // Remove loading screen and proceed with iframe replacement
   removeLoadingScreen(basicInfoSection);
 
-  // Get the patient number from the URL
   const patientNumber = location.href.split("/")[4];
   debugLog(`tampermonkey patient number for basic info replacement`, patientNumber);
   let success = false;
 
-  // First, check if we need to clean up existing iframes due to mode mismatch
   const hasExistingIframes = basicInfoSection.find(".misha-iframe-container").length > 0;
   if (hasExistingIframes) {
     const isCurrentlyFullReplacement = validateIframeReplacement(basicInfoSection, true);
     const isCurrentlyInjection = validateIframeReplacement(basicInfoSection, false);
 
-    // Clean up if mode doesn't match current setup
     if ((enablePCPInformation && !isCurrentlyFullReplacement) || (!enablePCPInformation && !isCurrentlyInjection)) {
       debugLog(`tampermonkey mode mismatch detected, cleaning up existing iframes`);
       cleanupExistingBasicInfoIframes(basicInfoSection);
@@ -2414,59 +2381,47 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
   }
 
   if (enablePCPInformation) {
-    // Full replacement mode - replace entire basic information section
     debugLog(`tampermonkey using full replacement mode`);
 
-    // Check if iframe already exists and is valid for full replacement
     if (validateIframeReplacement(basicInfoSection, true)) {
       debugLog(`tampermonkey basic info iframe already exists and is valid (full replacement)`);
       return;
     }
 
-    // Clear the existing content of the basic information section
     basicInfoSection.empty();
 
-    // Create iframe for patient status
     const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
       height: "520px",
       width: "100%",
       border: "none",
     });
 
-    // Append the iframe to the basic information section
     basicInfoSection.append(iframe);
 
-    // Store reference to the iframe for height updates
     const iframeElement = iframe.find("#MishaFrame");
     if (iframeElement.length > 0) {
       iframeElement.attr("data-patient-id", patientNumber);
       iframeElement.addClass("dynamic-height-iframe");
     }
 
-    // Validate the replacement was successful
     success = validateIframeReplacement(basicInfoSection, true);
     if (success) {
       debugLog(`tampermonkey successfully replaced basic information section with patient status iframe`);
     }
   } else {
-    // Injection mode - restore original content and inject iframe after first col-12
     debugLog(`tampermonkey using injection mode (after first col-12)`);
 
-    // Restore original content if we have it stored
     if (originalBasicInfoContent !== null) {
       debugLog(`tampermonkey restoring original basic info content for injection mode`);
       basicInfoSection.html(originalBasicInfoContent);
-      // Clear the stored content since we've used it
       originalBasicInfoContent = null;
     }
 
-    // Check if iframe already exists and is valid for injection mode
     if (validateIframeReplacement(basicInfoSection, false)) {
       debugLog(`tampermonkey basic info iframe already exists and is valid (injection mode)`);
       return;
     }
 
-    // Inject iframe after first col-12
     success = injectIframeAfterFirstCol12(basicInfoSection, patientNumber);
   }
 
@@ -2475,7 +2430,6 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
   } else {
     debugLog(`tampermonkey iframe handling failed (attempt ${retryCount + 1})`);
     if (retryCount < maxRetries && currentPatientId === location.href.split("/")[4]) {
-      // Only retry if we haven't exceeded max retries and patient hasn't changed
       debugLog(`tampermonkey scheduling retry ${retryCount + 1} for basic info handling`);
       createTimeout(() => replaceBasicInformationSection(retryCount + 1, startTime), 300 * (retryCount + 1));
     } else {
@@ -2487,7 +2441,6 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
     }
   }
 
-  // If we reach here but don't have basicInfoSection, wait for it
   if (basicInfoSection.length === 0) {
     debugLog(`tampermonkey basic information section not found, waiting...`);
     createTimeout(() => replaceBasicInformationSection(retryCount, startTime), 200);
