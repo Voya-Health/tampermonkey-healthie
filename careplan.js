@@ -2342,13 +2342,12 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
   if (!enablePCPInformationReceived) {
     const waitTime = Date.now() - startTime;
     debugLog(`tampermonkey enablePCPInformationReceived: ${enablePCPInformationReceived}, waitTime: ${waitTime}ms`);
-
     if (waitTime > enablePCPInformationTimeout) {
       debugLog(
-        `tampermonkey timeout waiting for enablePCPInformation event (${waitTime}ms), proceeding with default mode (injection)`
+        `tampermonkey timeout waiting for enablePCPInformation event (${waitTime}ms), proceeding with default mode (full replacement)`
       );
       enablePCPInformationReceived = true;
-      enablePCPInformation = false;
+      enablePCPInformation = true;
     } else {
       debugLog(`tampermonkey waiting for enablePCPInformation event (${waitTime}ms/${enablePCPInformationTimeout}ms)`);
 
