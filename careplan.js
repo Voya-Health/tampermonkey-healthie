@@ -1165,7 +1165,9 @@ function waitEditChartingNote() {
 
 function addGroupNameContent(groupName) {
   const groupNameSpan = document.querySelector('[data-tooltip-id="quick-profile-user-group__tooltip"]');
-  groupNameSpan.textContent = groupName;
+  if (groupNameSpan) {
+    groupNameSpan.textContent = groupName;
+  }
 }
 
 function removeCareplan() {
