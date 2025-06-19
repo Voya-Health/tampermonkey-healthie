@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -50,6 +50,10 @@ let isEmailVerified = true;
 let isPhoneNumberVerified = true;
 let isLoadingEmailPhone = true;
 let patientGroupName = "";
+let enablePCPInformation = false;
+let enablePCPInformationReceived = false;
+let enablePCPInformationTimeout = 10000; // 10 seconds timeout
+let originalBasicInfoContent = null; // Store original content
 
 function debugLog(...messages) {
   if (isStagingEnv || debug) {
@@ -1038,9 +1042,8 @@ function isPediatric(dobString) {
   let age = today.getFullYear() - dob.getFullYear();
 
   // Adjust if birthday hasn't occurred yet this year
-  const hasBirthdayPassed = 
-    today.getMonth() > dob.getMonth() || 
-    (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+  const hasBirthdayPassed =
+    today.getMonth() > dob.getMonth() || (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
 
   if (!hasBirthdayPassed) {
     age--;
@@ -1055,32 +1058,37 @@ function loadPediatricBanner() {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(loadPediatricBanner, 200);
   } else {
-    const basicInfo = $('.BasicInfo_basicInfo__Ks2nG');
+    const basicInfo = $(".BasicInfo_basicInfo__Ks2nG");
     if (basicInfo.length > 0) {
-        const dob = $('[data-testid="client-dob"]').text();
-        if (dob.length > 0) {
-          const isPatientPediatric = isPediatric(dob);
-          const pediatricBanner = $('.pediatric-banner');
+      const dob = $('[data-testid="client-dob"]').text();
+      if (dob.length > 0) {
+        const isPatientPediatric = isPediatric(dob);
+        const pediatricBanner = $(".pediatric-banner");
+        const mainContent = $(".scrollbars");
 
-          if (isPatientPediatric && !pediatricBanner.length) {
-            // insert pediatric label
-            const searchBarHeader = $('#main-layout__header');
-            $('<div class="pediatric-banner">PEDIATRIC</div>').css({
-                backgroundColor: '#EDF4FB',
-                color: '#457AC8',
-                fontWeight: '700',
-                marginTop: '60px',
-                padding: '12px 24px'
-            }).insertAfter(searchBarHeader);
+        if (isPatientPediatric && !pediatricBanner.length) {
+          // insert pediatric label
+          const searchBarHeader = $("#main-layout__header");
+          $('<div class="pediatric-banner">PEDIATRIC</div>')
+            .css({
+              backgroundColor: "#EDF4FB",
+              color: "#457AC8",
+              fontWeight: "700",
+              marginTop: "60px",
+              padding: "12px 24px",
+            })
+            .insertAfter(searchBarHeader);
 
-            // adjust spacing of the next element, if Pediatric banner is inserted
-            const mainContent = $('.scrollbars');
-            mainContent.css({ marginTop: '0px' })
-          }
-        } else {
-          //wait for content load
-          createTimeout(loadPediatricBanner, 200);
+          // adjust spacing of the next element, if Pediatric banner is inserted
+          mainContent.css({ marginTop: "0px" });
+        } else if (!isPatientPediatric && pediatricBanner.length) {
+          pediatricBanner.remove();
+          mainContent.css({ marginTop: "60px" });
         }
+      } else {
+        //wait for content load
+        createTimeout(loadPediatricBanner, 200);
+      }
     } else {
       //wait for content load
       createTimeout(loadPediatricBanner, 200);
@@ -1162,7 +1170,9 @@ function waitEditChartingNote() {
 
 function addGroupNameContent(groupName) {
   const groupNameSpan = document.querySelector('[data-tooltip-id="quick-profile-user-group__tooltip"]');
-  groupNameSpan.textContent = groupName;
+  if (groupNameSpan) {
+    groupNameSpan.textContent = groupName;
+  }
 }
 
 function removeCareplan() {
@@ -1387,6 +1397,50 @@ function waitForMishaMessages() {
     if (event.data.loading !== undefined) {
       debugLog("tampermonkey loading", event.data.loading);
       isLoadingEmailPhone = event.data.loading ? true : false;
+    }
+    if (event.data.healthieActionsTab !== undefined) {
+      debugLog("tampermonkey navigating to patient actions tab", event.data.healthieActionsTab);
+      const patientId = event.data.healthieActionsTab;
+      window.open(`https://${healthieURL}/users/${patientId}/actions`, "_top");
+    }
+
+    // Handle patient information height updates from misha iframe
+    if (event.data.basicInformationHeight !== undefined) {
+      debugLog("tampermonkey received basicInformationHeight event", event.data.basicInformationHeight);
+
+      // Convert string to number if needed
+      const height =
+        typeof event.data.basicInformationHeight === "string"
+          ? parseInt(event.data.basicInformationHeight, 10)
+          : event.data.basicInformationHeight;
+
+      // Get patient number from current URL
+      const currentPatientNumber = location.href.split("/")[4];
+
+      if (currentPatientNumber && !isNaN(height)) {
+        updatePatientStatusIframeHeight(currentPatientNumber, height);
+      } else {
+        debugLog("tampermonkey could not determine patient number or invalid height", {
+          patientNumber: currentPatientNumber,
+          height: height,
+        });
+      }
+    }
+    if (event.data.enablePCPInformation !== undefined) {
+      debugLog("tampermonkey received enablePCPInformation event", event.data.enablePCPInformation);
+      const previousValue = enablePCPInformation;
+      const wasNotReceived = !enablePCPInformationReceived;
+      enablePCPInformation = event.data.enablePCPInformation;
+      enablePCPInformationReceived = true;
+      debugLog("tampermonkey enablePCPInformation status set to", enablePCPInformation);
+
+      if (wasNotReceived || previousValue !== enablePCPInformation) {
+        debugLog(
+          "tampermonkey enablePCPInformation changed or first received, triggering basic info section processing"
+        );
+        clearAllTimeouts();
+        createTimeout(() => replaceBasicInformationSection(0), 100);
+      }
     }
   };
 }
@@ -1829,6 +1883,12 @@ function observeDOMChanges(mutations, observer) {
     carePlanLoopLock = 0;
     debugLog(`tampermonkey URL changed to ${location.href}`);
 
+    // Reset basic info section variables when navigating to a new patient/page
+    enablePCPInformationReceived = false;
+    enablePCPInformation = false;
+    originalBasicInfoContent = null;
+    debugLog(`tampermonkey reset basic info variables for new URL`);
+
     // Clear all timeouts
     for (let i = 0; i < timeoutIds.length; i++) {
       //debugLog(`tampermonkey clear timeout ${timeoutIds[i]}`);
@@ -1874,6 +1934,7 @@ function observeDOMChanges(mutations, observer) {
 
     if (urlValidation.membership.test(location.href)) {
       addMembershipAndOnboarding();
+      replaceBasicInformationSection();
     }
 
     if (urlValidation.verifyEmailPhone.test(location.href)) {
@@ -2012,6 +2073,7 @@ function observeDOMChanges(mutations, observer) {
     ) {
       observer.disconnect();
       addMembershipAndOnboarding();
+      replaceBasicInformationSection();
       observer.observe(document.documentElement, {
         childList: true,
         subtree: true,
@@ -2035,7 +2097,397 @@ function hideChartingNotesAppointment() {
   }
 }
 
+function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
+  // Skip the div with role="button" and find the next div with a child containing class "row"
+  // that has a div containing class "col-12"
+  debugLog("tampermonkey looking for injection point after first col-12");
+
+  // Find all divs after the role="button" div
+  const buttonDiv = basicInfoSection.find('div[role="button"]').first();
+  let targetDiv = null;
+
+  if (buttonDiv.length > 0) {
+    // Look for the next div after the button that contains row > col-12
+    let nextElements = buttonDiv.nextAll();
+    nextElements.each(function () {
+      const rowDiv = $(this).find(".row").first();
+      if (rowDiv.length > 0) {
+        const col12Div = rowDiv.find(".col-12").first();
+        if (col12Div.length > 0) {
+          targetDiv = col12Div;
+          return false; // break out of each loop
+        }
+      }
+    });
+  }
+
+  if (targetDiv) {
+    debugLog("tampermonkey found injection target after first col-12");
+
+    // Check if iframe already exists after this col-12
+    const existingIframe = targetDiv.next(".misha-iframe-container");
+    if (existingIframe.length > 0) {
+      debugLog("tampermonkey iframe already exists after col-12, skipping injection");
+      return true;
+    }
+
+    // Create iframe for patient status
+    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientId}`, {
+      height: "520px",
+      width: "100%",
+      border: "none",
+    });
+
+    // Insert iframe after the first col-12
+    targetDiv.after(iframe);
+
+    // Store reference to the iframe for height updates
+    const iframeElement = iframe.find("#MishaFrame");
+    if (iframeElement.length > 0) {
+      iframeElement.attr("data-patient-id", patientId);
+      iframeElement.addClass("dynamic-height-iframe");
+    }
+
+    debugLog("tampermonkey successfully injected iframe after first col-12");
+    return true;
+  } else {
+    debugLog("tampermonkey could not find injection target (col-12 after button)");
+    return false;
+  }
+}
+
+function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
+  // Check if iframe exists
+  const existingIframe = basicInfoSection.find(".misha-iframe-container");
+  if (existingIframe.length > 0) {
+    if (isFullReplacement) {
+      // For full replacement, iframe should be the first child
+      const firstChild = basicInfoSection.children().first();
+      return firstChild.hasClass("misha-iframe-container");
+    } else {
+      // For injection mode, iframe should exist after the first col-12
+      const buttonDiv = basicInfoSection.find('div[role="button"]').first();
+      if (buttonDiv.length > 0) {
+        let nextElements = buttonDiv.nextAll();
+        let found = false;
+        nextElements.each(function () {
+          const rowDiv = $(this).find(".row").first();
+          if (rowDiv.length > 0) {
+            const col12Div = rowDiv.find(".col-12").first();
+            if (col12Div.length > 0) {
+              const nextElement = col12Div.next();
+              if (nextElement.hasClass("misha-iframe-container")) {
+                found = true;
+                return false; // break
+              }
+            }
+          }
+        });
+        return found;
+      }
+    }
+  }
+  return false;
+}
+
+function cleanupExistingBasicInfoIframes(basicInfoSection) {
+  const existingIframes = basicInfoSection.find(".misha-iframe-container");
+  if (existingIframes.length > 0) {
+    debugLog(`tampermonkey removing ${existingIframes.length} existing iframe(s) for mode change`);
+    existingIframes.remove();
+    return true;
+  }
+  return false;
+}
+
+function createLoadingScreen() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog("tampermonkey createLoadingScreen: jQuery not available");
+    return null;
+  }
+
+  debugLog("tampermonkey creating loading screen");
+  const loadingContainer = $("<div>").addClass("basic-info-loading-container").css({
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "40px 20px",
+    margin: "10px",
+    backgroundColor: "#f8f9fa",
+    borderRadius: "8px",
+    minHeight: "200px",
+    width: "calc(100% - 20px)",
+    boxSizing: "border-box",
+    zIndex: "1000",
+    position: "relative",
+  });
+
+  const spinner = $("<div>").addClass("loading-spinner").css({
+    width: "32px",
+    height: "32px",
+    border: "3px solid #f3f3f3",
+    borderTop: "3px solid #026460",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite",
+    marginBottom: "16px",
+  });
+
+  const loadingText = $("<div>").addClass("loading-text").text("Loading patient information...").css({
+    fontSize: "14px",
+    color: "#6c757d",
+    fontWeight: "500",
+    textAlign: "center",
+    marginBottom: "8px",
+  });
+
+  if (
+    !$("style").filter(function () {
+      return $(this).text().indexOf("@keyframes spin") !== -1;
+    }).length
+  ) {
+    const spinnerStyle = $("<style>").text(`
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .basic-info-loading-container {
+        transition: opacity 0.3s ease-in-out;
+      }
+    `);
+    $("head").append(spinnerStyle);
+  }
+
+  loadingContainer.append(spinner, loadingText);
+  debugLog("tampermonkey loading screen created successfully");
+  return loadingContainer;
+}
+
+function removeLoadingScreen(basicInfoSection) {
+  const $ = initJQuery();
+  if (!$ || !basicInfoSection) {
+    return;
+  }
+
+  const loadingContainer = basicInfoSection.find(".basic-info-loading-container");
+  if (loadingContainer.length > 0) {
+    loadingContainer.fadeOut(300, function () {
+      $(this).remove();
+    });
+    debugLog("tampermonkey removed loading screen from basic info section");
+  }
+}
+
+function showLoadingScreen(basicInfoSection) {
+  const $ = initJQuery();
+  if (!$ || !basicInfoSection) {
+    debugLog("tampermonkey showLoadingScreen: jQuery or basicInfoSection not available");
+    return;
+  }
+
+  if (basicInfoSection.find(".basic-info-loading-container").length > 0) {
+    debugLog("tampermonkey loading screen already exists, skipping");
+    return;
+  }
+
+  const loadingScreen = createLoadingScreen();
+  if (loadingScreen) {
+    debugLog("tampermonkey appending loading screen to basic info section");
+    basicInfoSection.append(loadingScreen);
+    debugLog("tampermonkey showed loading screen in basic info section");
+  } else {
+    debugLog("tampermonkey failed to create loading screen");
+  }
+}
+function replaceBasicInformationSection(retryCount = 0, startTime = null) {
+  debugLog(
+    `tampermonkey replaceBasicInformationSection called - retry: ${retryCount}, startTime: ${startTime}, enablePCPInformationReceived: ${enablePCPInformationReceived}`
+  );
+
+  const $ = initJQuery();
+  const maxRetries = 3;
+  const currentPatientId = location.href.split("/")[4];
+
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    createTimeout(() => replaceBasicInformationSection(retryCount, startTime), 200);
+    return;
+  }
+  if (startTime === null) {
+    startTime = Date.now();
+  }
+
+  const basicInfoSection = $('section.cp-sidebar-expandable-section[data-testid="cp-section-basic-information"]');
+  if (basicInfoSection.length === 0) {
+    debugLog(`tampermonkey waiting for basic information section`);
+    createTimeout(() => replaceBasicInformationSection(retryCount, startTime), 200);
+    return;
+  }
+
+  if (!enablePCPInformationReceived && originalBasicInfoContent === null) {
+    originalBasicInfoContent = basicInfoSection.html();
+    debugLog(`tampermonkey stored original basic info content`);
+    basicInfoSection.empty();
+    showLoadingScreen(basicInfoSection);
+    debugLog(`tampermonkey cleared basic info section and showed loading screen`);
+  }
+
+  if (!enablePCPInformationReceived) {
+    const waitTime = Date.now() - startTime;
+    debugLog(`tampermonkey enablePCPInformationReceived: ${enablePCPInformationReceived}, waitTime: ${waitTime}ms`);
+    if (waitTime > enablePCPInformationTimeout) {
+      debugLog(
+        `tampermonkey timeout waiting for enablePCPInformation event (${waitTime}ms), proceeding with default mode (full replacement)`
+      );
+      enablePCPInformationReceived = true;
+      enablePCPInformation = true;
+    } else {
+      debugLog(`tampermonkey waiting for enablePCPInformation event (${waitTime}ms/${enablePCPInformationTimeout}ms)`);
+
+      if (basicInfoSection.find(".basic-info-loading-container").length === 0) {
+        debugLog(`tampermonkey loading screen missing, reshowing it`);
+        basicInfoSection.empty();
+        showLoadingScreen(basicInfoSection);
+      }
+      createTimeout(() => replaceBasicInformationSection(retryCount, startTime), 300);
+      return;
+    }
+  }
+  debugLog(`tampermonkey found basic information section (attempt ${retryCount + 1}/${maxRetries + 1})`);
+  debugLog(`tampermonkey enablePCPInformation status: ${enablePCPInformation}`);
+  removeLoadingScreen(basicInfoSection);
+
+  const patientNumber = location.href.split("/")[4];
+  debugLog(`tampermonkey patient number for basic info replacement`, patientNumber);
+  let success = false;
+
+  const hasExistingIframes = basicInfoSection.find(".misha-iframe-container").length > 0;
+  if (hasExistingIframes) {
+    const isCurrentlyFullReplacement = validateIframeReplacement(basicInfoSection, true);
+    const isCurrentlyInjection = validateIframeReplacement(basicInfoSection, false);
+
+    if ((enablePCPInformation && !isCurrentlyFullReplacement) || (!enablePCPInformation && !isCurrentlyInjection)) {
+      debugLog(`tampermonkey mode mismatch detected, cleaning up existing iframes`);
+      cleanupExistingBasicInfoIframes(basicInfoSection);
+    }
+  }
+
+  if (enablePCPInformation) {
+    debugLog(`tampermonkey using full replacement mode`);
+
+    if (validateIframeReplacement(basicInfoSection, true)) {
+      debugLog(`tampermonkey basic info iframe already exists and is valid (full replacement)`);
+      return;
+    }
+
+    basicInfoSection.empty();
+
+    const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
+      height: "520px",
+      width: "100%",
+      border: "none",
+    });
+
+    basicInfoSection.append(iframe);
+
+    const iframeElement = iframe.find("#MishaFrame");
+    if (iframeElement.length > 0) {
+      iframeElement.attr("data-patient-id", patientNumber);
+      iframeElement.addClass("dynamic-height-iframe");
+    }
+
+    success = validateIframeReplacement(basicInfoSection, true);
+    if (success) {
+      debugLog(`tampermonkey successfully replaced basic information section with patient status iframe`);
+    }
+  } else {
+    debugLog(`tampermonkey using injection mode (after first col-12)`);
+
+    if (originalBasicInfoContent !== null) {
+      debugLog(`tampermonkey restoring original basic info content for injection mode`);
+      basicInfoSection.html(originalBasicInfoContent);
+      originalBasicInfoContent = null;
+    }
+
+    if (validateIframeReplacement(basicInfoSection, false)) {
+      debugLog(`tampermonkey basic info iframe already exists and is valid (injection mode)`);
+      return;
+    }
+
+    success = injectIframeAfterFirstCol12(basicInfoSection, patientNumber);
+  }
+
+  if (success) {
+    debugLog(`tampermonkey basic information section handling completed successfully`);
+  } else {
+    debugLog(`tampermonkey iframe handling failed (attempt ${retryCount + 1})`);
+    if (retryCount < maxRetries && currentPatientId === location.href.split("/")[4]) {
+      debugLog(`tampermonkey scheduling retry ${retryCount + 1} for basic info handling`);
+      createTimeout(() => replaceBasicInformationSection(retryCount + 1, startTime), 300 * (retryCount + 1));
+    } else {
+      if (retryCount >= maxRetries) {
+        debugLog(`tampermonkey max retries (${maxRetries}) exceeded for basic info handling`);
+      } else {
+        debugLog(`tampermonkey patient changed during retry, aborting basic info handling`);
+      }
+    }
+  }
+
+  if (basicInfoSection.length === 0) {
+    debugLog(`tampermonkey basic information section not found, waiting...`);
+    createTimeout(() => replaceBasicInformationSection(retryCount, startTime), 200);
+    return;
+  }
+}
+
 //observe changes to the DOM, check for URL changes
 const config = { subtree: true, childList: true };
 const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
+
+function updatePatientStatusIframeHeight(patientId, contentHeight) {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load for height update`);
+    createTimeout(() => updatePatientStatusIframeHeight(patientId, contentHeight), 200);
+    return;
+  }
+
+  // Find the iframe for this specific patient
+  const targetIframe = $(`.dynamic-height-iframe[data-patient-id="${patientId}"]`);
+
+  if (targetIframe.length > 0) {
+    // Set minimum height to prevent content from being too small
+    const minHeight = 280;
+    const newHeight = Math.max(contentHeight, minHeight);
+
+    // Update iframe height
+    targetIframe.css({
+      height: `${newHeight}px`,
+      transition: "height 0.2s ease-in-out",
+    });
+
+    // Also update the container div height
+    const iframeContainer = targetIframe.closest(".misha-iframe-container");
+    if (iframeContainer.length > 0) {
+      iframeContainer.css({
+        height: `${newHeight}px`,
+        transition: "height 0.2s ease-in-out",
+      });
+    }
+
+    // Update the basic information section
+    const basicInfoSection = targetIframe.closest('section[data-testid="cp-section-basic-information"]');
+    if (basicInfoSection.length > 0) {
+      basicInfoSection.css({
+        "min-height": `${newHeight}px`,
+        transition: "min-height 0.3s ease-in-out",
+      });
+    }
+
+    debugLog(`tampermonkey successfully updated heights for patient ${patientId}`);
+  } else {
+    debugLog(`tampermonkey could not find iframe for patient ${patientId}`);
+  }
+}
