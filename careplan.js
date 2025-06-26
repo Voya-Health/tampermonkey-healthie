@@ -495,7 +495,7 @@ function showOverlay(url, style = {}) {
     let overlay = $("<div>").addClass("overlay-dialog").css({
       position: "fixed",
       inset: "0",
-      zIndex: "999",
+      zIndex: "999999999",
       background: "#000000d9",
       display: "flex",
       flexDirection: "column",
@@ -1895,7 +1895,6 @@ function observeDOMChanges(mutations, observer) {
       clearTimeout(timeoutIds[i]);
     }
     timeoutIds = [];
-
     waitForMishaMessages();
     hideGroupNameOccurrences();
 
