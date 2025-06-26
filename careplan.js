@@ -1058,7 +1058,7 @@ function loadPediatricBanner() {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(loadPediatricBanner, 200);
   } else {
-    const basicInfo = $(".BasicInfo_basicInfo__Ks2nG");
+    const basicInfo = $('[data-testid="cp-section-basic-information"]');
     if (basicInfo.length > 0) {
       const dob = $('[data-testid="client-dob"]').text();
       if (dob.length > 0) {
