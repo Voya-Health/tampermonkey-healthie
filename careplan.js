@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -495,7 +495,7 @@ function showOverlay(url, style = {}) {
     let overlay = $("<div>").addClass("overlay-dialog").css({
       position: "fixed",
       inset: "0",
-      zIndex: "999",
+      zIndex: "999999999",
       background: "#000000d9",
       display: "flex",
       flexDirection: "column",
@@ -1895,7 +1895,6 @@ function observeDOMChanges(mutations, observer) {
       clearTimeout(timeoutIds[i]);
     }
     timeoutIds = [];
-
     waitForMishaMessages();
     hideGroupNameOccurrences();
 
@@ -2240,6 +2239,7 @@ function createLoadingScreen() {
     fontWeight: "500",
     textAlign: "center",
     marginBottom: "8px",
+    zIndex: "100"
   });
 
   if (
