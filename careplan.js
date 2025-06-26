@@ -1,7 +1,11 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
+<<<<<<< cax-1406-patientstatusstandalone-bug-component-while-loading-overlaps-on
 // @version      1.4
+=======
+// @version      1.3
+>>>>>>> main
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -1058,7 +1062,7 @@ function loadPediatricBanner() {
     debugLog(`tampermonkey waiting for jquery to load`);
     createTimeout(loadPediatricBanner, 200);
   } else {
-    const basicInfo = $(".BasicInfo_basicInfo__Ks2nG");
+    const basicInfo = $('[data-testid="cp-section-basic-information"]');
     if (basicInfo.length > 0) {
       const dob = $('[data-testid="client-dob"]').text();
       if (dob.length > 0) {
