@@ -1,11 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-<<<<<<< cax-1406-patientstatusstandalone-bug-component-while-loading-overlaps-on
 // @version      1.4
-=======
-// @version      1.3
->>>>>>> main
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
