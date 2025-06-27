@@ -306,7 +306,7 @@ function createPatientDialogIframe() {
     return;
   }
   debugLog(`jQuery is loaded, attempting to find 'Add Client' button`);
-  let addPatientBtn = $(".add-client-container button").filter(function () {
+  let addPatientBtn = $('[data-testid="new-client-modal-container"] [data-testid="primaryButton"]').filter(function () {
     return $(this).text().toLowerCase().includes("add client");
   })[0];
   if (addPatientBtn) {
