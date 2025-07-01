@@ -276,7 +276,7 @@ function waitAppointmentsHome() {
 }
 
 function initBookAppointmentButton() {
-  let bookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
+  let bookAppointmentBtn = $("[data-testid='add-appointment-button']")[0];
 
   if (bookAppointmentBtn) {
     let patientNumber = location.href.split("/")[4];
@@ -285,7 +285,7 @@ function initBookAppointmentButton() {
     $(bookAppointmentBtn).remove();
     debugLog(`tampermonkey parent element is `, $(appointmentSec).children()[0]);
     clonedSec.insertAfter($(appointmentSec).children()[0]);
-    let newBookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
+    let newBookAppointmentBtn = $("[data-testid='add-appointment-button']")[0];
     let clonedBtn = $(newBookAppointmentBtn).clone();
     $(newBookAppointmentBtn).replaceWith(clonedBtn);
     clonedBtn.on("click", function (e) {
