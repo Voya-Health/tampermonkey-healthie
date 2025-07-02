@@ -410,9 +410,9 @@ function hideGroupNameOccurrences() {
 
   const selectors = {
     sidebarGroup:
-      "#main-section-container > div > div > div > div.col-3.col-sm-12.client-profile-sidebar > div:nth-child(1) > div:nth-child(1) > div > section:nth-child(2) > div.BasicInfo_basicInfo__Ks2nG > div > div:nth-child(2) > div",
+      '[data-testid="cp-section-basic-information"] div[class*="BasicInfo_basicInfo"] > div > div:nth-child(2) > div',
     clientInfoGroup:
-      "#main-section-container > div > div > div > div.col-9.col-sm-12 > div.cp-tab-contents > div.ActionsTabClientForms_formsContainer__3qLl5 > div:nth-child(1) > div.CollapsibleSection_healthieCollapsibleSection__2qKEm.CollapsibleSection_clipContent__uYSyD > div.CollapsibleSection_sectionBody__5VeiC > form > div:nth-child(7) > div:nth-child(2)",
+      '.cp-tab-contents div[class*="ActionsTabClientForms_formsContainer"] div[class*="CollapsibleSection_sectionBody"] form > div:nth-child(7) > div:nth-child(2)',
     groupTab: "div#tab-groups",
     tableColumns: ".all-users table.table.users-table.users-list tr > *:nth-child(6)",
   };
