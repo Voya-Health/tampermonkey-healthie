@@ -1135,13 +1135,13 @@ function waitEditChartingNote() {
       // Hide display of last and next appointment
       hideChartingNotesAppointment();
 
-      // add onclick event to General tab
-      const generalTabBtn = $(".TabsComponent_tab__2x4Tz");
+      // add onclick event to General tab 
+      const generalTabBtn = $('[class*="TabsComponent_tab"], .TabsComponent_tab__2x4Tz');
       generalTabBtn.on("click", function (e) {
         createTimeout(waitEditChartingNote, 0);
       });
-      // add onclick event to QuickProfile btn
-      const quickProfileBtn = $(".PrivateNotesHeader_quickProfile__kRq1v");
+      // add onclick event to QuickProfile btn 
+      const quickProfileBtn = $('[class*="PrivateNotesHeader_quickProfile"], .PrivateNotesHeader_quickProfile__kRq1v');
       quickProfileBtn.on("click", function (e) {
         createTimeout(waitEditChartingNote, 0);
       });
