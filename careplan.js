@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -276,7 +276,7 @@ function waitAppointmentsHome() {
 }
 
 function initBookAppointmentButton() {
-  let bookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
+  let bookAppointmentBtn = $("[data-testid='add-appointment-button']")[0];
 
   if (bookAppointmentBtn) {
     let patientNumber = location.href.split("/")[4];
@@ -285,7 +285,7 @@ function initBookAppointmentButton() {
     $(bookAppointmentBtn).remove();
     debugLog(`tampermonkey parent element is `, $(appointmentSec).children()[0]);
     clonedSec.insertAfter($(appointmentSec).children()[0]);
-    let newBookAppointmentBtn = $(".insurance-authorization-section").find("button:contains('Book Appointment')")[0];
+    let newBookAppointmentBtn = $("[data-testid='add-appointment-button']")[0];
     let clonedBtn = $(newBookAppointmentBtn).clone();
     $(newBookAppointmentBtn).replaceWith(clonedBtn);
     clonedBtn.on("click", function (e) {
@@ -306,7 +306,7 @@ function createPatientDialogIframe() {
     return;
   }
   debugLog(`jQuery is loaded, attempting to find 'Add Client' button`);
-  let addPatientBtn = $(".add-client-container button").filter(function () {
+  let addPatientBtn = $('[data-testid="new-client-modal-container"] [data-testid="primaryButton"]').filter(function () {
     return $(this).text().toLowerCase().includes("add client");
   })[0];
   if (addPatientBtn) {
@@ -410,9 +410,9 @@ function hideGroupNameOccurrences() {
 
   const selectors = {
     sidebarGroup:
-      "#main-section-container > div > div > div > div.col-3.col-sm-12.client-profile-sidebar > div:nth-child(1) > div:nth-child(1) > div > section:nth-child(2) > div.BasicInfo_basicInfo__Ks2nG > div > div:nth-child(2) > div",
+      '[data-testid="cp-section-basic-information"] div[class*="BasicInfo_basicInfo"] > div > div:nth-child(2) > div',
     clientInfoGroup:
-      "#main-section-container > div > div > div > div.col-9.col-sm-12 > div.cp-tab-contents > div.ActionsTabClientForms_formsContainer__3qLl5 > div:nth-child(1) > div.CollapsibleSection_healthieCollapsibleSection__2qKEm.CollapsibleSection_clipContent__uYSyD > div.CollapsibleSection_sectionBody__5VeiC > form > div:nth-child(7) > div:nth-child(2)",
+      '.cp-tab-contents div[class*="ActionsTabClientForms_formsContainer"] div[class*="CollapsibleSection_sectionBody"] form > div:nth-child(7) > div:nth-child(2)',
     groupTab: "div#tab-groups",
     tableColumns: ".all-users table.table.users-table.users-list tr > *:nth-child(6)",
   };
@@ -1135,13 +1135,13 @@ function waitEditChartingNote() {
       // Hide display of last and next appointment
       hideChartingNotesAppointment();
 
-      // add onclick event to General tab
-      const generalTabBtn = $(".TabsComponent_tab__2x4Tz");
+      // add onclick event to General tab 
+      const generalTabBtn = $('[class*="TabsComponent_tab"], .TabsComponent_tab__2x4Tz');
       generalTabBtn.on("click", function (e) {
         createTimeout(waitEditChartingNote, 0);
       });
-      // add onclick event to QuickProfile btn
-      const quickProfileBtn = $(".PrivateNotesHeader_quickProfile__kRq1v");
+      // add onclick event to QuickProfile btn 
+      const quickProfileBtn = $('[class*="PrivateNotesHeader_quickProfile"], .PrivateNotesHeader_quickProfile__kRq1v');
       quickProfileBtn.on("click", function (e) {
         createTimeout(waitEditChartingNote, 0);
       });
@@ -1774,10 +1774,11 @@ function healthieGQL(payload) {
 }
 
 function addMembershipAndOnboarding() {
-  //get phone icon and related column
-  const phoneColumn = document.querySelector(
-    "#main-section-container > div > div > div > div.col-3.col-sm-12.client-profile-sidebar > div:nth-child(1) > div:nth-child(1) > div > section:nth-child(2) > div.BasicInfo_basicInfo__Ks2nG > div > div:nth-child(1)"
-  );
+  //get phone icon and related column - using basic info section as more stable entry point
+  const basicInfoSection = document.querySelector('[data-testid="cp-section-basic-information"]');
+  const phoneColumn = basicInfoSection
+    ? basicInfoSection.querySelector('div[class*="BasicInfo_basicInfo"] > div > div:nth-child(1)')
+    : null;
   const iframeAdded = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
 
   if (phoneColumn && !iframeAdded) {
@@ -2239,7 +2240,7 @@ function createLoadingScreen() {
     fontWeight: "500",
     textAlign: "center",
     marginBottom: "8px",
-    zIndex: "100"
+    zIndex: "100",
   });
 
   if (
