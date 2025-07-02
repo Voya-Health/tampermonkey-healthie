@@ -1774,10 +1774,11 @@ function healthieGQL(payload) {
 }
 
 function addMembershipAndOnboarding() {
-  //get phone icon and related column
-  const phoneColumn = document.querySelector(
-    "#main-section-container > div > div > div > div.col-3.col-sm-12.client-profile-sidebar > div:nth-child(1) > div:nth-child(1) > div > section:nth-child(2) > div.BasicInfo_basicInfo__Ks2nG > div > div:nth-child(1)"
-  );
+  //get phone icon and related column - using basic info section as more stable entry point
+  const basicInfoSection = document.querySelector('[data-testid="cp-section-basic-information"]');
+  const phoneColumn = basicInfoSection
+    ? basicInfoSection.querySelector('div[class*="BasicInfo_basicInfo"] > div > div:nth-child(1)')
+    : null;
   const iframeAdded = phoneColumn ? phoneColumn.parentNode.querySelector(".misha-iframe-container") : null;
 
   if (phoneColumn && !iframeAdded) {
