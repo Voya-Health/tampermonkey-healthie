@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.6
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -331,9 +331,11 @@ function waitForAddPatientButton() {
     createTimeout(waitForAddPatientButton, 200);
     return;
   }
-  let addPatientBtn = $(".add-client-container button").filter(function () {
-    return $(this).text().toLowerCase().includes("add client");
-  })[0];
+  let addPatientBtn = $('[data-testid="new-client-modal-container"] button, .add-client-container button').filter(
+    function () {
+      return $(this).text().toLowerCase().includes("add client");
+    }
+  )[0];
   if (addPatientBtn) {
     debugLog("Add Client Button found");
     createPatientDialogIframe();
@@ -1135,12 +1137,12 @@ function waitEditChartingNote() {
       // Hide display of last and next appointment
       hideChartingNotesAppointment();
 
-      // add onclick event to General tab 
+      // add onclick event to General tab
       const generalTabBtn = $('[class*="TabsComponent_tab"], .TabsComponent_tab__2x4Tz');
       generalTabBtn.on("click", function (e) {
         createTimeout(waitEditChartingNote, 0);
       });
-      // add onclick event to QuickProfile btn 
+      // add onclick event to QuickProfile btn
       const quickProfileBtn = $('[class*="PrivateNotesHeader_quickProfile"], .PrivateNotesHeader_quickProfile__kRq1v');
       quickProfileBtn.on("click", function (e) {
         createTimeout(waitEditChartingNote, 0);
