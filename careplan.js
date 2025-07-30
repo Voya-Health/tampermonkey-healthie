@@ -2115,7 +2115,7 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
     // Look for the next div after the button that contains row > col
     let nextElements = buttonDiv.nextAll();
     nextElements.each(function () {
-      const rowDiv = $(this).find(".row").first();
+      const rowDiv = $(this).find(".row.align-middle").first();
       if (rowDiv.length > 0) {
         const columnsDiv = rowDiv.find(".col").first();
         if (columnsDiv.length > 0) {
@@ -2178,7 +2178,7 @@ function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
         let nextElements = buttonDiv.nextAll();
         let found = false;
         nextElements.each(function () {
-          const rowDiv = $(this).find(".row").first();
+          const rowDiv = $(this).find(".row.align-middle").first();
           if (rowDiv.length > 0) {
             const col12Div = rowDiv.find(".col").first();
             if (col12Div.length > 0) {
