@@ -2100,20 +2100,48 @@ function hideChartingNotesAppointment() {
 }
 
 function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
-  debugLog("tampermonkey using simple injection approach");
+  // Skip the div with role="button" and find the next div with a child containing class "row"
+  // that has a div containing class "col-12"
+  debugLog("tampermonkey looking for injection point after first col-12");
 
   // Check if iframe already exists
   const existingIframe = basicInfoSection.find(".misha-iframe-container");
   if (existingIframe.length > 0) {
-    debugLog("tampermonkey iframe already exists, skipping injection");
+    debugLog("tampermonkey iframe already exists after col-12, skipping injection");
     return true;
   }
 
-  // Simple approach: find any .col-12 div and inject after it
-  const col12Divs = basicInfoSection.find(".col-12");
-  if (col12Divs.length > 0) {
-    const targetDiv = col12Divs.first();
-    debugLog("tampermonkey found col-12 div for injection");
+  // Find all divs after the role="button" div
+  const buttonDiv = basicInfoSection.find('div[role="button"]').first();
+  let targetDiv = null;
+
+  if (buttonDiv.length > 0) {
+    // Look for the next div after the button that contains row > col-12
+    let nextElements = buttonDiv.nextAll();
+    nextElements.each(function () {
+      const rowDiv = $(this).find(".row").first();
+      if (rowDiv.length > 0) {
+        const col12Div = rowDiv.find(".col-12").first();
+        if (col12Div.length > 0) {
+          targetDiv = col12Div;
+          return false; // break out of each loop
+        }
+      }
+    });
+  }
+
+  // Fallback: if button approach fails, look for any .col-12 in the section
+  if (!targetDiv) {
+    debugLog("tampermonkey button approach failed, trying fallback col-12 search");
+    const col12Divs = basicInfoSection.find(".col-12");
+    if (col12Divs.length > 0) {
+      targetDiv = col12Divs.first();
+      debugLog("tampermonkey found col-12 via fallback search");
+    }
+  }
+
+  if (targetDiv) {
+    debugLog("tampermonkey found injection target after col-12");
 
     // Create iframe for patient status
     const iframe = generateIframe(`${routeURLs.patientStatus}/${patientId}`, {
@@ -2122,7 +2150,7 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
       border: "none",
     });
 
-    // Insert iframe after the first col-12
+    // Insert iframe after the col-12
     targetDiv.after(iframe);
 
     // Store reference to the iframe for height updates
@@ -2132,28 +2160,12 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
       iframeElement.addClass("dynamic-height-iframe");
     }
 
-    debugLog("tampermonkey successfully injected iframe after col-12");
+    debugLog("tampermonkey successfully injected iframe after first col-12");
     return true;
+  } else {
+    debugLog("tampermonkey could not find injection target (col-12), will retry");
+    return false;
   }
-
-  // Fallback: inject at the end of the section
-  debugLog("tampermonkey falling back to append injection");
-  const iframe = generateIframe(`${routeURLs.patientStatus}/${patientId}`, {
-    height: "520px",
-    width: "100%",
-    border: "none",
-  });
-
-  basicInfoSection.append(iframe);
-
-  const iframeElement = iframe.find("#MishaFrame");
-  if (iframeElement.length > 0) {
-    iframeElement.attr("data-patient-id", patientId);
-    iframeElement.addClass("dynamic-height-iframe");
-  }
-
-  debugLog("tampermonkey successfully injected iframe as fallback");
-  return true;
 }
 
 function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
@@ -2165,7 +2177,7 @@ function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
       const firstChild = basicInfoSection.children().first();
       return firstChild.hasClass("misha-iframe-container");
     } else {
-      // For injection mode, iframe should exist after the first col-12
+      // For injection mode, iframe should exist after any col-12 (with fallback)
       const buttonDiv = basicInfoSection.find('div[role="button"]').first();
       if (buttonDiv.length > 0) {
         let nextElements = buttonDiv.nextAll();
@@ -2183,7 +2195,16 @@ function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
             }
           }
         });
-        return found;
+        if (found) return true;
+      }
+
+      // Fallback: check if iframe exists after any .col-12 in the section
+      const col12Divs = basicInfoSection.find(".col-12");
+      for (let i = 0; i < col12Divs.length; i++) {
+        const nextElement = $(col12Divs[i]).next();
+        if (nextElement.hasClass("misha-iframe-container")) {
+          return true;
+        }
       }
     }
   }
