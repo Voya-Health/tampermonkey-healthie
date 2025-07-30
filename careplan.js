@@ -2180,9 +2180,9 @@ function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
         nextElements.each(function () {
           const rowDiv = $(this).find(".row.align-middle").first();
           if (rowDiv.length > 0) {
-            const col12Div = rowDiv.find(".col").first();
-            if (col12Div.length > 0) {
-              const nextElement = col12Div.next();
+            const columnsDiv = rowDiv.find(".col:not(.is-narrow)").first();
+            if (columnsDiv.length > 0) {
+              const nextElement = columnsDiv.next();
               if (nextElement.hasClass("misha-iframe-container")) {
                 found = true;
                 return false; // break
