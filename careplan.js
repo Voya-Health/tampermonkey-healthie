@@ -2100,10 +2100,10 @@ function hideChartingNotesAppointment() {
 }
 
 function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
-  debugLog("tampermonkey looking for injection point after first col-12");
+  debugLog("tampermonkey looking for injection point after first col");
   const existingIframe = basicInfoSection.find(".misha-iframe-container");
   if (existingIframe.length > 0) {
-    debugLog("tampermonkey iframe already exists after col-12, skipping injection");
+    debugLog("tampermonkey iframe already exists after col, skipping injection");
     return true;
   }
 
@@ -2112,14 +2112,14 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
   let targetDiv = null;
 
   if (buttonDiv.length > 0) {
-    // Look for the next div after the button that contains row > col-12
+    // Look for the next div after the button that contains row > col
     let nextElements = buttonDiv.nextAll();
     nextElements.each(function () {
       const rowDiv = $(this).find(".row").first();
       if (rowDiv.length > 0) {
-        const col12Div = rowDiv.find(".col").first();
-        if (col12Div.length > 0) {
-          targetDiv = col12Div;
+        const columnsDiv = rowDiv.find(".col").first();
+        if (columnsDiv.length > 0) {
+          targetDiv = columnsDiv;
           return false; // break out of each loop
         }
       }
@@ -2129,10 +2129,10 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
   // Fallback for if the replacement above fails
   if (!targetDiv) {
     debugLog("tampermonkey button approach failed, trying fallback col search");
-    const col12Divs = basicInfoSection.find(".col");
-    if (col12Divs.length > 0) {
-      targetDiv = col12Divs.first();
-      debugLog("tampermonkey found col-12 via fallback search");
+    const columnDivs = basicInfoSection.find(".col");
+    if (columnDivs.length > 0) {
+      targetDiv = columnDivs.first();
+      debugLog("tampermonkey found col via fallback search");
     }
   }
 
@@ -2155,10 +2155,10 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
       iframeElement.addClass("dynamic-height-iframe");
     }
 
-    debugLog("tampermonkey successfully injected iframe after first col-12");
+    debugLog("tampermonkey successfully injected iframe after first col");
     return true;
   } else {
-    debugLog("tampermonkey could not find injection target (col-12), will retry");
+    debugLog("tampermonkey could not find injection target (col), will retry");
     return false;
   }
 }
@@ -2172,7 +2172,7 @@ function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
       const firstChild = basicInfoSection.children().first();
       return firstChild.hasClass("misha-iframe-container");
     } else {
-      // For injection mode, iframe should exist after any col-12 (with fallback)
+      // For injection mode, iframe should exist after any col (with fallback)
       const buttonDiv = basicInfoSection.find('div[role="button"]').first();
       if (buttonDiv.length > 0) {
         let nextElements = buttonDiv.nextAll();
@@ -2180,7 +2180,7 @@ function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
         nextElements.each(function () {
           const rowDiv = $(this).find(".row").first();
           if (rowDiv.length > 0) {
-            const col12Div = rowDiv.find(".col-12").first();
+            const col12Div = rowDiv.find(".col").first();
             if (col12Div.length > 0) {
               const nextElement = col12Div.next();
               if (nextElement.hasClass("misha-iframe-container")) {
@@ -2193,8 +2193,8 @@ function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
         if (found) return true;
       }
 
-      // Fallback: check if iframe exists after any .col-12 in the section
-      const col12Divs = basicInfoSection.find(".col-12");
+      // Fallback: check if iframe exists after any .col in the section
+      const col12Divs = basicInfoSection.find(".col");
       for (let i = 0; i < col12Divs.length; i++) {
         const nextElement = $(col12Divs[i]).next();
         if (nextElement.hasClass("misha-iframe-container")) {
@@ -2419,7 +2419,7 @@ function replaceBasicInformationSection(retryCount = 0, startTime = null) {
       debugLog(`tampermonkey successfully replaced basic information section with patient status iframe`);
     }
   } else {
-    debugLog(`tampermonkey using injection mode (after first col-12)`);
+    debugLog(`tampermonkey using injection mode (after first col)`);
 
     if (originalBasicInfoContent !== null) {
       debugLog(`tampermonkey restoring original basic info content for injection mode`);
