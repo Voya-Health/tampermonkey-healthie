@@ -2481,7 +2481,7 @@ function updatePatientStatusIframeHeight(patientId, contentHeight) {
 
     // Update iframe height
     targetIframe.css({
-      height: `${newHeight}px`,
+      height: `${newHeight + 70}px`,
       transition: "height 0.2s ease-in-out",
     });
 
@@ -2489,7 +2489,7 @@ function updatePatientStatusIframeHeight(patientId, contentHeight) {
     const iframeContainer = targetIframe.closest(".misha-iframe-container");
     if (iframeContainer.length > 0) {
       iframeContainer.css({
-        height: `${newHeight}px`,
+        height: `${newHeight + 70}px`,
         transition: "height 0.2s ease-in-out",
       });
     }
