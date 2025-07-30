@@ -2100,38 +2100,20 @@ function hideChartingNotesAppointment() {
 }
 
 function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
-  // Skip the div with role="button" and find the next div with a child containing class "row"
-  // that has a div containing class "col-12"
-  debugLog("tampermonkey looking for injection point after first col-12");
+  debugLog("tampermonkey using simple injection approach");
 
-  // Find all divs after the role="button" div
-  const buttonDiv = basicInfoSection.find('div[role="button"]').first();
-  let targetDiv = null;
-
-  if (buttonDiv.length > 0) {
-    // Look for the next div after the button that contains row > col-12
-    let nextElements = buttonDiv.nextAll();
-    nextElements.each(function () {
-      const rowDiv = $(this).find(".row").first();
-      if (rowDiv.length > 0) {
-        const col12Div = rowDiv.find(".col-12").first();
-        if (col12Div.length > 0) {
-          targetDiv = col12Div;
-          return false; // break out of each loop
-        }
-      }
-    });
+  // Check if iframe already exists
+  const existingIframe = basicInfoSection.find(".misha-iframe-container");
+  if (existingIframe.length > 0) {
+    debugLog("tampermonkey iframe already exists, skipping injection");
+    return true;
   }
 
-  if (targetDiv) {
-    debugLog("tampermonkey found injection target after first col-12");
-
-    // Check if iframe already exists after this col-12
-    const existingIframe = targetDiv.next(".misha-iframe-container");
-    if (existingIframe.length > 0) {
-      debugLog("tampermonkey iframe already exists after col-12, skipping injection");
-      return true;
-    }
+  // Simple approach: find any .col-12 div and inject after it
+  const col12Divs = basicInfoSection.find(".col-12");
+  if (col12Divs.length > 0) {
+    const targetDiv = col12Divs.first();
+    debugLog("tampermonkey found col-12 div for injection");
 
     // Create iframe for patient status
     const iframe = generateIframe(`${routeURLs.patientStatus}/${patientId}`, {
@@ -2150,12 +2132,28 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
       iframeElement.addClass("dynamic-height-iframe");
     }
 
-    debugLog("tampermonkey successfully injected iframe after first col-12");
+    debugLog("tampermonkey successfully injected iframe after col-12");
     return true;
-  } else {
-    debugLog("tampermonkey could not find injection target (col-12 after button)");
-    return false;
   }
+
+  // Fallback: inject at the end of the section
+  debugLog("tampermonkey falling back to append injection");
+  const iframe = generateIframe(`${routeURLs.patientStatus}/${patientId}`, {
+    height: "520px",
+    width: "100%",
+    border: "none",
+  });
+
+  basicInfoSection.append(iframe);
+
+  const iframeElement = iframe.find("#MishaFrame");
+  if (iframeElement.length > 0) {
+    iframeElement.attr("data-patient-id", patientId);
+    iframeElement.addClass("dynamic-height-iframe");
+  }
+
+  debugLog("tampermonkey successfully injected iframe as fallback");
+  return true;
 }
 
 function validateIframeReplacement(basicInfoSection, isFullReplacement = true) {
