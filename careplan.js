@@ -2100,11 +2100,7 @@ function hideChartingNotesAppointment() {
 }
 
 function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
-  // Skip the div with role="button" and find the next div with a child containing class "row"
-  // that has a div containing class "col-12"
   debugLog("tampermonkey looking for injection point after first col-12");
-
-  // Check if iframe already exists
   const existingIframe = basicInfoSection.find(".misha-iframe-container");
   if (existingIframe.length > 0) {
     debugLog("tampermonkey iframe already exists after col-12, skipping injection");
@@ -2130,7 +2126,7 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
     });
   }
 
-  // Fallback: if button approach fails, look for any .col-12 in the section
+  // Fallback for if the replacement above fails
   if (!targetDiv) {
     debugLog("tampermonkey button approach failed, trying fallback col-12 search");
     const col12Divs = basicInfoSection.find(".col-12");
@@ -2150,7 +2146,6 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
       border: "none",
     });
 
-    // Insert iframe after the col-12
     targetDiv.after(iframe);
 
     // Store reference to the iframe for height updates
