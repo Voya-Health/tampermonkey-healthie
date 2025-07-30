@@ -2117,7 +2117,7 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
     nextElements.each(function () {
       const rowDiv = $(this).find(".row").first();
       if (rowDiv.length > 0) {
-        const col12Div = rowDiv.find(".col-12").first();
+        const col12Div = rowDiv.find(".col").first();
         if (col12Div.length > 0) {
           targetDiv = col12Div;
           return false; // break out of each loop
@@ -2128,8 +2128,8 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
 
   // Fallback for if the replacement above fails
   if (!targetDiv) {
-    debugLog("tampermonkey button approach failed, trying fallback col-12 search");
-    const col12Divs = basicInfoSection.find(".col-12");
+    debugLog("tampermonkey button approach failed, trying fallback col search");
+    const col12Divs = basicInfoSection.find(".col");
     if (col12Divs.length > 0) {
       targetDiv = col12Divs.first();
       debugLog("tampermonkey found col-12 via fallback search");
@@ -2137,7 +2137,7 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
   }
 
   if (targetDiv) {
-    debugLog("tampermonkey found injection target after col-12");
+    debugLog("tampermonkey found injection target after col");
 
     // Create iframe for patient status
     const iframe = generateIframe(`${routeURLs.patientStatus}/${patientId}`, {
