@@ -2117,7 +2117,7 @@ function injectIframeAfterFirstCol12(basicInfoSection, patientId) {
     nextElements.each(function () {
       const rowDiv = $(this).find(".row.align-middle").first();
       if (rowDiv.length > 0) {
-        const columnsDiv = rowDiv.find(".col").first();
+        const columnsDiv = rowDiv.find(".col:not(.is-narrow)").first();
         if (columnsDiv.length > 0) {
           targetDiv = columnsDiv;
           return false; // break out of each loop
