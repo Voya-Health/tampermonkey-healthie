@@ -34,10 +34,10 @@ const urlValidation = {
   appointments: /\/appointments|\/organization|\/providers\//,
   appointmentsHome: /^https?:\/\/[^/]+\.com(\/overview|\/)?$/,
   appointmentsProfile:
-    /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|overview|custom_nav_items\/\d+))?\/?$/,
+    /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|overview|custom_nav_items\/\d+))?\/?(\?.*)?$/,
   membership:
-    /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions|overview|actions|custom_nav_items\/\d+))?\/?$/,
-  verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions|actions))\/?$/,
+    /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions|overview|actions|custom_nav_items\/\d+))?\/?(\?.*)?$/,
+  verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions|actions))\/?(\?.*)?$/,
   carePlan: /\/all_plans$/,
   clientList: /\/clients\/active/,
   conversations: /\/conversations/,
@@ -1777,7 +1777,7 @@ function healthieGQL(payload) {
   return response;
 }
 
-function addMembershipAndOnboarding() {
+function addMembershipAndOnboarding(retryCount = 0, maxRetries = 25) {
   //get phone icon and related column - using basic info section as more stable entry point
   const basicInfoSection = document.querySelector('[data-testid="cp-section-basic-information"]');
   const phoneColumn = basicInfoSection
@@ -1799,10 +1799,14 @@ function addMembershipAndOnboarding() {
     const iframeExists = phoneColumn.parentNode.querySelector(".misha-iframe-container");
     // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
     !iframeExists && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
-  } else {
+    debugLog(`tampermonkey successfully injected patient status iframe`);
+  } else if (retryCount < maxRetries) {
+    debugLog(`tampermonkey retrying addMembershipAndOnboarding in 500ms (${retryCount + 1}/${maxRetries})`);
     createTimeout(() => {
-      addMembershipAndOnboarding();
-    }, 200);
+      addMembershipAndOnboarding(retryCount + 1, maxRetries);
+    }, 500);
+  } else {
+    debugLog(`tampermonkey addMembershipAndOnboarding failed after ${maxRetries} retries`);
   }
 }
 
