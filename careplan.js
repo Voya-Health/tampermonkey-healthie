@@ -33,8 +33,10 @@ const urlValidation = {
   apiKeys: /\/settings\/api_keys$/,
   appointments: /\/appointments|\/organization|\/providers\//,
   appointmentsHome: /^https?:\/\/[^/]+\.com(\/overview|\/)?$/,
-  appointmentsProfile: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|overview))?\/?$/,
-  membership: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions|overview|actions))?\/?$/,
+  appointmentsProfile:
+    /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|overview|custom_nav_items\/\d+))?\/?$/,
+  membership:
+    /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Overview|Actions|overview|actions|custom_nav_items\/\d+))?\/?$/,
   verifyEmailPhone: /^https?:\/\/([^\/]+)?\.?([^\/]+)\/users\/\d+(?:\/(?:Actions|actions))\/?$/,
   carePlan: /\/all_plans$/,
   clientList: /\/clients\/active/,
