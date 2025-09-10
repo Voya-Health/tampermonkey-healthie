@@ -2022,6 +2022,9 @@ function observeDOMChanges(mutations, observer) {
       //Function that will check when EditChartingNote tab has loaded
       debugLog("tampermonkey calls waitEditChartingNote");
       waitEditChartingNote();
+
+      // Set up search result click interceptor for edit charting note pages
+      setupSearchResultClickInterceptor();
     }
 
     if (!urlValidation.editChartingNote.test(location.href) && patientGroupName !== "") {
@@ -2033,6 +2036,9 @@ function observeDOMChanges(mutations, observer) {
       //Function that will check when care plan tab has loaded
       debugLog("tampermonkey calls waitCarePlan");
       waitCarePlan();
+
+      // Set up search result click interceptor for care plan pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.goals.test(location.href)) {
@@ -2041,20 +2047,32 @@ function observeDOMChanges(mutations, observer) {
       waitGoalTab();
       debugLog("tampermonkey calls loadPediatricBanner");
       loadPediatricBanner();
+
+      // Set up search result click interceptor for goals pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.appointmentsProfile.test(location.href)) {
       debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
       waitAppointmentsProfile();
+
+      // Set up search result click interceptor for appointment profile pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.membership.test(location.href)) {
       addMembershipAndOnboarding();
       replaceBasicInformationSection();
+
+      // Set up search result click interceptor for membership pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.verifyEmailPhone.test(location.href)) {
       verifyEmailPhone();
+
+      // Set up search result click interceptor for verify email/phone pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.apiKeys.test(location.href)) {
