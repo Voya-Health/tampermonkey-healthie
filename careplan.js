@@ -404,6 +404,114 @@ function waitAppointmentsProfile() {
   }
 }
 
+function setupSearchResultClickInterceptor() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load in search interceptor`);
+    createTimeout(setupSearchResultClickInterceptor, 200);
+    return;
+  }
+
+  // Extract current user ID from URL
+  const currentUrl = location.href;
+  const userIdMatch = currentUrl.match(/\/users\/(\d+)/);
+  if (!userIdMatch) {
+    debugLog(`tampermonkey search interceptor: no user ID found in current URL`);
+    return;
+  }
+  const currentUserId = userIdMatch[1];
+
+  debugLog(`tampermonkey setting up search result click interceptor for user ID: ${currentUserId}`);
+
+  // Set up click interceptor using event delegation on document
+  $(document)
+    .off("click.tampermonkeySearchInterceptor")
+    .on("click.tampermonkeySearchInterceptor", '[data-testid="view-profile"]', function (event) {
+      const clickedElement = $(this);
+      let targetHref = clickedElement.attr("href");
+
+      // Also check parent elements for href if not found on clicked element
+      if (!targetHref) {
+        targetHref = clickedElement.closest("a").attr("href");
+      }
+
+      debugLog(`tampermonkey search interceptor: clicked view-profile with href: ${targetHref}`);
+
+      if (targetHref) {
+        // Check if the target href contains the same user ID as current page
+        const targetUserIdMatch = targetHref.match(/\/users\/(\d+)/);
+        if (targetUserIdMatch && targetUserIdMatch[1] === currentUserId) {
+          debugLog(
+            `tampermonkey search interceptor: preventing click to same user ${currentUserId}, reloading page instead`
+          );
+
+          // Prevent the default navigation
+          event.preventDefault();
+          event.stopPropagation();
+
+          // Force page reload to refresh all elements
+          debugLog(`tampermonkey search interceptor: reloading page`);
+          location.reload();
+
+          return false;
+        } else {
+          debugLog(
+            `tampermonkey search interceptor: different user target (${
+              targetUserIdMatch ? targetUserIdMatch[1] : "unknown"
+            }), allowing normal navigation`
+          );
+        }
+      } else {
+        debugLog(`tampermonkey search interceptor: no href found on clicked element`);
+      }
+    });
+
+  // Also set up interceptor for search results container to catch dynamically added elements
+  const setupSearchResultsObserver = () => {
+    const searchResults = $('[data-testid="header-client-search-results"]');
+    if (searchResults.length > 0) {
+      debugLog(`tampermonkey search interceptor: found search results container`);
+
+      // Additional click handler specifically for search results
+      searchResults
+        .off("click.tampermonkeySearchResults")
+        .on("click.tampermonkeySearchResults", '[data-testid="view-profile"]', function (event) {
+          const clickedElement = $(this);
+          let targetHref = clickedElement.attr("href");
+
+          if (!targetHref) {
+            targetHref = clickedElement.closest("a").attr("href");
+          }
+
+          debugLog(`tampermonkey search results interceptor: clicked view-profile with href: ${targetHref}`);
+
+          if (targetHref) {
+            const targetUserIdMatch = targetHref.match(/\/users\/(\d+)/);
+            if (targetUserIdMatch && targetUserIdMatch[1] === currentUserId) {
+              debugLog(
+                `tampermonkey search results interceptor: preventing click to same user ${currentUserId}, reloading page instead`
+              );
+
+              event.preventDefault();
+              event.stopPropagation();
+              location.reload();
+
+              return false;
+            }
+          }
+        });
+    } else {
+      // Retry if search results container not found yet
+      setTimeout(setupSearchResultsObserver, 1000);
+    }
+  };
+
+  // Set up the search results observer with a delay
+  setTimeout(setupSearchResultsObserver, 500);
+
+  debugLog(`tampermonkey search result click interceptor setup complete`);
+}
+
 function hideGroupNameOccurrences() {
   const $ = initJQuery();
   if (!$) {
