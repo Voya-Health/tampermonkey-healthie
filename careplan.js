@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      1.9
+// @version      2.0
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -402,6 +402,114 @@ function waitAppointmentsProfile() {
       createTimeout(waitAppointmentsProfile, 200);
     }
   }
+}
+
+function setupSearchResultClickInterceptor() {
+  const $ = initJQuery();
+  if (!$) {
+    debugLog(`tampermonkey waiting for jquery to load in search interceptor`);
+    createTimeout(setupSearchResultClickInterceptor, 200);
+    return;
+  }
+
+  // Extract current user ID from URL
+  const currentUrl = location.href;
+  const userIdMatch = currentUrl.match(/\/users\/(\d+)/);
+  if (!userIdMatch) {
+    debugLog(`tampermonkey search interceptor: no user ID found in current URL`);
+    return;
+  }
+  const currentUserId = userIdMatch[1];
+
+  debugLog(`tampermonkey setting up search result click interceptor for user ID: ${currentUserId}`);
+
+  // Set up click interceptor using event delegation on document
+  $(document)
+    .off("click.tampermonkeySearchInterceptor")
+    .on("click.tampermonkeySearchInterceptor", '[data-testid="view-profile"]', function (event) {
+      const clickedElement = $(this);
+      let targetHref = clickedElement.attr("href");
+
+      // Also check parent elements for href if not found on clicked element
+      if (!targetHref) {
+        targetHref = clickedElement.closest("a").attr("href");
+      }
+
+      debugLog(`tampermonkey search interceptor: clicked view-profile with href: ${targetHref}`);
+
+      if (targetHref) {
+        // Check if the target href contains the same user ID as current page
+        const targetUserIdMatch = targetHref.match(/\/users\/(\d+)/);
+        if (targetUserIdMatch && targetUserIdMatch[1] === currentUserId) {
+          debugLog(
+            `tampermonkey search interceptor: preventing click to same user ${currentUserId}, reloading page instead`
+          );
+
+          // Prevent the default navigation
+          event.preventDefault();
+          event.stopPropagation();
+
+          // Force page reload to refresh all elements
+          debugLog(`tampermonkey search interceptor: reloading page`);
+          location.reload();
+
+          return false;
+        } else {
+          debugLog(
+            `tampermonkey search interceptor: different user target (${
+              targetUserIdMatch ? targetUserIdMatch[1] : "unknown"
+            }), allowing normal navigation`
+          );
+        }
+      } else {
+        debugLog(`tampermonkey search interceptor: no href found on clicked element`);
+      }
+    });
+
+  // Also set up interceptor for search results container to catch dynamically added elements
+  const setupSearchResultsObserver = () => {
+    const searchResults = $('[data-testid="header-client-search-results"]');
+    if (searchResults.length > 0) {
+      debugLog(`tampermonkey search interceptor: found search results container`);
+
+      // Additional click handler specifically for search results
+      searchResults
+        .off("click.tampermonkeySearchResults")
+        .on("click.tampermonkeySearchResults", '[data-testid="view-profile"]', function (event) {
+          const clickedElement = $(this);
+          let targetHref = clickedElement.attr("href");
+
+          if (!targetHref) {
+            targetHref = clickedElement.closest("a").attr("href");
+          }
+
+          debugLog(`tampermonkey search results interceptor: clicked view-profile with href: ${targetHref}`);
+
+          if (targetHref) {
+            const targetUserIdMatch = targetHref.match(/\/users\/(\d+)/);
+            if (targetUserIdMatch && targetUserIdMatch[1] === currentUserId) {
+              debugLog(
+                `tampermonkey search results interceptor: preventing click to same user ${currentUserId}, reloading page instead`
+              );
+
+              event.preventDefault();
+              event.stopPropagation();
+              location.reload();
+
+              return false;
+            }
+          }
+        });
+    } else {
+      // Retry if search results container not found yet
+      setTimeout(setupSearchResultsObserver, 1000);
+    }
+  };
+
+  // Set up the search results observer with a delay
+  setTimeout(setupSearchResultsObserver, 500);
+
+  debugLog(`tampermonkey search result click interceptor setup complete`);
 }
 
 function hideGroupNameOccurrences() {
@@ -1914,6 +2022,9 @@ function observeDOMChanges(mutations, observer) {
       //Function that will check when EditChartingNote tab has loaded
       debugLog("tampermonkey calls waitEditChartingNote");
       waitEditChartingNote();
+
+      // Set up search result click interceptor for edit charting note pages
+      setupSearchResultClickInterceptor();
     }
 
     if (!urlValidation.editChartingNote.test(location.href) && patientGroupName !== "") {
@@ -1925,6 +2036,9 @@ function observeDOMChanges(mutations, observer) {
       //Function that will check when care plan tab has loaded
       debugLog("tampermonkey calls waitCarePlan");
       waitCarePlan();
+
+      // Set up search result click interceptor for care plan pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.goals.test(location.href)) {
@@ -1933,20 +2047,32 @@ function observeDOMChanges(mutations, observer) {
       waitGoalTab();
       debugLog("tampermonkey calls loadPediatricBanner");
       loadPediatricBanner();
+
+      // Set up search result click interceptor for goals pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.appointmentsProfile.test(location.href)) {
       debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
       waitAppointmentsProfile();
+
+      // Set up search result click interceptor for appointment profile pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.membership.test(location.href)) {
       addMembershipAndOnboarding();
       replaceBasicInformationSection();
+
+      // Set up search result click interceptor for membership pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.verifyEmailPhone.test(location.href)) {
       verifyEmailPhone();
+
+      // Set up search result click interceptor for verify email/phone pages
+      setupSearchResultClickInterceptor();
     }
 
     if (urlValidation.apiKeys.test(location.href)) {
