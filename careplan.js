@@ -1515,6 +1515,18 @@ function waitForMishaMessages() {
       const patientId = event.data.healthieActionsTab;
       window.open(`https://${healthieURL}/users/${patientId}/actions`, "_top");
     }
+    if (event.data.verifyEmail !== undefined) {
+      debugLog("tampermonkey received verifyEmail event", event.data.verifyEmail);
+      const { patientId, email } = event.data.verifyEmail;
+      const verifyOverlayURL = `${routeURLs.otpVerify}?id=${patientId}&email=${encodeURIComponent(email)}`;
+      showOverlay(verifyOverlayURL, styles.otpOverlay);
+    }
+    if (event.data.verifyPhone !== undefined) {
+      debugLog("tampermonkey received verifyPhone event", event.data.verifyPhone);
+      const { patientId, phone } = event.data.verifyPhone;
+      const verifyOverlayURL = `${routeURLs.otpVerify}?id=${patientId}&phone=${encodeURIComponent(phone)}`;
+      showOverlay(verifyOverlayURL, styles.otpOverlay);
+    }
 
     // Handle patient information height updates from misha iframe
     if (event.data.basicInformationHeight !== undefined) {
