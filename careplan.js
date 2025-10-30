@@ -359,8 +359,16 @@ function waitAppointmentsProfile() {
       return $(this).find('[data-testid="tab-container"]').length > 0;
     })[0];
     if (appointmentWindow) {
-      initBookAppointmentButton();
       debugLog(`tampermonkey found appointment view on user profile`);
+
+      // Clone the book appointment button BEFORE removing children
+      let bookAppointmentBtn = $('[data-testid="add-appointment-button"]')[0];
+      let clonedBookBtn = null;
+      if (bookAppointmentBtn) {
+        clonedBookBtn = $(bookAppointmentBtn).clone();
+        debugLog(`tampermonkey cloned book appointment button`);
+      }
+
       $(appointmentWindow).css({ margin: "0", padding: "3px" });
       // get the parent with class .column.is-6 and change the width to 100%
       let parent = $(appointmentWindow).closest(".column.is-6");
@@ -394,6 +402,17 @@ function waitAppointmentsProfile() {
       const patientID = location.href.split("/")[4];
       const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
       $(appointmentWindow).append(iframe);
+
+      // Add the cloned book appointment button back after the iframe
+      if (clonedBookBtn) {
+        const patientNumber = location.href.split("/")[4];
+        clonedBookBtn.on("click", function (e) {
+          e.stopPropagation();
+          showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
+        });
+        $(appointmentWindow).append(clonedBookBtn);
+        debugLog(`tampermonkey added book appointment button after iframe`);
+      }
     } else {
       // wait for content load
       debugLog(`tampermonkey waiting appointment view on user profile`);
