@@ -355,7 +355,7 @@ function waitAppointmentsProfile() {
     return;
   } else {
     // check to see if the appointment view contents have loaded
-    let appointmentWindow = $(".insurance-authorization-section div").filter(function () {
+    let appointmentWindow = $('[data-testid="cop-appointments-section"] div').filter(function () {
       return $(this).find('[data-testid="tab-container"]').length > 0;
     })[0];
     if (appointmentWindow) {
@@ -380,9 +380,7 @@ function waitAppointmentsProfile() {
         });
 
       // also adjust width of packages section
-      $(".insurance-authorization-section.cp-section.with-dropdown-menus-for-packgs")
-        .closest(".column.is-6")
-        .css("width", "100%");
+      $('[data-testid="cop-appointments-section"]').closest(".column.is-6").css("width", "100%");
 
       // remove all children of appointments section
       while (appointmentWindow.childNodes.length > 0) {
