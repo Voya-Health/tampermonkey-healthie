@@ -397,13 +397,6 @@ function waitAppointmentsProfile() {
         appointmentWindow.removeChild(appointmentWindow.lastChild);
       }
 
-      // example of url to load - https://securestaging.gethealthie.com/users/388687
-      // can also be - https://securestaging.gethealthie.com/users/388687/Overview
-      const patientID = location.href.split("/")[4];
-      const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
-      $(appointmentWindow).append(iframe);
-
-      // Add the cloned book appointment button back after the iframe
       if (clonedBookBtn) {
         const patientNumber = location.href.split("/")[4];
         clonedBookBtn.on("click", function (e) {
@@ -411,8 +404,14 @@ function waitAppointmentsProfile() {
           showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
         });
         $(appointmentWindow).append(clonedBookBtn);
-        debugLog(`tampermonkey added book appointment button after iframe`);
+        debugLog(`tampermonkey added book appointment button before iframe`);
       }
+
+      // example of url to load - https://securestaging.gethealthie.com/users/388687
+      // can also be - https://securestaging.gethealthie.com/users/388687/Overview
+      const patientID = location.href.split("/")[4];
+      const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
+      $(appointmentWindow).append(iframe);
     } else {
       // wait for content load
       debugLog(`tampermonkey waiting appointment view on user profile`);
