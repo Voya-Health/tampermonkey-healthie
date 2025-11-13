@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -355,12 +355,20 @@ function waitAppointmentsProfile() {
     return;
   } else {
     // check to see if the appointment view contents have loaded
-    let appointmentWindow = $(".insurance-authorization-section div").filter(function () {
+    let appointmentWindow = $('[data-testid="cop-appointments-section"] div').filter(function () {
       return $(this).find('[data-testid="tab-container"]').length > 0;
     })[0];
     if (appointmentWindow) {
-      initBookAppointmentButton();
       debugLog(`tampermonkey found appointment view on user profile`);
+
+      // Clone the book appointment button BEFORE removing children
+      let bookAppointmentBtn = $('[data-testid="add-appointment-button"]')[0];
+      let clonedBookBtn = null;
+      if (bookAppointmentBtn) {
+        clonedBookBtn = $(bookAppointmentBtn).clone();
+        debugLog(`tampermonkey cloned book appointment button`);
+      }
+
       $(appointmentWindow).css({ margin: "0", padding: "3px" });
       // get the parent with class .column.is-6 and change the width to 100%
       let parent = $(appointmentWindow).closest(".column.is-6");
@@ -380,15 +388,23 @@ function waitAppointmentsProfile() {
         });
 
       // also adjust width of packages section
-      $(".insurance-authorization-section.cp-section.with-dropdown-menus-for-packgs")
-        .closest(".column.is-6")
-        .css("width", "100%");
+      $('[data-testid="cop-appointments-section"]').closest(".column.is-6").css("width", "100%");
 
       // remove all children of appointments section
       while (appointmentWindow.childNodes.length > 0) {
         let childClassName = appointmentWindow.lastChild.className;
         debugLog(`tampermonkey removing child `, childClassName);
         appointmentWindow.removeChild(appointmentWindow.lastChild);
+      }
+
+      if (clonedBookBtn) {
+        const patientNumber = location.href.split("/")[4];
+        clonedBookBtn.on("click", function (e) {
+          e.stopPropagation();
+          showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
+        });
+        $(appointmentWindow).append(clonedBookBtn);
+        debugLog(`tampermonkey added book appointment button before iframe`);
       }
 
       // example of url to load - https://securestaging.gethealthie.com/users/388687
@@ -1514,6 +1530,18 @@ function waitForMishaMessages() {
       debugLog("tampermonkey navigating to patient actions tab", event.data.healthieActionsTab);
       const patientId = event.data.healthieActionsTab;
       window.open(`https://${healthieURL}/users/${patientId}/actions`, "_top");
+    }
+    if (event.data.verifyEmail !== undefined) {
+      debugLog("tampermonkey received verifyEmail event", event.data.verifyEmail);
+      const { patientId, email } = event.data.verifyEmail;
+      const verifyOverlayURL = `${routeURLs.otpVerify}?id=${patientId}&email=${encodeURIComponent(email)}`;
+      showOverlay(verifyOverlayURL, styles.otpOverlay);
+    }
+    if (event.data.verifyPhone !== undefined) {
+      debugLog("tampermonkey received verifyPhone event", event.data.verifyPhone);
+      const { patientId, phone } = event.data.verifyPhone;
+      const verifyOverlayURL = `${routeURLs.otpVerify}?id=${patientId}&phone=${encodeURIComponent(phone)}`;
+      showOverlay(verifyOverlayURL, styles.otpOverlay);
     }
 
     // Handle patient information height updates from misha iframe
