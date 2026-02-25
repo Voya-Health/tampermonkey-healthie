@@ -55,6 +55,7 @@ function debugLog(...messages) {
     unsafeWindow.console.log(...messages);
   }
 }
+
 const routeURLs = {
   schedule: "schedule",
   careplan: "careplan",
@@ -669,6 +670,45 @@ function showOverlay(url, style = {}) {
       debugLog(`Tampermonkey displayed overlay`);
     }
   }
+}
+
+/**
+ * PostMessage contract: Misha appointments iframe → Healthie (TM)
+ * When user clicks "+ Add Appointment" in the iframe, Misha posts to parent.
+ * TM listens and opens the schedule overlay (showOverlay).
+ *
+ * Message payload: { type: 'OPEN_SCHEDULE', patientId: string }
+ * - type: must be 'OPEN_SCHEDULE'
+ * - patientId: Healthie user id (numeric string), e.g. from referrer_url
+ *
+ * Allowed origins (TM only accepts from these):
+ * - https://misha.vorihealth.com
+ * - https://qa.misha.vori.health
+ * - http://localhost:3005 (local dev)
+ */
+// Allowed origins for postMessage from Misha iframe (must match iframe's document origin)
+const MISHA_POSTMESSAGE_ORIGINS = [
+  'https://misha.vorihealth.com',
+  'https://qa.misha.vori.health',
+  'http://localhost:3005', // local dev
+];
+
+function setupMishaPostMessageListener() {
+  window.addEventListener('message', function (event) {
+    if (!MISHA_POSTMESSAGE_ORIGINS.includes(event.origin)) {
+      return;
+    }
+    const data = event.data;
+    if (!data || data.type !== 'OPEN_SCHEDULE') {
+      return;
+    }
+    const patientId = data.patientId;
+    if (!patientId || typeof patientId !== 'string' || !/^\d+$/.test(patientId)) {
+      debugLog('tampermonkey OPEN_SCHEDULE: invalid or missing patientId', patientId);
+      return;
+    }
+    showOverlay(`${routeURLs.schedule}/${patientId}`, styles.scheduleOverlay);
+  });
 }
 
 function showBothCalendars(clonedCalendar, ogCalendar) {
@@ -2236,6 +2276,9 @@ function replaceBasicInformationSection(retryCount = 0) {
 const config = { subtree: true, childList: true };
 const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
+
+// Listen for OPEN_SCHEDULE postMessage from Misha appointments iframe (e.g. "+ Add Appointment" button)
+setupMishaPostMessageListener();
 
 function updatePatientStatusIframeHeight(patientId, contentHeight) {
   const $ = initJQuery();
