@@ -341,79 +341,6 @@ function waitForAddPatientButton() {
   }
 }
 
-function waitAppointmentsProfile() {
-  const $ = initJQuery();
-  if (!$) {
-    debugLog(`tampermonkey jquery not loaded`);
-    createTimeout(waitAppointmentsProfile, 200);
-    return;
-  } else {
-    // check to see if the appointment view contents have loaded
-    let appointmentWindow = $('[data-testid="cop-appointments-section"] div').filter(function () {
-      return $(this).find('[data-testid="tab-container"]').length > 0;
-    })[0];
-    if (appointmentWindow) {
-      debugLog(`tampermonkey found appointment view on user profile`);
-
-      // Clone the book appointment button BEFORE removing children
-      let bookAppointmentBtn = $('[data-testid="add-appointment-button"]')[0];
-      let clonedBookBtn = null;
-      if (bookAppointmentBtn) {
-        clonedBookBtn = $(bookAppointmentBtn).clone();
-        debugLog(`tampermonkey cloned book appointment button`);
-      }
-
-      $(appointmentWindow).css({ margin: "0", padding: "3px" });
-      // get the parent with class .column.is-6 and change the width to 100%
-      let parent = $(appointmentWindow).closest(".column.is-6");
-      parent
-        .css({
-          width: "98%",
-          minHeight: "420px",
-          maxHeight: "max(60vh, 560px)",
-          overflow: "scroll",
-          marginTop: "2rem",
-          padding: "0",
-        })
-        .closest(".columns") // also adjust style of grandparent
-        .css({
-          display: "flex",
-          flexDirection: "column",
-        });
-
-      // also adjust width of packages section
-      $('[data-testid="cop-appointments-section"]').closest(".column.is-6").css("width", "100%");
-
-      // remove all children of appointments section
-      while (appointmentWindow.childNodes.length > 0) {
-        let childClassName = appointmentWindow.lastChild.className;
-        debugLog(`tampermonkey removing child `, childClassName);
-        appointmentWindow.removeChild(appointmentWindow.lastChild);
-      }
-
-      if (clonedBookBtn) {
-        const patientNumber = location.href.split("/")[4];
-        clonedBookBtn.on("click", function (e) {
-          e.stopPropagation();
-          showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
-        });
-        $(appointmentWindow).append(clonedBookBtn);
-        debugLog(`tampermonkey added book appointment button before iframe`);
-      }
-
-      // example of url to load - https://securestaging.gethealthie.com/users/388687
-      // can also be - https://securestaging.gethealthie.com/users/388687/Overview
-      const patientID = location.href.split("/")[4];
-      const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
-      $(appointmentWindow).append(iframe);
-    } else {
-      // wait for content load
-      debugLog(`tampermonkey waiting appointment view on user profile`);
-      createTimeout(waitAppointmentsProfile, 200);
-    }
-  }
-}
-
 function setupSearchResultClickInterceptor() {
   const $ = initJQuery();
   if (!$) {
@@ -2007,8 +1934,7 @@ function observeDOMChanges(mutations, observer) {
     }
 
     if (urlValidation.appointmentsProfile.test(location.href)) {
-      debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
-      waitAppointmentsProfile();
+      debugLog("tampermonkey calls setupSearchResultClickInterceptor for appointment profile pages");
 
       // Set up search result click interceptor for appointment profile pages
       setupSearchResultClickInterceptor();
