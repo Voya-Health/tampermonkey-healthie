@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.3
+// @version      2.4
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -66,6 +66,9 @@ const routeURLs = {
   otpVerify: "otpVerifyStandalone",
   createPatientDialog: "createPatientDialog",
 };
+
+const appointmentCardsIframeSelector = 'iframe[src*="/iFrame/patientAppointments"]';
+const appointmentCardsIframeMinHeight = "80vh";
 
 const styles = {
   scheduleOverlay: {
@@ -215,6 +218,19 @@ function generateIframe(routeURL, options = {}) {
     debugLog(`tampermonkey generated iframe for ${routeURL}`);
     return iframeElement;
   }
+}
+
+function constrainAppointmentCardsIframeHeight() {
+  document.querySelectorAll(appointmentCardsIframeSelector).forEach((iframe) => {
+    if (iframe.style.minHeight === appointmentCardsIframeMinHeight) {
+      return;
+    }
+
+    iframe.style.minHeight = appointmentCardsIframeMinHeight;
+    debugLog(
+      `tampermonkey constrained appointment cards iframe min-height to ${appointmentCardsIframeMinHeight}`
+    );
+  });
 }
 
 function waitAppointmentsHome() {
@@ -1913,6 +1929,8 @@ function verifyEmailPhoneButtons(isEmail) {
 }
 
 function observeDOMChanges(mutations, observer) {
+  constrainAppointmentCardsIframeHeight();
+
   // handle url changes
   if (location.href !== previousUrl) {
     previousUrl = location.href;
@@ -2236,6 +2254,7 @@ function replaceBasicInformationSection(retryCount = 0) {
 const config = { subtree: true, childList: true };
 const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
+constrainAppointmentCardsIframeHeight();
 
 function updatePatientStatusIframeHeight(patientId, contentHeight) {
   const $ = initJQuery();
