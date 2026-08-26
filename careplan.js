@@ -29,6 +29,7 @@ const maxWaitAttempts = 25;
 // renders once the header search is used, so a long wait would just idle.
 const maxSearchResultsWaitAttempts = 5;
 const jqueryCdnUrl = "https://code.jquery.com/jquery-3.7.0.min.js";
+const jqueryCdnIntegrity = "sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=";
 // Check for Healthie environment
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
@@ -117,6 +118,33 @@ function createTimeout(timeoutFunction, delay) {
   return timeoutId;
 }
 
+function scheduleRetryOrStop(retryFn, attempt, maxAttempts, delay, giveUpMessage, waitingMessage) {
+  if (attempt < maxAttempts) {
+    if (waitingMessage) {
+      debugLog(waitingMessage);
+    }
+    createTimeout(() => retryFn(attempt + 1), delay);
+    return;
+  }
+  debugLog(giveUpMessage);
+}
+
+function waitForJQueryOrRetry(retryFn, attempt, giveUpMessage, waitingMessage) {
+  const $ = initJQuery();
+  if ($) {
+    return $;
+  }
+  scheduleRetryOrStop(
+    retryFn,
+    attempt,
+    maxWaitAttempts,
+    200,
+    giveUpMessage,
+    waitingMessage || `tampermonkey waiting for jquery to load`
+  );
+  return null;
+}
+
 function clearAllTimeouts() {
   debugLog(`tampermonkey clear all timeouts`);
   timeoutIds.forEach((id) => {
@@ -166,12 +194,12 @@ function clearAllIntervals() {
 
 function initJQuery() {
   const $ = unsafeWindow.jQuery || unsafeWindow.$;
-  if (typeof $ === "function" && $.fn && $.fn.jquery) {
+  if (typeof $ === "function" && $.fn?.jquery) {
     return $;
   }
 
-  const existingScript = [...document.scripts].find((script) => script.src === jqueryCdnUrl);
-  if (existingScript) {
+  const jqueryAlreadyRequested = [...document.scripts].some((script) => script.src === jqueryCdnUrl);
+  if (jqueryAlreadyRequested) {
     debugLog(`tampermonkey waiting for existing jquery script to load`);
     return;
   }
@@ -179,6 +207,8 @@ function initJQuery() {
   debugLog(`tampermonkey loading jquery`);
   let script = document.createElement("script");
   script.src = jqueryCdnUrl;
+  script.integrity = jqueryCdnIntegrity;
+  script.crossOrigin = "anonymous";
   script.type = "text/javascript";
   script.dataset.tampermonkeyJquery = "true";
   script.onload = function () {
@@ -426,13 +456,13 @@ function waitAppointmentsProfile() {
 }
 
 function setupSearchResultClickInterceptor(attempt = 0) {
-  const $ = initJQuery();
-  if (!$ && attempt < maxWaitAttempts) {
-    debugLog(`tampermonkey waiting for jquery to load in search interceptor`);
-    createTimeout(() => setupSearchResultClickInterceptor(attempt + 1), 200);
-    return;
-  } else if (!$) {
-    debugLog(`tampermonkey stopped waiting for jquery in search interceptor after ${attempt} attempts`);
+  const $ = waitForJQueryOrRetry(
+    setupSearchResultClickInterceptor,
+    attempt,
+    `tampermonkey stopped waiting for jquery in search interceptor after ${attempt} attempts`,
+    `tampermonkey waiting for jquery to load in search interceptor`
+  );
+  if (!$) {
     return;
   }
 
@@ -530,11 +560,14 @@ function setupSearchResultClickInterceptor(attempt = 0) {
             }
           }
         });
-    } else if (attempt < maxSearchResultsWaitAttempts) {
-      // Retry if search results container not found yet
-      createTimeout(() => setupSearchResultsObserver(attempt + 1), 1000);
     } else {
-      debugLog(`tampermonkey stopped waiting for search results container after ${attempt} attempts`);
+      scheduleRetryOrStop(
+        setupSearchResultsObserver,
+        attempt,
+        maxSearchResultsWaitAttempts,
+        1000,
+        `tampermonkey stopped waiting for search results container after ${attempt} attempts`
+      );
     }
   };
 
@@ -545,13 +578,12 @@ function setupSearchResultClickInterceptor(attempt = 0) {
 }
 
 function hideGroupNameOccurrences(attempt = 0) {
-  const $ = initJQuery();
-  if (!$ && attempt < maxWaitAttempts) {
-    debugLog(`tampermonkey waiting for jquery to load`);
-    createTimeout(() => hideGroupNameOccurrences(attempt + 1), 200);
-    return;
-  } else if (!$) {
-    debugLog(`tampermonkey stopped waiting for jquery while hiding group names after ${attempt} attempts`);
+  const $ = waitForJQueryOrRetry(
+    hideGroupNameOccurrences,
+    attempt,
+    `tampermonkey stopped waiting for jquery while hiding group names after ${attempt} attempts`
+  );
+  if (!$) {
     return;
   }
 
@@ -1091,13 +1123,16 @@ function waitGoalTab(attempt = 0) {
   if (goals_tab) {
     debugLog(`tampermonkey found goals tab`);
     goals_tab.remove();
-  } else if (attempt < maxWaitAttempts) {
-    //wait for content load
-    debugLog(`tampermonkey waiting goals tab`);
-    createTimeout(() => waitGoalTab(attempt + 1), 200);
-  } else {
-    debugLog(`tampermonkey stopped waiting for goals tab after ${attempt} attempts`);
+    return;
   }
+  scheduleRetryOrStop(
+    waitGoalTab,
+    attempt,
+    maxWaitAttempts,
+    200,
+    `tampermonkey stopped waiting for goals tab after ${attempt} attempts`,
+    `tampermonkey waiting goals tab`
+  );
 }
 
 function isPediatric(dobString) {
@@ -1117,52 +1152,59 @@ function isPediatric(dobString) {
 
 function loadPediatricBanner(attempt = 0) {
   // find patient DOB
-  const $ = initJQuery();
-  if (!$ && attempt < maxWaitAttempts) {
-    debugLog(`tampermonkey waiting for jquery to load`);
-    createTimeout(() => loadPediatricBanner(attempt + 1), 200);
-  } else if (!$) {
-    debugLog(`tampermonkey stopped waiting for jquery while loading pediatric banner after ${attempt} attempts`);
-  } else {
-    const basicInfo = $('[data-testid="cp-section-basic-information"]');
-    if (basicInfo.length > 0) {
-      const dob = $('[data-testid="client-dob"]').text();
-      if (dob.length > 0) {
-        const isPatientPediatric = isPediatric(dob);
-        const pediatricBanner = $(".pediatric-banner");
-        const mainContent = $(".scrollbars");
+  const $ = waitForJQueryOrRetry(
+    loadPediatricBanner,
+    attempt,
+    `tampermonkey stopped waiting for jquery while loading pediatric banner after ${attempt} attempts`
+  );
+  if (!$) {
+    return;
+  }
 
-        if (isPatientPediatric && !pediatricBanner.length) {
-          // insert pediatric label
-          const searchBarHeader = $("#main-layout__header");
-          $('<div class="pediatric-banner">PEDIATRIC</div>')
-            .css({
-              backgroundColor: "#EDF4FB",
-              color: "#457AC8",
-              fontWeight: "700",
-              marginTop: "60px",
-              padding: "12px 24px",
-            })
-            .insertAfter(searchBarHeader);
+  const basicInfo = $('[data-testid="cp-section-basic-information"]');
+  if (basicInfo.length > 0) {
+    const dob = $('[data-testid="client-dob"]').text();
+    if (dob.length > 0) {
+      const isPatientPediatric = isPediatric(dob);
+      const pediatricBanner = $(".pediatric-banner");
+      const mainContent = $(".scrollbars");
 
-          // adjust spacing of the next element, if Pediatric banner is inserted
-          mainContent.css({ marginTop: "0px" });
-        } else if (!isPatientPediatric && pediatricBanner.length) {
-          pediatricBanner.remove();
-          mainContent.css({ marginTop: "60px" });
-        }
-      } else if (attempt < maxWaitAttempts) {
-        //wait for content load
-        createTimeout(() => loadPediatricBanner(attempt + 1), 200);
-      } else {
-        debugLog(`tampermonkey stopped waiting for patient DOB after ${attempt} attempts`);
+      if (isPatientPediatric && !pediatricBanner.length) {
+        // insert pediatric label
+        const searchBarHeader = $("#main-layout__header");
+        $('<div class="pediatric-banner">PEDIATRIC</div>')
+          .css({
+            backgroundColor: "#EDF4FB",
+            color: "#457AC8",
+            fontWeight: "700",
+            marginTop: "60px",
+            padding: "12px 24px",
+          })
+          .insertAfter(searchBarHeader);
+
+        // adjust spacing of the next element, if Pediatric banner is inserted
+        mainContent.css({ marginTop: "0px" });
+      } else if (!isPatientPediatric && pediatricBanner.length) {
+        pediatricBanner.remove();
+        mainContent.css({ marginTop: "60px" });
       }
-    } else if (attempt < maxWaitAttempts) {
-      //wait for content load
-      createTimeout(() => loadPediatricBanner(attempt + 1), 200);
     } else {
-      debugLog(`tampermonkey stopped waiting for basic patient information after ${attempt} attempts`);
+      scheduleRetryOrStop(
+        loadPediatricBanner,
+        attempt,
+        maxWaitAttempts,
+        200,
+        `tampermonkey stopped waiting for patient DOB after ${attempt} attempts`
+      );
     }
+  } else {
+    scheduleRetryOrStop(
+      loadPediatricBanner,
+      attempt,
+      maxWaitAttempts,
+      200,
+      `tampermonkey stopped waiting for basic patient information after ${attempt} attempts`
+    );
   }
 }
 
@@ -1194,12 +1236,13 @@ function waitCarePlan() {
 }
 
 function waitEditChartingNote(attempt = 0) {
-  const $ = initJQuery();
-  if (!$ && attempt < maxWaitAttempts) {
-    debugLog(`tampermonkey waiting for jquery to load`);
-    createTimeout(() => waitEditChartingNote(attempt + 1), 200);
-  } else if (!$) {
-    debugLog(`tampermonkey stopped waiting for jquery on chart note edit after ${attempt} attempts`);
+  const $ = waitForJQueryOrRetry(
+    waitEditChartingNote,
+    attempt,
+    `tampermonkey stopped waiting for jquery on chart note edit after ${attempt} attempts`
+  );
+  if (!$) {
+    return;
   } else {
     // Wait for side bar patient profile to load
     const quickProfileTabContent = $("#quick-profile-core-content");
@@ -1234,10 +1277,14 @@ function waitEditChartingNote(attempt = 0) {
       } else {
         addGroupNameContent(patientGroupName);
       }
-    } else if (attempt < maxWaitAttempts) {
-      createTimeout(() => waitEditChartingNote(attempt + 1), 200);
     } else {
-      debugLog(`tampermonkey stopped waiting for quick profile after ${attempt} attempts`);
+      scheduleRetryOrStop(
+        waitEditChartingNote,
+        attempt,
+        maxWaitAttempts,
+        200,
+        `tampermonkey stopped waiting for quick profile after ${attempt} attempts`
+      );
     }
   }
 }
@@ -1683,12 +1730,15 @@ function isAPIconnected(attempt = 0) {
 
       header.insertAdjacentElement("afterend", apiMsgDiv);
     }
-  } else if (attempt < maxWaitAttempts) {
-    //wait for content load
-    debugLog(`tampermonkey waiting for header`);
-    createTimeout(() => isAPIconnected(attempt + 1), 200);
   } else {
-    debugLog(`tampermonkey stopped waiting for header after ${attempt} attempts`);
+    scheduleRetryOrStop(
+      isAPIconnected,
+      attempt,
+      maxWaitAttempts,
+      200,
+      `tampermonkey stopped waiting for header after ${attempt} attempts`,
+      `tampermonkey waiting for header`
+    );
   }
 }
 
@@ -2169,20 +2219,18 @@ function observeDOMChanges(mutations, observer) {
 }
 
 function hideChartingNotesAppointment(attempt = 0) {
-  const $ = initJQuery();
-  if (!$ && attempt < maxWaitAttempts) {
-    console.log(`hideChartingNotesAppointment tampermonkey waiting for jquery to load`);
-    createTimeout(() => hideChartingNotesAppointment(attempt + 1), 200);
+  const $ = waitForJQueryOrRetry(
+    hideChartingNotesAppointment,
+    attempt,
+    `tampermonkey stopped waiting for jquery while hiding chart note appointments after ${attempt} attempts`
+  );
+  if (!$) {
     return;
-  } else if (!$) {
-    debugLog(`tampermonkey stopped waiting for jquery while hiding chart note appointments after ${attempt} attempts`);
-    return;
-  } else {
-    console.log(`hideChartingNotesAppointment Removing appointment tab ...`);
-
-    $(`section[data-testid="cp-section-appointments"]`).hide();
-    console.log(`Tampermonkey hideChartingNotesAppointment removed appointment tab`);
   }
+
+  console.log(`hideChartingNotesAppointment Removing appointment tab ...`);
+  $(`section[data-testid="cp-section-appointments"]`).hide();
+  console.log(`Tampermonkey hideChartingNotesAppointment removed appointment tab`);
 }
 
 function validateIframeReplacement(basicInfoSection) {
