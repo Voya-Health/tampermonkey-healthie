@@ -28,8 +28,6 @@ const maxWaitAttempts = 25;
 // Shorter bound than maxWaitAttempts: this poll runs at 1s and its target only
 // renders once the header search is used, so a long wait would just idle.
 const maxSearchResultsWaitAttempts = 5;
-const jqueryCdnUrl = "https://code.jquery.com/jquery-3.7.0.min.js";
-const jqueryCdnIntegrity = "sha256-2Pmvv0kuTBOenSvLm6bvfBSSHrUJ+3A7x6P5Ebd07/g=";
 // Check for Healthie environment
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
@@ -193,28 +191,20 @@ function clearAllIntervals() {
 }
 
 function initJQuery() {
-  const $ = unsafeWindow.jQuery || unsafeWindow.$;
-  if (typeof $ === "function" && $.fn?.jquery) {
+  let $ = unsafeWindow.jQuery;
+  if ($ && $ !== undefined && typeof $ === "function") {
     return $;
+  } else {
+    debugLog(`tampermonkey waiting for jquery to load`);
+    let script = document.createElement("script");
+    script.src = "https://code.jquery.com/jquery-3.7.0.min.js";
+    script.type = "text/javascript";
+    script.onload = function () {
+      debugLog(`tampermonkey jquery loaded successfully`);
+    };
+    document.getElementsByTagName("head")[0].appendChild(script);
+    createTimeout(initJQuery, 200);
   }
-
-  const jqueryAlreadyRequested = [...document.scripts].some((script) => script.src === jqueryCdnUrl);
-  if (jqueryAlreadyRequested) {
-    debugLog(`tampermonkey waiting for existing jquery script to load`);
-    return;
-  }
-
-  debugLog(`tampermonkey loading jquery`);
-  let script = document.createElement("script");
-  script.src = jqueryCdnUrl;
-  script.integrity = jqueryCdnIntegrity;
-  script.crossOrigin = "anonymous";
-  script.type = "text/javascript";
-  script.dataset.tampermonkeyJquery = "true";
-  script.onload = function () {
-    debugLog(`tampermonkey jquery loaded successfully`);
-  };
-  (document.head || document.documentElement).appendChild(script);
 }
 initJQuery();
 
