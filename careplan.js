@@ -196,13 +196,16 @@ function initJQuery() {
     return $;
   } else {
     debugLog(`tampermonkey waiting for jquery to load`);
-    let script = document.createElement("script");
-    script.src = "https://code.jquery.com/jquery-3.7.0.min.js";
-    script.type = "text/javascript";
-    script.onload = function () {
-      debugLog(`tampermonkey jquery loaded successfully`);
-    };
-    document.getElementsByTagName("head")[0].appendChild(script);
+    const jquerySrc = "https://code.jquery.com/jquery-3.7.0.min.js";
+    if (!document.querySelector(`script[src="${jquerySrc}"]`)) {
+      let script = document.createElement("script");
+      script.src = jquerySrc;
+      script.type = "text/javascript";
+      script.onload = function () {
+        debugLog(`tampermonkey jquery loaded successfully`);
+      };
+      document.getElementsByTagName("head")[0].appendChild(script);
+    }
     createTimeout(initJQuery, 200);
   }
 }
