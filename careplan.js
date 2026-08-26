@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.3
+// @version      2.4
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -20,9 +20,15 @@ let debug = false;
 let previousUrl = "";
 let patientNumber = "";
 let carePlanLoopLock = 0;
+let searchInterceptorUrl = "";
 //Keep track of timeouts
 let timeoutIds = [];
 let intervalIds = [];
+const maxWaitAttempts = 25;
+// Shorter bound than maxWaitAttempts: this poll runs at 1s and its target only
+// renders once the header search is used, so a long wait would just idle.
+const maxSearchResultsWaitAttempts = 5;
+const jqueryCdnUrl = "https://code.jquery.com/jquery-3.7.0.min.js";
 // Check for Healthie environment
 const isStagingEnv = location.href.includes("securestaging") ? true : false;
 let mishaURL = isStagingEnv ? "qa.misha.vori.health/" : "misha.vorihealth.com/";
@@ -159,20 +165,26 @@ function clearAllIntervals() {
 }
 
 function initJQuery() {
-  let $ = unsafeWindow.jQuery;
-  if ($ && $ !== undefined && typeof $ === "function") {
+  const $ = unsafeWindow.jQuery || unsafeWindow.$;
+  if (typeof $ === "function" && $.fn && $.fn.jquery) {
     return $;
-  } else {
-    debugLog(`tampermonkey waiting for jquery to load`);
-    let script = document.createElement("script");
-    script.src = "https://code.jquery.com/jquery-3.7.0.min.js";
-    script.type = "text/javascript";
-    script.onload = function () {
-      debugLog(`tampermonkey jquery loaded successfully`);
-    };
-    document.getElementsByTagName("head")[0].appendChild(script);
-    createTimeout(initJQuery, 200);
   }
+
+  const existingScript = [...document.scripts].find((script) => script.src === jqueryCdnUrl);
+  if (existingScript) {
+    debugLog(`tampermonkey waiting for existing jquery script to load`);
+    return;
+  }
+
+  debugLog(`tampermonkey loading jquery`);
+  let script = document.createElement("script");
+  script.src = jqueryCdnUrl;
+  script.type = "text/javascript";
+  script.dataset.tampermonkeyJquery = "true";
+  script.onload = function () {
+    debugLog(`tampermonkey jquery loaded successfully`);
+  };
+  (document.head || document.documentElement).appendChild(script);
 }
 initJQuery();
 
@@ -413,22 +425,31 @@ function waitAppointmentsProfile() {
   }
 }
 
-function setupSearchResultClickInterceptor() {
+function setupSearchResultClickInterceptor(attempt = 0) {
   const $ = initJQuery();
-  if (!$) {
+  if (!$ && attempt < maxWaitAttempts) {
     debugLog(`tampermonkey waiting for jquery to load in search interceptor`);
-    createTimeout(setupSearchResultClickInterceptor, 200);
+    createTimeout(() => setupSearchResultClickInterceptor(attempt + 1), 200);
+    return;
+  } else if (!$) {
+    debugLog(`tampermonkey stopped waiting for jquery in search interceptor after ${attempt} attempts`);
     return;
   }
 
   // Extract current user ID from URL
   const currentUrl = location.href;
+  if (searchInterceptorUrl === currentUrl) {
+    debugLog(`tampermonkey search interceptor already set up for current URL`);
+    return;
+  }
+
   const userIdMatch = currentUrl.match(/\/users\/(\d+)/);
   if (!userIdMatch) {
     debugLog(`tampermonkey search interceptor: no user ID found in current URL`);
     return;
   }
   const currentUserId = userIdMatch[1];
+  searchInterceptorUrl = currentUrl;
 
   debugLog(`tampermonkey setting up search result click interceptor for user ID: ${currentUserId}`);
 
@@ -476,7 +497,7 @@ function setupSearchResultClickInterceptor() {
     });
 
   // Also set up interceptor for search results container to catch dynamically added elements
-  const setupSearchResultsObserver = () => {
+  const setupSearchResultsObserver = (attempt = 0) => {
     const searchResults = $('[data-testid="header-client-search-results"]');
     if (searchResults.length > 0) {
       debugLog(`tampermonkey search interceptor: found search results container`);
@@ -509,23 +530,28 @@ function setupSearchResultClickInterceptor() {
             }
           }
         });
-    } else {
+    } else if (attempt < maxSearchResultsWaitAttempts) {
       // Retry if search results container not found yet
-      setTimeout(setupSearchResultsObserver, 1000);
+      createTimeout(() => setupSearchResultsObserver(attempt + 1), 1000);
+    } else {
+      debugLog(`tampermonkey stopped waiting for search results container after ${attempt} attempts`);
     }
   };
 
   // Set up the search results observer with a delay
-  setTimeout(setupSearchResultsObserver, 500);
+  createTimeout(setupSearchResultsObserver, 500);
 
   debugLog(`tampermonkey search result click interceptor setup complete`);
 }
 
-function hideGroupNameOccurrences() {
+function hideGroupNameOccurrences(attempt = 0) {
   const $ = initJQuery();
-  if (!$) {
+  if (!$ && attempt < maxWaitAttempts) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    createTimeout(hideGroupNameOccurrences, 200);
+    createTimeout(() => hideGroupNameOccurrences(attempt + 1), 200);
+    return;
+  } else if (!$) {
+    debugLog(`tampermonkey stopped waiting for jquery while hiding group names after ${attempt} attempts`);
     return;
   }
 
@@ -1059,16 +1085,18 @@ function waitAddAppointmentsBtn() {
   }
 }
 
-function waitGoalTab() {
+function waitGoalTab(attempt = 0) {
   //check to see if the care plan tab contents has loaded
   const goals_tab = document.querySelector('[data-testid="tab-goals"]');
   if (goals_tab) {
     debugLog(`tampermonkey found goals tab`);
     goals_tab.remove();
-  } else {
+  } else if (attempt < maxWaitAttempts) {
     //wait for content load
     debugLog(`tampermonkey waiting goals tab`);
-    createTimeout(waitGoalTab, 200);
+    createTimeout(() => waitGoalTab(attempt + 1), 200);
+  } else {
+    debugLog(`tampermonkey stopped waiting for goals tab after ${attempt} attempts`);
   }
 }
 
@@ -1087,12 +1115,14 @@ function isPediatric(dobString) {
   return age < 18;
 }
 
-function loadPediatricBanner() {
+function loadPediatricBanner(attempt = 0) {
   // find patient DOB
   const $ = initJQuery();
-  if (!$) {
+  if (!$ && attempt < maxWaitAttempts) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    createTimeout(loadPediatricBanner, 200);
+    createTimeout(() => loadPediatricBanner(attempt + 1), 200);
+  } else if (!$) {
+    debugLog(`tampermonkey stopped waiting for jquery while loading pediatric banner after ${attempt} attempts`);
   } else {
     const basicInfo = $('[data-testid="cp-section-basic-information"]');
     if (basicInfo.length > 0) {
@@ -1121,13 +1151,17 @@ function loadPediatricBanner() {
           pediatricBanner.remove();
           mainContent.css({ marginTop: "60px" });
         }
-      } else {
+      } else if (attempt < maxWaitAttempts) {
         //wait for content load
-        createTimeout(loadPediatricBanner, 200);
+        createTimeout(() => loadPediatricBanner(attempt + 1), 200);
+      } else {
+        debugLog(`tampermonkey stopped waiting for patient DOB after ${attempt} attempts`);
       }
-    } else {
+    } else if (attempt < maxWaitAttempts) {
       //wait for content load
-      createTimeout(loadPediatricBanner, 200);
+      createTimeout(() => loadPediatricBanner(attempt + 1), 200);
+    } else {
+      debugLog(`tampermonkey stopped waiting for basic patient information after ${attempt} attempts`);
     }
   }
 }
@@ -1159,26 +1193,28 @@ function waitCarePlan() {
   }
 }
 
-function waitEditChartingNote() {
+function waitEditChartingNote(attempt = 0) {
   const $ = initJQuery();
-  if (!$) {
+  if (!$ && attempt < maxWaitAttempts) {
     debugLog(`tampermonkey waiting for jquery to load`);
-    createTimeout(waitEditChartingNote, 200);
+    createTimeout(() => waitEditChartingNote(attempt + 1), 200);
+  } else if (!$) {
+    debugLog(`tampermonkey stopped waiting for jquery on chart note edit after ${attempt} attempts`);
   } else {
     // Wait for side bar patient profile to load
-    const quickProfileTabContent = $(".quick-profile__tab-content.with-portal");
+    const quickProfileTabContent = $("#quick-profile-core-content");
     if (quickProfileTabContent.length) {
       // Hide display of last and next appointment
       hideChartingNotesAppointment();
 
       // add onclick event to General tab
       const generalTabBtn = $('[class*="TabsComponent_tab"], .TabsComponent_tab__2x4Tz');
-      generalTabBtn.on("click", function (e) {
+      generalTabBtn.off("click.tampermonkeyChartNote").on("click.tampermonkeyChartNote", function () {
         createTimeout(waitEditChartingNote, 0);
       });
       // add onclick event to QuickProfile btn
       const quickProfileBtn = $('[class*="PrivateNotesHeader_quickProfile"], .PrivateNotesHeader_quickProfile__kRq1v');
-      quickProfileBtn.on("click", function (e) {
+      quickProfileBtn.off("click.tampermonkeyChartNote").on("click.tampermonkeyChartNote", function () {
         createTimeout(waitEditChartingNote, 0);
       });
       if (patientGroupName === "") {
@@ -1198,8 +1234,10 @@ function waitEditChartingNote() {
       } else {
         addGroupNameContent(patientGroupName);
       }
+    } else if (attempt < maxWaitAttempts) {
+      createTimeout(() => waitEditChartingNote(attempt + 1), 200);
     } else {
-      createTimeout(waitEditChartingNote, 200);
+      debugLog(`tampermonkey stopped waiting for quick profile after ${attempt} attempts`);
     }
   }
 }
@@ -1599,7 +1637,7 @@ function waitSettingsAPIpage() {
   }
 }
 
-function isAPIconnected() {
+function isAPIconnected(attempt = 0) {
   //check to see if the header has loaded
   if (document.querySelector(".header")) {
     let voriHeaderExists = document.querySelector(".vori-api-message");
@@ -1645,10 +1683,12 @@ function isAPIconnected() {
 
       header.insertAdjacentElement("afterend", apiMsgDiv);
     }
-  } else {
+  } else if (attempt < maxWaitAttempts) {
     //wait for content load
     debugLog(`tampermonkey waiting for header`);
-    createTimeout(isAPIconnected, 200);
+    createTimeout(() => isAPIconnected(attempt + 1), 200);
+  } else {
+    debugLog(`tampermonkey stopped waiting for header after ${attempt} attempts`);
   }
 }
 
@@ -1955,7 +1995,7 @@ function observeDOMChanges(mutations, observer) {
       setupSearchResultClickInterceptor();
     }
 
-    if (urlValidation.goals.test(location.href)) {
+    if (urlValidation.goals.test(location.href) && !urlValidation.editChartingNote.test(location.href)) {
       //Function that will check when goal tab has loaded
       debugLog("tampermonkey calls waitGoalTab");
       waitGoalTab();
@@ -2128,11 +2168,14 @@ function observeDOMChanges(mutations, observer) {
   }
 }
 
-function hideChartingNotesAppointment() {
+function hideChartingNotesAppointment(attempt = 0) {
   const $ = initJQuery();
-  if (!$) {
+  if (!$ && attempt < maxWaitAttempts) {
     console.log(`hideChartingNotesAppointment tampermonkey waiting for jquery to load`);
-    createTimeout(hideChartingNotesAppointment, 200);
+    createTimeout(() => hideChartingNotesAppointment(attempt + 1), 200);
+    return;
+  } else if (!$) {
+    debugLog(`tampermonkey stopped waiting for jquery while hiding chart note appointments after ${attempt} attempts`);
     return;
   } else {
     console.log(`hideChartingNotesAppointment Removing appointment tab ...`);
