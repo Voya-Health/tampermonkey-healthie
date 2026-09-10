@@ -1486,12 +1486,9 @@ function waitForMishaMessages() {
     }
     if (event.data.newChartNoteId !== undefined) {
       debugLog("tampermonkey navigating to new charting note", event.data.newChartNoteId);
-      window.open(
-        `https://${healthieURL}/users/${event.data.newChartNoteId.split("-")[1]}/private_notes/edit/${
-          event.data.newChartNoteId.split("-")[0]
-        }`,
-        "_top"
-      );
+      window.top.location.href = `https://${healthieURL}/users/${
+        event.data.newChartNoteId.split("-")[1]
+      }/private_notes/edit/${event.data.newChartNoteId.split("-")[0]}`;
     }
     if (event.data.patientGroupName !== undefined) {
       debugLog("tampermonkey replace patientGroupName content", event.data.patientGroupName);
