@@ -722,6 +722,31 @@ function showOverlay(url, style = {}) {
   }
 }
 
+// Staging Add Appointment posts { type: "OPEN_SCHEDULE", patientId }. Prod uses waitAppointmentsProfile.
+const MISHA_POSTMESSAGE_ORIGINS = [
+  "https://misha.vorihealth.com",
+  "https://qa.misha.vori.health",
+  "http://localhost:3005",
+];
+
+function setupMishaPostMessageListener() {
+  window.addEventListener("message", function (event) {
+    if (!MISHA_POSTMESSAGE_ORIGINS.includes(event.origin)) {
+      return;
+    }
+    const data = event.data;
+    if (!data || data.type !== "OPEN_SCHEDULE") {
+      return;
+    }
+    const patientId = data.patientId;
+    if (!patientId || typeof patientId !== "string" || !/^\d+$/.test(patientId)) {
+      debugLog("tampermonkey OPEN_SCHEDULE: invalid or missing patientId", patientId);
+      return;
+    }
+    showOverlay(`${routeURLs.schedule}/${patientId}`, styles.scheduleOverlay);
+  });
+}
+
 function showBothCalendars(clonedCalendar, ogCalendar) {
   clonedCalendar.css({
     position: "absolute",
@@ -2047,8 +2072,12 @@ function observeDOMChanges(mutations, observer) {
     }
 
     if (urlValidation.appointmentsProfile.test(location.href)) {
-      debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
-      waitAppointmentsProfile();
+      if (isStagingEnv) {
+        debugLog("tampermonkey skips waitAppointmentsProfile on staging; OPEN_SCHEDULE listener opens the modal");
+      } else {
+        debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
+        waitAppointmentsProfile();
+      }
 
       // Set up search result click interceptor for appointment profile pages
       setupSearchResultClickInterceptor();
@@ -2317,6 +2346,7 @@ function replaceBasicInformationSection(retryCount = 0) {
 const config = { subtree: true, childList: true };
 const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
+setupMishaPostMessageListener();
 
 function updatePatientStatusIframeHeight(patientId, contentHeight) {
   const $ = initJQuery();
