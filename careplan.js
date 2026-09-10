@@ -55,56 +55,6 @@ function debugLog(...messages) {
     unsafeWindow.console.log(...messages);
   }
 }
-
-// BEGIN chart-note-navigation
-function parseChartNoteRef(raw) {
-  if (raw == null) {
-    return null;
-  }
-  const value = String(raw);
-  const dash = value.indexOf("-");
-  if (dash < 1 || dash === value.length - 1) {
-    return null;
-  }
-  return { noteId: value.slice(0, dash), patientId: value.slice(dash + 1) };
-}
-
-function buildChartNoteEditUrl(healthieHost, raw) {
-  const parsed = parseChartNoteRef(raw);
-  if (!parsed || !healthieHost) {
-    return null;
-  }
-  return `https://${healthieHost}/users/${parsed.patientId}/private_notes/edit/${parsed.noteId}`;
-}
-
-function navigateToChartNote(topWin, url) {
-  if (!topWin || !topWin.location || typeof topWin.location.assign !== "function" || !url) {
-    return false;
-  }
-  topWin.location.assign(url);
-  return true;
-}
-
-function bindMishaMessageListener(target, handler) {
-  if (!target || typeof target.addEventListener !== "function" || target.__mishaMessageBound) {
-    return false;
-  }
-  target.__mishaMessageBound = true;
-  target.addEventListener("message", handler);
-  return true;
-}
-
-function resolveTopWindow(sandboxWindow, pageWindow) {
-  if (pageWindow && pageWindow.top) {
-    return pageWindow.top;
-  }
-  if (sandboxWindow && sandboxWindow.top) {
-    return sandboxWindow.top;
-  }
-  return sandboxWindow;
-}
-// END chart-note-navigation
-
 const routeURLs = {
   schedule: "schedule",
   careplan: "careplan",
@@ -1293,10 +1243,7 @@ function rescheduleAppointment(appointmentID) {
 }
 
 function waitForMishaMessages() {
-  bindMishaMessageListener(window, function (event) {
-    if (!event.data || typeof event.data !== "object") {
-      return;
-    }
+  window.onmessage = function (event) {
     debugLog("tampermonkey received misha event", event, "event.data", event.data);
     //check event to see if is care plan message
     if (event.data.tmInput !== undefined && patientNumber !== "") {
@@ -1460,14 +1407,10 @@ function waitForMishaMessages() {
       GM_openInTab(`https://${healthieURL}/users/${event.data.patientProfile}`);
     }
     if (event.data.newChartNoteId !== undefined) {
-      const chartUrl = buildChartNoteEditUrl(healthieURL, event.data.newChartNoteId);
-      debugLog("tampermonkey navigating to new charting note", event.data.newChartNoteId, chartUrl);
-      if (chartUrl) {
-        const pageWindow = typeof unsafeWindow !== "undefined" ? unsafeWindow : undefined;
-        navigateToChartNote(resolveTopWindow(window, pageWindow), chartUrl);
-      } else {
-        debugLog("tampermonkey invalid newChartNoteId", event.data.newChartNoteId);
-      }
+      debugLog("tampermonkey navigating to new charting note", event.data.newChartNoteId);
+      window.top.location.href = `https://${healthieURL}/users/${
+        event.data.newChartNoteId.split("-")[1]
+      }/private_notes/edit/${event.data.newChartNoteId.split("-")[0]}`;
     }
     if (event.data.patientGroupName !== undefined) {
       debugLog("tampermonkey replace patientGroupName content", event.data.patientGroupName);
@@ -1528,7 +1471,7 @@ function waitForMishaMessages() {
         });
       }
     }
-  });
+  };
 }
 
 function waitSettingsAPIpage() {
@@ -2290,7 +2233,6 @@ function replaceBasicInformationSection(retryCount = 0) {
 const config = { subtree: true, childList: true };
 const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
-waitForMishaMessages();
 
 function updatePatientStatusIframeHeight(patientId, contentHeight) {
   const $ = initJQuery();
