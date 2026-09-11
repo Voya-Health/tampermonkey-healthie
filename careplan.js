@@ -448,6 +448,15 @@ function waitAppointmentsProfile() {
   }
 }
 
+function handleAppointmentsProfileRoute() {
+  if (isStagingEnv) {
+    debugLog("tampermonkey skips waitAppointmentsProfile on staging; OPEN_SCHEDULE listener opens the modal");
+    return;
+  }
+  debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
+  waitAppointmentsProfile();
+}
+
 function setupSearchResultClickInterceptor(attempt = 0) {
   const $ = waitForJQueryOrRetry(
     setupSearchResultClickInterceptor,
@@ -735,7 +744,7 @@ function setupMishaPostMessageListener() {
       return;
     }
     const data = event.data;
-    if (!data || data.type !== "OPEN_SCHEDULE") {
+    if (data?.type !== "OPEN_SCHEDULE") {
       return;
     }
     const patientId = data.patientId;
@@ -1345,27 +1354,21 @@ function rescheduleAppointment(appointmentID) {
   showOverlay(`${routeURLs.schedule}/${appointmentID}`, styles.scheduleOverlay);
 }
 
-function waitForMishaMessages() {
-  window.onmessage = function (event) {
-    debugLog("tampermonkey received misha event", event, "event.data", event.data);
-    //check event to see if is care plan message
-    if (event.data.tmInput !== undefined && patientNumber !== "") {
-      // let's get all user goals and delete them before adding new ones
-      const getGoalQuery = `query {
+function handleCarePlanTmInput(carePlan) {
+  const getGoalQuery = `query {
                     goals(user_id: "${patientNumber}", per_page: 100) {
                       id,
                       name
                     }
                   }
                   `;
-      const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-      healthieGQL(getGoalPayload).then((response) => {
-        const allGoals = response.data.goals;
-        debugLog("tampermonkey all goals", response);
+  const getGoalPayload = JSON.stringify({ query: getGoalQuery });
+  healthieGQL(getGoalPayload).then((response) => {
+    const allGoals = response.data.goals;
+    debugLog("tampermonkey all goals", response);
 
-        // delete all goals
-        allGoals.forEach((goal) => {
-          const deleteGoalQuery = `mutation {
+    allGoals.forEach((goal) => {
+      const deleteGoalQuery = `mutation {
                     deleteGoal(input: {id: "${goal.id}"}) {
                       goal {
                         id
@@ -1378,26 +1381,24 @@ function waitForMishaMessages() {
                     }
                   }
                   `;
-          const deleteGoalPayload = JSON.stringify({
-            query: deleteGoalQuery,
-          });
-          healthieGQL(deleteGoalPayload).then((response) => {
-            debugLog("tampermonkey deleted goal", response);
-          });
-        });
+      const deleteGoalPayload = JSON.stringify({
+        query: deleteGoalQuery,
+      });
+      healthieGQL(deleteGoalPayload).then((response) => {
+        debugLog("tampermonkey deleted goal", response);
+      });
+    });
 
-        const carePlan = event.data.tmInput;
-        debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
-        const goal = carePlan.goal.title;
-        debugLog("tampermokey goal title ", goal);
+    debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
+    const goal = carePlan.goal.title;
+    debugLog("tampermokey goal title ", goal);
 
-        const milestones = carePlan.milestones;
-        //create goal for each milestone
-        milestones.forEach((element) => {
-          debugLog("tampermonkey milestone inserted", element);
-          const milestoneTitle = element.title;
-          if (element.isVisible) {
-            const query = `mutation {
+    const milestones = carePlan.milestones;
+    milestones.forEach((element) => {
+      debugLog("tampermonkey milestone inserted", element);
+      const milestoneTitle = element.title;
+      if (element.isVisible) {
+        const query = `mutation {
                                   createGoal(input: {
                                     name: "${milestoneTitle}",
                                     user_id: "${patientNumber}",
@@ -1413,13 +1414,12 @@ function waitForMishaMessages() {
                                   }
                                 }
                                 `;
-            const payload = JSON.stringify({ query });
-            healthieGQL(payload);
-          }
-        });
+        const payload = JSON.stringify({ query });
+        healthieGQL(payload);
+      }
+    });
 
-        //create goal for what matters to me
-        const query = `mutation {
+    const query = `mutation {
                           createGoal(input: {
                             name: "${goal}",
                             user_id: "${patientNumber}",
@@ -1435,22 +1435,19 @@ function waitForMishaMessages() {
                           }
                         }
                         `;
-        const payload = JSON.stringify({ query });
-        healthieGQL(payload);
+    const payload = JSON.stringify({ query });
+    healthieGQL(payload);
 
-        const tasks = carePlan.tasks.tasks;
-        debugLog("tampermonkey tasks are ", tasks);
-        //create goal for each task
-        tasks.forEach((element) => {
-          debugLog("tampermonkey task is ", element);
-          if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
-            //motion guide task
-            debugLog("tampermonkey motion guide assigned");
-            //create goal for each assigned exercise
-            element.items[0].exercises.forEach((element) => {
-              debugLog("tampermonkey", element);
-              const name = element.contentfulEntityId + " - " + element.side;
-              const query = `mutation {
+    const tasks = carePlan.tasks.tasks;
+    debugLog("tampermonkey tasks are ", tasks);
+    tasks.forEach((element) => {
+      debugLog("tampermonkey task is ", element);
+      if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
+        debugLog("tampermonkey motion guide assigned");
+        element.items[0].exercises.forEach((element) => {
+          debugLog("tampermonkey", element);
+          const name = element.contentfulEntityId + " - " + element.side;
+          const query = `mutation {
                                   createGoal(input: {
                                     name: "${name}",
                                     user_id: "${patientNumber}",
@@ -1466,14 +1463,12 @@ function waitForMishaMessages() {
                                   }
                                 }
                                 `;
-              const payload = JSON.stringify({ query });
-              healthieGQL(payload);
-            });
-          } else {
-            if (element.isVisible) {
-              //regular task
-              debugLog("tampermonkey regular task assigned");
-              const query = `mutation {
+          const payload = JSON.stringify({ query });
+          healthieGQL(payload);
+        });
+      } else if (element.isVisible) {
+        debugLog("tampermonkey regular task assigned");
+        const query = `mutation {
                                   createGoal(input: {
                                     name: "${element.title}",
                                     user_id: "${patientNumber}",
@@ -1489,92 +1484,113 @@ function waitForMishaMessages() {
                                   }
                                 }
                                 `;
-              const payload = JSON.stringify({ query });
-              healthieGQL(payload);
-            }
-          }
-        });
-      });
-    }
-    if (event.data.reschedule !== undefined || event.data.reload !== undefined) {
-      rescheduleAppointment(event.data.reschedule);
-    }
-    if (event.data.reload !== undefined) {
-      window.location.reload();
-    }
-    if (event.data.closeWindow !== undefined) {
-      hideOverlay();
-    }
-    if (event.data.patientProfile !== undefined) {
-      debugLog("tampermonkey navigating to patient profile", event.data.patientProfile);
-      GM_openInTab(`https://${healthieURL}/users/${event.data.patientProfile}`);
-    }
-    if (event.data.newChartNoteId !== undefined) {
-      debugLog("tampermonkey navigating to new charting note", event.data.newChartNoteId);
-      window.top.location.href = `https://${healthieURL}/users/${
-        event.data.newChartNoteId.split("-")[1]
-      }/private_notes/edit/${event.data.newChartNoteId.split("-")[0]}`;
-    }
-    if (event.data.patientGroupName !== undefined) {
-      debugLog("tampermonkey replace patientGroupName content", event.data.patientGroupName);
-      patientGroupName = event.data.patientGroupName;
-      addGroupNameContent(event.data.patientGroupName);
-    }
-    if (event.data.isEmailVerified !== undefined) {
-      debugLog("tampermonkey is email verified", event.data.isEmailVerified);
-      isEmailVerified = event.data.isEmailVerified;
-      !isEmailVerified && verifyEmailPhoneButtons(true);
-    }
-    if (event.data.isPhoneNumberVerified !== undefined) {
-      debugLog("tampermonkey is phone verified", event.data.isPhoneNumberVerified);
-      isPhoneNumberVerified = event.data.isPhoneNumberVerified;
-      !isPhoneNumberVerified && verifyEmailPhoneButtons(false);
-    }
-    if (event.data.loading !== undefined) {
-      debugLog("tampermonkey loading", event.data.loading);
-      isLoadingEmailPhone = event.data.loading ? true : false;
-    }
-    if (event.data.healthieActionsTab !== undefined) {
-      debugLog("tampermonkey navigating to patient actions tab", event.data.healthieActionsTab);
-      const patientId = event.data.healthieActionsTab;
-      window.open(`https://${healthieURL}/users/${patientId}/actions`, "_top");
-    }
-    if (event.data.verifyEmail !== undefined) {
-      debugLog("tampermonkey received verifyEmail event", event.data.verifyEmail);
-      const { patientId, email } = event.data.verifyEmail;
-      const verifyOverlayURL = `${routeURLs.otpVerify}?id=${patientId}&email=${encodeURIComponent(email)}`;
-      showOverlay(verifyOverlayURL, styles.otpOverlay);
-    }
-    if (event.data.verifyPhone !== undefined) {
-      debugLog("tampermonkey received verifyPhone event", event.data.verifyPhone);
-      const { patientId, phone } = event.data.verifyPhone;
-      const verifyOverlayURL = `${routeURLs.otpVerify}?id=${patientId}&phone=${encodeURIComponent(phone)}`;
-      showOverlay(verifyOverlayURL, styles.otpOverlay);
-    }
-
-    // Handle patient information height updates from misha iframe
-    if (event.data.basicInformationHeight !== undefined) {
-      debugLog("tampermonkey received basicInformationHeight event", event.data.basicInformationHeight);
-
-      // Convert string to number if needed
-      const height =
-        typeof event.data.basicInformationHeight === "string"
-          ? parseInt(event.data.basicInformationHeight, 10)
-          : event.data.basicInformationHeight;
-
-      // Get patient number from current URL
-      const currentPatientNumber = location.href.split("/")[4];
-
-      if (currentPatientNumber && !isNaN(height)) {
-        updatePatientStatusIframeHeight(currentPatientNumber, height);
-      } else {
-        debugLog("tampermonkey could not determine patient number or invalid height", {
-          patientNumber: currentPatientNumber,
-          height: height,
-        });
+        const payload = JSON.stringify({ query });
+        healthieGQL(payload);
       }
-    }
-  };
+    });
+  });
+}
+
+function handleRescheduleOrReload(data) {
+  if (data.reschedule !== undefined || data.reload !== undefined) {
+    rescheduleAppointment(data.reschedule);
+  }
+  if (data.reload !== undefined) {
+    window.location.reload();
+  }
+}
+
+function handleNewChartNoteId(newChartNoteId) {
+  debugLog("tampermonkey navigating to new charting note", newChartNoteId);
+  window.top.location.href = `https://${healthieURL}/users/${
+    newChartNoteId.split("-")[1]
+  }/private_notes/edit/${newChartNoteId.split("-")[0]}`;
+}
+
+function handleVerifyStatusMessages(data) {
+  if (data.isEmailVerified !== undefined) {
+    debugLog("tampermonkey is email verified", data.isEmailVerified);
+    isEmailVerified = data.isEmailVerified;
+    !isEmailVerified && verifyEmailPhoneButtons(true);
+  }
+  if (data.isPhoneNumberVerified !== undefined) {
+    debugLog("tampermonkey is phone verified", data.isPhoneNumberVerified);
+    isPhoneNumberVerified = data.isPhoneNumberVerified;
+    !isPhoneNumberVerified && verifyEmailPhoneButtons(false);
+  }
+  if (data.loading !== undefined) {
+    debugLog("tampermonkey loading", data.loading);
+    isLoadingEmailPhone = data.loading ? true : false;
+  }
+}
+
+function handleBasicInformationHeight(rawHeight) {
+  debugLog("tampermonkey received basicInformationHeight event", rawHeight);
+  const height = typeof rawHeight === "string" ? parseInt(rawHeight, 10) : rawHeight;
+  const currentPatientNumber = location.href.split("/")[4];
+  if (currentPatientNumber && !Number.isNaN(height)) {
+    updatePatientStatusIframeHeight(currentPatientNumber, height);
+  } else {
+    debugLog("tampermonkey could not determine patient number or invalid height", {
+      patientNumber: currentPatientNumber,
+      height: height,
+    });
+  }
+}
+
+function handleMishaWindowMessage(event) {
+  if (!MISHA_POSTMESSAGE_ORIGINS.includes(event.origin)) {
+    return;
+  }
+  const data = event.data;
+  if (!data) {
+    return;
+  }
+  debugLog("tampermonkey received misha event", event, "event.data", data);
+  if (data.tmInput !== undefined && patientNumber !== "") {
+    handleCarePlanTmInput(data.tmInput);
+  }
+  handleRescheduleOrReload(data);
+  if (data.closeWindow !== undefined) {
+    hideOverlay();
+  }
+  if (data.patientProfile !== undefined) {
+    debugLog("tampermonkey navigating to patient profile", data.patientProfile);
+    GM_openInTab(`https://${healthieURL}/users/${data.patientProfile}`);
+  }
+  if (data.newChartNoteId !== undefined) {
+    handleNewChartNoteId(data.newChartNoteId);
+  }
+  if (data.patientGroupName !== undefined) {
+    debugLog("tampermonkey replace patientGroupName content", data.patientGroupName);
+    patientGroupName = data.patientGroupName;
+    addGroupNameContent(data.patientGroupName);
+  }
+  handleVerifyStatusMessages(data);
+  if (data.healthieActionsTab !== undefined) {
+    debugLog("tampermonkey navigating to patient actions tab", data.healthieActionsTab);
+    const patientId = data.healthieActionsTab;
+    window.open(`https://${healthieURL}/users/${patientId}/actions`, "_top");
+  }
+  if (data.verifyEmail !== undefined) {
+    debugLog("tampermonkey received verifyEmail event", data.verifyEmail);
+    const { patientId, email } = data.verifyEmail;
+    const verifyOverlayURL = `${routeURLs.otpVerify}?id=${patientId}&email=${encodeURIComponent(email)}`;
+    showOverlay(verifyOverlayURL, styles.otpOverlay);
+  }
+  if (data.verifyPhone !== undefined) {
+    debugLog("tampermonkey received verifyPhone event", data.verifyPhone);
+    const { patientId, phone } = data.verifyPhone;
+    const verifyOverlayURL = `${routeURLs.otpVerify}?id=${patientId}&phone=${encodeURIComponent(phone)}`;
+    showOverlay(verifyOverlayURL, styles.otpOverlay);
+  }
+  if (data.basicInformationHeight !== undefined) {
+    handleBasicInformationHeight(data.basicInformationHeight);
+  }
+}
+
+function waitForMishaMessages() {
+  window.onmessage = handleMishaWindowMessage;
 }
 
 function waitSettingsAPIpage() {
@@ -2072,12 +2088,7 @@ function observeDOMChanges(mutations, observer) {
     }
 
     if (urlValidation.appointmentsProfile.test(location.href)) {
-      if (isStagingEnv) {
-        debugLog("tampermonkey skips waitAppointmentsProfile on staging; OPEN_SCHEDULE listener opens the modal");
-      } else {
-        debugLog("tampermonkey calls waitAppointmentsProfile and addMembershipAndOnboarding");
-        waitAppointmentsProfile();
-      }
+      handleAppointmentsProfileRoute();
 
       // Set up search result click interceptor for appointment profile pages
       setupSearchResultClickInterceptor();
@@ -2332,12 +2343,10 @@ function replaceBasicInformationSection(retryCount = 0) {
     if (retryCount < maxRetries && currentPatientId === location.href.split("/")[4]) {
       debugLog(`tampermonkey scheduling retry ${retryCount + 1} for basic info handling`);
       createTimeout(() => replaceBasicInformationSection(retryCount + 1), 300 * (retryCount + 1));
+    } else if (retryCount >= maxRetries) {
+      debugLog(`tampermonkey max retries (${maxRetries}) exceeded for basic info handling`);
     } else {
-      if (retryCount >= maxRetries) {
-        debugLog(`tampermonkey max retries (${maxRetries}) exceeded for basic info handling`);
-      } else {
-        debugLog(`tampermonkey patient changed during retry, aborting basic info handling`);
-      }
+      debugLog(`tampermonkey patient changed during retry, aborting basic info handling`);
     }
   }
 }
