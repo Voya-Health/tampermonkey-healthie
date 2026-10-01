@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.4
+// @version      2.5
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -11,9 +11,11 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_openInTab
+// @grant        GM_xmlhttpRequest
+// @connect      browser-intake-datadoghq.com
 // ==/UserScript==
 
-/* globals contentful */
+/* globals contentful, GM_xmlhttpRequest */
 
 //Enable/Disable debug mode
 let debug = false;
@@ -60,6 +62,423 @@ function debugLog(...messages) {
     unsafeWindow.console.log(...messages);
   }
 }
+
+// Same public browser logs token as DATADOG_LOGS_CLIENT_TOKEN in
+// voya-cust web-misha/core-lib/config/envs.ts. Not the server API key.
+const TM_VERSION = "2.5";
+const DD_LOGS_CLIENT_TOKEN = "pubdf55240f49807c01cd3ed2168506ced8";
+const DD_INTAKE_URL =
+  "https://browser-intake-datadoghq.com/api/v2/logs?ddsource=browser&dd-evp-origin=browser&dd-api-key=" +
+  DD_LOGS_CLIENT_TOKEN;
+const DD_MAX_PER_MINUTE = 30;
+const ddPageId = Math.random().toString(36).slice(2, 10);
+const ddInstallIdKey = "voriDatadogInstallId";
+
+function readInstallId() {
+  const existing = GM_getValue(ddInstallIdKey, "");
+  if (existing) {
+    return existing;
+  }
+  const id = Math.random().toString(36).slice(2, 14);
+  GM_setValue(ddInstallIdKey, id);
+  return id;
+}
+
+const ddInstallId = readInstallId();
+let ddQueue = [];
+let ddSentThisWindow = 0;
+let ddWindowStarted = Date.now();
+let ddFlushTimer = null;
+let ddHooksInstalled = false;
+let ddLastMessage = "";
+let ddLastAt = 0;
+
+function sanitizeForDatadog(value) {
+  return String(value == null ? "" : value)
+    .replace(/https?:\/\/[^\s)"']+/g, function (url) {
+      return url.split("?")[0].split("#")[0];
+    })
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+    .slice(0, 500);
+}
+
+function normalizePath(pathname) {
+  return String(pathname || "")
+    .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, ":uuid")
+    .replace(/\/\d+(?=\/|$)/g, "/:id");
+}
+
+function safeUrl(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || ""), location.origin);
+    return parsed.origin + normalizePath(parsed.pathname);
+  } catch (e) {
+    return "invalid-url";
+  }
+}
+
+function errorFingerprint(value) {
+  const text = String(value == null ? "" : value);
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function safeErrorName(value) {
+  const name = String(value || "Error").replace(/[^A-Za-z0-9_.-]/g, "");
+  return name.slice(0, 60) || "Error";
+}
+
+function errorSummary(kind, error) {
+  const message = error && typeof error.message === "string" ? error.message : String(error || kind);
+  const name = safeErrorName(error && error.name);
+  return kind + "_error name=" + name + " fingerprint=" + errorFingerprint(message);
+}
+
+function rollDatadogWindow() {
+  const now = Date.now();
+  if (now - ddWindowStarted < 60000) {
+    return;
+  }
+  ddWindowStarted = now;
+  ddSentThisWindow = 0;
+}
+
+function makeDatadogLog(status, kind, message) {
+  const env = isStagingEnv ? "staging" : "prod";
+  return {
+    message: sanitizeForDatadog("[" + kind + "] " + message),
+    status: status,
+    service: "tampermonkey-healthie",
+    ddsource: "browser",
+    ddtags: "env:" + env + ",version:" + TM_VERSION + ",kind:" + kind,
+    tm_version: TM_VERSION,
+    tm_kind: kind,
+    tm_install_id: ddInstallId,
+    healthie_path: normalizePath(location.pathname),
+    page_id: ddPageId,
+  };
+}
+
+function reportDatadogStatus(onResult, status) {
+  if (onResult) {
+    onResult(status);
+  }
+}
+
+function sendDatadogBatch(batch, onResult) {
+  GM_xmlhttpRequest({
+    method: "POST",
+    url: DD_INTAKE_URL,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: JSON.stringify(batch),
+    onload: function (response) {
+      reportDatadogStatus(onResult, response.status);
+    },
+    onerror: function () {
+      reportDatadogStatus(onResult, 0);
+    },
+  });
+}
+
+function enqueueDatadogLog(status, kind, message) {
+  try {
+    const now = Date.now();
+    if (message === ddLastMessage && now - ddLastAt < 2000) {
+      return;
+    }
+    ddLastMessage = message;
+    ddLastAt = now;
+    rollDatadogWindow();
+    if (ddSentThisWindow >= DD_MAX_PER_MINUTE) {
+      return;
+    }
+    ddSentThisWindow += 1;
+    ddQueue.push(makeDatadogLog(status, kind, message));
+    if (!ddFlushTimer) {
+      ddFlushTimer = window.setTimeout(flushDatadogLogs, 1000);
+    }
+  } catch (e) {}
+}
+
+function flushDatadogLogs() {
+  ddFlushTimer = null;
+  if (!ddQueue.length || typeof GM_xmlhttpRequest !== "function") {
+    ddQueue = [];
+    return;
+  }
+  const batch = ddQueue.splice(0, 10);
+  sendDatadogBatch(batch);
+  if (ddQueue.length) {
+    ddFlushTimer = window.setTimeout(flushDatadogLogs, 1000);
+  }
+}
+
+function graphqlErrorSummary(text) {
+  if (!text || text.length > 200000) {
+    return "";
+  }
+  try {
+    const body = JSON.parse(text);
+    const errors = body && body.errors;
+    if (!errors || !errors.length) {
+      return "";
+    }
+    const first = errors[0];
+    const code = first && first.extensions && first.extensions.code;
+    const codeText = code ? " code=" + safeErrorName(code) : "";
+    return "count=" + errors.length + codeText;
+  } catch (e) {
+    return "";
+  }
+}
+
+function noteHttpResult(method, rawUrl, status) {
+  if (status >= 400) {
+    enqueueDatadogLog("error", "http", method + " " + status + " " + safeUrl(rawUrl));
+  }
+}
+
+function noteGraphqlText(rawUrl, text) {
+  if (!/graphql/i.test(String(rawUrl || ""))) {
+    return;
+  }
+  const summary = graphqlErrorSummary(text);
+  if (summary) {
+    enqueueDatadogLog("error", "graphql", summary + " " + safeUrl(rawUrl));
+  }
+}
+
+function requestMethod(input, init) {
+  return ((init && init.method) || (input && input.method) || "GET").toUpperCase();
+}
+
+function requestUrl(input) {
+  if (typeof input === "string") {
+    return input;
+  }
+  if (input instanceof URL) {
+    return input.href;
+  }
+  return (input && input.url) || "";
+}
+
+function noteFetchResponse(method, rawUrl, response) {
+  try {
+    noteHttpResult(method, rawUrl, response.status);
+    if (!response.ok || !response.clone || !/graphql/i.test(rawUrl)) {
+      return;
+    }
+    response
+      .clone()
+      .text()
+      .then(function (text) {
+        noteGraphqlText(rawUrl, text);
+      })
+      .catch(function () {});
+  } catch (e) {}
+}
+
+function noteFetchFailure(method, rawUrl, error) {
+  try {
+    if (error && error.name === "AbortError") {
+      return;
+    }
+    const detail =
+      method + " network_error " + safeUrl(rawUrl) + " fingerprint=" + errorFingerprint(error && error.message);
+    enqueueDatadogLog("error", "http", detail);
+  } catch (e) {}
+}
+
+function hookPageFetch() {
+  const pageFetch = unsafeWindow.fetch;
+  if (!pageFetch || pageFetch.__vxWrapped) {
+    return;
+  }
+  function wrappedFetch(input, init) {
+    const method = requestMethod(input, init);
+    const rawUrl = requestUrl(input);
+    return pageFetch.apply(this, arguments).then(
+      function (response) {
+        noteFetchResponse(method, rawUrl, response);
+        return response;
+      },
+      function (error) {
+        noteFetchFailure(method, rawUrl, error);
+        throw error;
+      }
+    );
+  }
+  wrappedFetch.__vxWrapped = true;
+  unsafeWindow.fetch = wrappedFetch;
+}
+
+function hookPageXhr() {
+  const XHR = unsafeWindow.XMLHttpRequest;
+  if (!XHR || XHR.__vxWrapped) {
+    return;
+  }
+  const origOpen = XHR.prototype.open;
+  const origSend = XHR.prototype.send;
+  XHR.prototype.open = function (method, url) {
+    this.__vxMethod = method;
+    this.__vxUrl = url;
+    return origOpen.apply(this, arguments);
+  };
+  XHR.prototype.send = function () {
+    this.addEventListener("loadend", function () {
+      noteXhrResult(this);
+    });
+    return origSend.apply(this, arguments);
+  };
+  XHR.__vxWrapped = true;
+}
+
+function noteXhrResult(xhr) {
+  try {
+    const method = (xhr.__vxMethod || "GET").toUpperCase();
+    noteHttpResult(method, xhr.__vxUrl, xhr.status);
+    if (xhr.status === 200 && /graphql/i.test(String(xhr.__vxUrl || ""))) {
+      noteGraphqlText(xhr.__vxUrl, xhr.responseText);
+    }
+  } catch (e) {}
+}
+
+function isErrorWithMessage(value) {
+  return Boolean(value && typeof value.message === "string" && (typeof value.stack === "string" || value.name));
+}
+
+function consoleErrorText(args) {
+  const parts = [];
+  const limit = Math.min(args.length, 3);
+  for (let i = 0; i < limit; i++) {
+    const value = args[i];
+    if (isErrorWithMessage(value)) {
+      parts.push(value.message);
+    } else if (typeof value === "string") {
+      parts.push(value);
+    }
+  }
+  return parts.join(" ");
+}
+
+function hookPageConsoleError(targetWindow) {
+  if (!targetWindow.console || targetWindow.console.__vxWrapped) {
+    return;
+  }
+  const originalError = targetWindow.console.error;
+  targetWindow.console.error = function () {
+    try {
+      const text = consoleErrorText(arguments);
+      if (text) {
+        enqueueDatadogLog("error", "console", errorSummary("console", { message: text }));
+      }
+    } catch (e) {}
+    return originalError.apply(this, arguments);
+  };
+  targetWindow.console.__vxWrapped = true;
+}
+
+function windowErrorDetail(event, fallbackMessage) {
+  const error = event && event.error ? event.error : { message: fallbackMessage };
+  let detail = errorSummary("window", error);
+  if (event && event.filename) {
+    detail += " @ " + safeUrl(event.filename) + ":" + (event.lineno || "");
+  }
+  return detail;
+}
+
+function watchWindowErrors(targetWindow) {
+  targetWindow.addEventListener("error", function (event) {
+    if (event.target && event.target !== targetWindow) {
+      return;
+    }
+    const message = event && event.message ? event.message : "error";
+    if (message === "Script error.") {
+      return;
+    }
+    enqueueDatadogLog("error", "window", windowErrorDetail(event, message));
+  });
+  targetWindow.addEventListener("unhandledrejection", function (event) {
+    const reason = event && event.reason;
+    enqueueDatadogLog("error", "unhandledrejection", errorSummary("unhandledrejection", reason));
+  });
+}
+
+function chartNoteAction(label) {
+  if (label.includes("sign and lock") || label.includes("sign & lock")) {
+    return "sign and lock";
+  }
+  if (label === "lock" || label === "sign") {
+    return label;
+  }
+  return "";
+}
+
+function watchChartNoteActions() {
+  document.addEventListener(
+    "click",
+    function (event) {
+      const target = event.target;
+      const button = target && target.closest && target.closest("button, [role='button']");
+      if (!button) {
+        return;
+      }
+      const label = (button.innerText || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const action = chartNoteAction(label);
+      if (!action) {
+        return;
+      }
+      enqueueDatadogLog("info", "chart-note", "clicked " + action);
+    },
+    true
+  );
+}
+
+function setupHealthieDatadogLogs() {
+  if (ddHooksInstalled) {
+    return;
+  }
+  ddHooksInstalled = true;
+  try {
+    hookPageFetch();
+    hookPageXhr();
+    hookPageConsoleError(unsafeWindow);
+    watchWindowErrors(unsafeWindow);
+    if (unsafeWindow !== window) {
+      watchWindowErrors(window);
+    }
+    watchChartNoteActions();
+    installDatadogSelfTest();
+  } catch (e) {}
+}
+
+function installDatadogSelfTest() {
+  unsafeWindow.__voriDatadogTest = function () {
+    const testId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const entry = makeDatadogLog("info", "diagnostic", "VX-3525 manual test " + testId);
+    return new Promise(function (resolve) {
+      sendDatadogBatch([entry], function (status) {
+        const result = {
+          accepted: status >= 200 && status < 300,
+          status: status,
+          test_id: testId,
+          service: "tampermonkey-healthie",
+          tm_install_id: ddInstallId,
+          page_id: ddPageId,
+        };
+        unsafeWindow.__voriDatadogLastStatus = result;
+        resolve(result);
+      });
+    });
+  };
+}
+
 const routeURLs = {
   schedule: "schedule",
   careplan: "careplan",
@@ -2356,6 +2775,7 @@ const config = { subtree: true, childList: true };
 const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
 setupMishaPostMessageListener();
+setupHealthieDatadogLogs();
 
 function updatePatientStatusIframeHeight(patientId, contentHeight) {
   const $ = initJQuery();
