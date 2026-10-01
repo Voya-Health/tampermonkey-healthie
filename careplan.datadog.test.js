@@ -172,11 +172,14 @@ const {
 
   const diagnosticPromise = context.unsafeWindow.__voriDatadogTest();
   const diagnosticRequest = requests.at(-1);
+  const diagnosticPayload = JSON.parse(diagnosticRequest.data);
+  assert.ok(diagnosticPayload[0].test_id);
   diagnosticRequest.onload({ status: 202 });
   const diagnostic = await diagnosticPromise;
   assert.equal(diagnostic.accepted, true);
   assert.equal(diagnostic.status, 202);
   assert.ok(diagnostic.test_id);
+  assert.equal(diagnosticPayload[0].test_id, diagnostic.test_id);
   assert.equal(context.unsafeWindow.__voriDatadogLastStatus, diagnostic);
 
   nextFetchResponse = {

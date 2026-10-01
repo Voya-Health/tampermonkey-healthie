@@ -462,6 +462,7 @@ function installDatadogSelfTest() {
   unsafeWindow.__voriDatadogTest = function () {
     const testId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
     const entry = makeDatadogLog("info", "diagnostic", "VX-3525 manual test " + testId);
+    entry.test_id = testId;
     return new Promise(function (resolve) {
       sendDatadogBatch([entry], function (status) {
         const result = {
