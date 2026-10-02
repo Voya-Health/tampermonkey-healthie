@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.6
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -65,13 +65,15 @@ function debugLog(...messages) {
 
 // Same public browser logs token as DATADOG_LOGS_CLIENT_TOKEN in
 // voya-cust web-misha/core-lib/config/envs.ts. Not the server API key.
-const TM_VERSION = "2.5";
+const TM_VERSION = "2.6";
 const DD_LOGS_CLIENT_TOKEN = "pubdf55240f49807c01cd3ed2168506ced8";
 const DD_INTAKE_URL =
   "https://browser-intake-datadoghq.com/api/v2/logs?ddsource=browser&dd-evp-origin=browser&dd-api-key=" +
   DD_LOGS_CLIENT_TOKEN;
 const DD_LIMITS_PER_MINUTE = { error: 20, warn: 20, info: 30 };
 const ddInstallIdKey = "voriDatadogInstallId";
+const ddProbeAtKey = "voriDatadogProbeAt";
+const DD_PROBE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 function randomId(length) {
   const bytes = new Uint8Array(length);
@@ -577,6 +579,19 @@ function noteMishaMessage(data) {
   }
 }
 
+function maybeSendDailyProbe() {
+  const lastProbeAt = Number(GM_getValue(ddProbeAtKey, 0)) || 0;
+  if (Date.now() - lastProbeAt < DD_PROBE_INTERVAL_MS) {
+    return;
+  }
+  const entry = makeDatadogLog("info", "probe", "daily probe version=" + TM_VERSION);
+  sendDatadogBatch([entry], function (status) {
+    if (status >= 200 && status < 300) {
+      GM_setValue(ddProbeAtKey, Date.now());
+    }
+  });
+}
+
 function setupHealthieDatadogLogs() {
   if (ddHooksInstalled) {
     return;
@@ -592,6 +607,7 @@ function setupHealthieDatadogLogs() {
     }
     watchChartNoteActions();
     installDatadogSelfTest();
+    maybeSendDailyProbe();
     const apiKeyState = typeof healthieAPIKey === "string" && healthieAPIKey ? "present" : "missing";
     enqueueDatadogLog("info", "lifecycle", "started version=" + TM_VERSION + " api_key=" + apiKeyState);
   } catch (e) {
