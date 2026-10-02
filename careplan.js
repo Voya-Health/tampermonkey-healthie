@@ -484,6 +484,99 @@ function watchChartNoteActions() {
   );
 }
 
+// Call before a page reload so queued logs are not lost with the page.
+function flushDatadogLogsNow() {
+  if (ddFlushTimer) {
+    window.clearTimeout(ddFlushTimer);
+  }
+  flushDatadogLogs();
+}
+
+function routeName(routeURL) {
+  const path = String(routeURL || "")
+    .split("?")[0]
+    .split("#")[0];
+  return normalizePath("/" + path).replace(/^\/+/, "") || "root";
+}
+
+function noteRetryExhausted(giveUpMessage, attempts) {
+  enqueueDatadogLog("warn", "retry-exhausted", String(giveUpMessage || "").replace("tampermonkey ", ""), {
+    retry_attempts: attempts,
+  });
+}
+
+// Cross-origin iframes rarely fire "error", so a missing "load" is the failure signal.
+// Normal loads are not logged so they can't use up the info cap that chart-note relies on.
+const DD_IFRAME_LOAD_TIMEOUT_MS = 20000;
+const DD_IFRAME_SLOW_MS = 5000;
+
+function watchIframeLoad(iframeNode, routeURL) {
+  if (!iframeNode?.addEventListener) {
+    return;
+  }
+  const route = routeName(routeURL);
+  const startedAt = Date.now();
+  let settled = false;
+  const settle = function (status, outcome) {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    const loadMs = Date.now() - startedAt;
+    if (outcome === "loaded" && loadMs < DD_IFRAME_SLOW_MS) {
+      return;
+    }
+    enqueueDatadogLog(status, "iframe", outcome + " " + route, { load_ms: loadMs });
+  };
+  iframeNode.addEventListener("load", function () {
+    settle("info", "loaded");
+  });
+  iframeNode.addEventListener("error", function () {
+    settle("warn", "failed");
+  });
+  window.setTimeout(function () {
+    if (iframeNode.isConnected) {
+      settle("warn", "timeout");
+    }
+  }, DD_IFRAME_LOAD_TIMEOUT_MS);
+}
+
+// Healthie reports rejected mutations in data.<mutation>.messages, not top-level errors.
+function goalRequestOk(result) {
+  const payload = result?.data && Object.values(result.data)[0];
+  return Boolean(payload) && !result.errors && !payload.messages?.length;
+}
+
+function goalResultCounts(results) {
+  const list = results || [];
+  return { ok: list.filter(goalRequestOk).length, total: list.length };
+}
+
+// Leaves out basicInformationHeight and the verification status updates, which Misha
+// sends often enough to use up the per-minute info cap.
+const MISHA_MESSAGE_TYPES = [
+  "tmInput",
+  "reschedule",
+  "reload",
+  "closeWindow",
+  "patientProfile",
+  "newChartNoteId",
+  "patientGroupName",
+  "healthieActionsTab",
+  "verifyEmail",
+  "verifyPhone",
+];
+
+function noteMishaMessage(data) {
+  if (typeof data !== "object") {
+    return;
+  }
+  const types = MISHA_MESSAGE_TYPES.filter((type) => data[type] !== undefined);
+  if (types.length) {
+    enqueueDatadogLog("info", "misha-message", "received " + types.join(","));
+  }
+}
+
 function setupHealthieDatadogLogs() {
   if (ddHooksInstalled) {
     return;
@@ -593,6 +686,7 @@ function scheduleRetryOrStop(retryFn, attempt, maxAttempts, delay, giveUpMessage
     return;
   }
   debugLog(giveUpMessage);
+  noteRetryExhausted(giveUpMessage, attempt);
 }
 
 function waitForJQueryOrRetry(retryFn, attempt, giveUpMessage, waitingMessage) {
@@ -715,6 +809,7 @@ function generateIframe(routeURL, options = {}) {
       src: `https://${mishaURL}${routeURL}`,
     });
     iframeElement.append(iframeContent);
+    watchIframeLoad(iframeContent[0], routeURL);
     debugLog(`tampermonkey generated iframe for ${routeURL}`);
     return iframeElement;
   }
@@ -1222,8 +1317,10 @@ function setupMishaPostMessageListener() {
     const patientId = data.patientId;
     if (!patientId || typeof patientId !== "string" || !/^\d+$/.test(patientId)) {
       debugLog("tampermonkey OPEN_SCHEDULE: invalid or missing patientId", patientId);
+      enqueueDatadogLog("warn", "misha-message", "rejected OPEN_SCHEDULE invalid patientId");
       return;
     }
+    enqueueDatadogLog("info", "misha-message", "received OPEN_SCHEDULE");
     showOverlay(`${routeURLs.schedule}/${patientId}`, styles.scheduleOverlay);
   });
 }
@@ -1905,15 +2002,32 @@ function handleCarePlanTmInput(carePlan) {
                     }
                   }
                   `;
+  enqueueDatadogLog("info", "care-plan-sync", "started");
+  let deleted = { ok: 0, total: 0 };
   healthieGoalQuery(getGoalQuery)
     .then((response) => {
       const allGoals = response.data.goals;
       debugLog("tampermonkey all goals", response);
       return Promise.all(allGoals.map((goal) => deleteHealthieGoal(goal.id)));
     })
-    .then(() => createCarePlanGoals(carePlan))
+    .then((deleteResults) => {
+      deleted = goalResultCounts(deleteResults);
+      return createCarePlanGoals(carePlan);
+    })
+    .then((createResults) => {
+      const created = goalResultCounts(createResults);
+      const allOk = deleted.ok === deleted.total && created.ok === created.total;
+      const counts = "deleted=" + deleted.ok + "/" + deleted.total + " created=" + created.ok + "/" + created.total;
+      enqueueDatadogLog(allOk ? "info" : "warn", "care-plan-sync", "finished " + counts, {
+        goals_deleted: deleted.ok,
+        goals_delete_total: deleted.total,
+        goals_created: created.ok,
+        goals_create_total: created.total,
+      });
+    })
     .catch((error) => {
       debugLog("tampermonkey care plan goal request failed", error);
+      enqueueDatadogLog("warn", "care-plan-sync", errorSummary("care_plan_sync", error));
     });
 }
 
@@ -1973,6 +2087,10 @@ function handleMishaWindowMessage(event) {
     return;
   }
   debugLog("tampermonkey received misha event", event, "event.data", data);
+  noteMishaMessage(data);
+  if (data.tmInput !== undefined && patientNumber === "") {
+    enqueueDatadogLog("warn", "misha-message", "rejected tmInput without patient");
+  }
   if (data.tmInput !== undefined && patientNumber !== "") {
     handleCarePlanTmInput(data.tmInput);
   }
@@ -2105,6 +2223,7 @@ function waitSettingsAPIpage() {
     newButton.onclick = function () {
       let apiKey = newInput.value.trim(); // Trim whitespace from the input value
       if (apiKey === "") {
+        enqueueDatadogLog("warn", "api-key", "rejected empty key");
         alert("Please enter a valid API key!");
       } else {
         const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
@@ -2125,9 +2244,12 @@ function waitSettingsAPIpage() {
             debugLog(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
 
             if (response.errors) {
+              enqueueDatadogLog("warn", "api-key", "validation failed errors=" + response.errors.length);
               alert("That is not a valid API key. Please verify the key and try again.");
             } else {
               GM_setValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", apiKey);
+              enqueueDatadogLog("info", "api-key", "saved");
+              flushDatadogLogsNow();
               alert("API key saved successfully!");
               createTimeout(null, 2000);
               window.location.reload();
@@ -2135,6 +2257,7 @@ function waitSettingsAPIpage() {
           })
           .catch((error) => {
             debugLog("tampermonkey api key check failed", error);
+            enqueueDatadogLog("warn", "api-key", errorSummary("api_key_check", error));
             alert("That is not a valid API key. Please verify the key and try again.");
           });
       }
@@ -2380,6 +2503,8 @@ function addMembershipAndOnboarding(retryCount = 0, maxRetries = 25) {
     // add iframe after phone element, get the native DOM Node from the jQuery object, this is the first array element.
     !iframeExists && phoneColumn.parentNode.insertBefore(iframe[0], phoneColumn.nextSibling);
     debugLog(`tampermonkey successfully injected patient status iframe`);
+  } else if (basicInfoSection?.firstElementChild?.classList.contains("misha-iframe-container")) {
+    debugLog(`tampermonkey basic info already replaced, skipping patient status column`);
   } else if (retryCount < maxRetries) {
     debugLog(`tampermonkey retrying addMembershipAndOnboarding in 500ms (${retryCount + 1}/${maxRetries})`);
     createTimeout(() => {
@@ -2387,6 +2512,7 @@ function addMembershipAndOnboarding(retryCount = 0, maxRetries = 25) {
     }, 500);
   } else {
     debugLog(`tampermonkey addMembershipAndOnboarding failed after ${maxRetries} retries`);
+    noteRetryExhausted("tampermonkey stopped waiting for patient status phone column", retryCount);
   }
 }
 
@@ -2453,6 +2579,7 @@ function verifyEmailPhoneButtons(isEmail) {
         style: buttonStyleString,
         type: "button",
         click: function () {
+          enqueueDatadogLog("info", "verify", "opened " + (isEmail ? "email" : "phone") + " from healthie");
           showOverlay(verifyOverlayURL, styles.otpOverlay);
         },
       });
@@ -2777,6 +2904,7 @@ function replaceBasicInformationSection(retryCount = 0) {
       createTimeout(() => replaceBasicInformationSection(retryCount + 1), 300 * (retryCount + 1));
     } else if (retryCount >= maxRetries) {
       debugLog(`tampermonkey max retries (${maxRetries}) exceeded for basic info handling`);
+      noteRetryExhausted("tampermonkey stopped replacing basic information section", retryCount);
     } else {
       debugLog(`tampermonkey patient changed during retry, aborting basic info handling`);
     }
