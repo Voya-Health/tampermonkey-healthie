@@ -123,8 +123,8 @@ function safeUrl(rawUrl) {
   try {
     const parsed = new URL(String(rawUrl || ""), location.origin);
     return parsed.origin + normalizePath(parsed.pathname);
-  } catch (e) {
-    // A malformed URL is reported as a placeholder instead of the raw value.
+  } catch (error) {
+    debugLog("tampermonkey skipped malformed datadog url", error);
     return "invalid-url";
   }
 }
@@ -168,22 +168,20 @@ function datadogSeverity(status) {
 function makeDatadogLog(status, kind, message, extra) {
   const severity = datadogSeverity(status);
   const env = isStagingEnv ? "staging" : "prod";
-  return Object.assign(
-    {
-      message: sanitizeForDatadog("[" + kind + "] " + message),
-      status: severity,
-      service: "tampermonkey-healthie",
-      ddsource: "browser",
-      ddtags: "env:" + env + ",version:" + TM_VERSION + ",kind:" + kind + ",severity:" + severity,
-      tm_version: TM_VERSION,
-      tm_kind: kind,
-      tm_severity: severity,
-      tm_install_id: ddInstallId,
-      healthie_path: normalizePath(location.pathname),
-      page_id: ddPageId,
-    },
-    extra || {}
-  );
+  return {
+    message: sanitizeForDatadog("[" + kind + "] " + message),
+    status: severity,
+    service: "tampermonkey-healthie",
+    ddsource: "browser",
+    ddtags: "env:" + env + ",version:" + TM_VERSION + ",kind:" + kind + ",severity:" + severity,
+    tm_version: TM_VERSION,
+    tm_kind: kind,
+    tm_severity: severity,
+    tm_install_id: ddInstallId,
+    healthie_path: normalizePath(location.pathname),
+    page_id: ddPageId,
+    ...(extra || {}),
+  };
 }
 
 function reportDatadogStatus(onResult, status) {
@@ -259,8 +257,8 @@ function graphqlErrorSummary(text) {
     const code = errors[0]?.extensions?.code;
     const codeText = code ? " code=" + safeErrorName(code) : "";
     return "count=" + errors.length + codeText;
-  } catch (e) {
-    // Non-JSON bodies are not GraphQL errors.
+  } catch (error) {
+    debugLog("tampermonkey skipped non-json graphql body", error);
     return "";
   }
 }
@@ -751,19 +749,23 @@ function waitAppointmentsHome() {
       const getCurrentUserPayload = JSON.stringify({
         query: getCurrentUserQuery,
       });
-      healthieGQL(getCurrentUserPayload).then((response) => {
-        const userId = response.data.user.id;
-        //provider-schedule/id
-        const iframeSrc = `https://${mishaURL}${routeURLs.providerSchedule}/${userId}`;
+      healthieGQL(getCurrentUserPayload)
+        .then((response) => {
+          const userId = response.data.user.id;
+          //provider-schedule/id
+          const iframeSrc = `https://${mishaURL}${routeURLs.providerSchedule}/${userId}`;
 
-        // Check if the iframe already exists
-        let existingIframe = document.querySelector(`iframe[src="${iframeSrc}"]`);
-        // If the iframe doesn't exist, create a new one
-        if (!existingIframe) {
-          const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
-          $(appointmentWindowObj).append(iframe);
-        }
-      });
+          // Check if the iframe already exists
+          let existingIframe = document.querySelector(`iframe[src="${iframeSrc}"]`);
+          // If the iframe doesn't exist, create a new one
+          if (!existingIframe) {
+            const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
+            $(appointmentWindowObj).append(iframe);
+          }
+        })
+        .catch((error) => {
+          debugLog("tampermonkey current user request failed", error);
+        });
     } else {
       //wait for content load
       debugLog(`tampermonkey waiting appointment view`);
@@ -1851,9 +1853,13 @@ function handleCarePlanTmInput(carePlan) {
       const deleteGoalPayload = JSON.stringify({
         query: deleteGoalQuery,
       });
-      healthieGQL(deleteGoalPayload).then((response) => {
-        debugLog("tampermonkey deleted goal", response);
-      });
+      healthieGQL(deleteGoalPayload)
+        .then((response) => {
+          debugLog("tampermonkey deleted goal", response);
+        })
+        .catch((error) => {
+          debugLog("tampermonkey delete goal request failed", error);
+        });
     });
 
     debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
@@ -1882,7 +1888,9 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload);
+        healthieGQL(payload).catch((error) => {
+          debugLog("tampermonkey create milestone goal failed", error);
+        });
       }
     });
 
@@ -1903,7 +1911,9 @@ function handleCarePlanTmInput(carePlan) {
                         }
                         `;
     const payload = JSON.stringify({ query });
-    healthieGQL(payload);
+    healthieGQL(payload).catch((error) => {
+      debugLog("tampermonkey create care plan goal failed", error);
+    });
 
     const tasks = carePlan.tasks.tasks;
     debugLog("tampermonkey tasks are ", tasks);
@@ -1931,7 +1941,9 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
           const payload = JSON.stringify({ query });
-          healthieGQL(payload);
+          healthieGQL(payload).catch((error) => {
+            debugLog("tampermonkey create exercise goal failed", error);
+          });
         });
       } else if (element.isVisible) {
         debugLog("tampermonkey regular task assigned");
@@ -1952,9 +1964,13 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload);
+        healthieGQL(payload).catch((error) => {
+          debugLog("tampermonkey create task goal failed", error);
+        });
       }
     });
+  }).catch((error) => {
+    debugLog("tampermonkey care plan goal request failed", error);
   });
 }
 
@@ -2161,18 +2177,23 @@ function waitSettingsAPIpage() {
                             }
                             `;
         const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-        healthieGQL(getGoalPayload).then((response) => {
-          debugLog(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
+        healthieGQL(getGoalPayload)
+          .then((response) => {
+            debugLog(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
 
-          if (response.errors) {
+            if (response.errors) {
+              alert("That is not a valid API key. Please verify the key and try again.");
+            } else {
+              GM_setValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", apiKey);
+              alert("API key saved successfully!");
+              createTimeout(null, 2000);
+              window.location.reload();
+            }
+          })
+          .catch((error) => {
+            debugLog("tampermonkey api key check failed", error);
             alert("That is not a valid API key. Please verify the key and try again.");
-          } else {
-            GM_setValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", apiKey);
-            alert("API key saved successfully!");
-            createTimeout(null, 2000);
-            window.location.reload();
-          }
-        });
+          });
       }
     };
   } else {
