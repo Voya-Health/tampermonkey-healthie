@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.5
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -65,7 +65,7 @@ function debugLog(...messages) {
 
 // Same public browser logs token as DATADOG_LOGS_CLIENT_TOKEN in
 // voya-cust web-misha/core-lib/config/envs.ts. Not the server API key.
-const TM_VERSION = "2.6";
+const TM_VERSION = "2.5";
 const DD_LOGS_CLIENT_TOKEN = "pubdf55240f49807c01cd3ed2168506ced8";
 const DD_INTAKE_URL =
   "https://browser-intake-datadoghq.com/api/v2/logs?ddsource=browser&dd-evp-origin=browser&dd-api-key=" +
