@@ -15,7 +15,7 @@
 // @connect      browser-intake-datadoghq.com
 // ==/UserScript==
 
-/* globals contentful, GM_xmlhttpRequest */
+/* globals contentful */
 
 //Enable/Disable debug mode
 let debug = false;
