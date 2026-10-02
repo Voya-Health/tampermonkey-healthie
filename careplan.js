@@ -168,7 +168,7 @@ function datadogSeverity(status) {
 function makeDatadogLog(status, kind, message, extra) {
   const severity = datadogSeverity(status);
   const env = isStagingEnv ? "staging" : "prod";
-  return {
+  const entry = {
     message: sanitizeForDatadog("[" + kind + "] " + message),
     status: severity,
     service: "tampermonkey-healthie",
@@ -180,8 +180,11 @@ function makeDatadogLog(status, kind, message, extra) {
     tm_install_id: ddInstallId,
     healthie_path: normalizePath(location.pathname),
     page_id: ddPageId,
-    ...(extra || {}),
   };
+  if (!extra) {
+    return entry;
+  }
+  return { ...entry, ...extra };
 }
 
 function reportDatadogStatus(onResult, status) {
@@ -1823,22 +1826,15 @@ function rescheduleAppointment(appointmentID) {
   showOverlay(`${routeURLs.schedule}/${appointmentID}`, styles.scheduleOverlay);
 }
 
-function handleCarePlanTmInput(carePlan) {
-  const getGoalQuery = `query {
-                    goals(user_id: "${patientNumber}", per_page: 100) {
-                      id,
-                      name
-                    }
-                  }
-                  `;
-  const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-  healthieGQL(getGoalPayload).then((response) => {
-    const allGoals = response.data.goals;
-    debugLog("tampermonkey all goals", response);
+function healthieGoalQuery(query) {
+  return healthieGQL(JSON.stringify({ query })).catch((error) => {
+    debugLog("tampermonkey healthie goal request failed", error);
+  });
+}
 
-    allGoals.forEach((goal) => {
-      const deleteGoalQuery = `mutation {
-                    deleteGoal(input: {id: "${goal.id}"}) {
+function deleteHealthieGoal(goalId) {
+  return healthieGoalQuery(`mutation {
+                    deleteGoal(input: {id: "${goalId}"}) {
                       goal {
                         id
                       }
@@ -1849,86 +1845,15 @@ function handleCarePlanTmInput(carePlan) {
                       }
                     }
                   }
-                  `;
-      const deleteGoalPayload = JSON.stringify({
-        query: deleteGoalQuery,
-      });
-      healthieGQL(deleteGoalPayload)
-        .then((response) => {
-          debugLog("tampermonkey deleted goal", response);
-        })
-        .catch((error) => {
-          debugLog("tampermonkey delete goal request failed", error);
-        });
-    });
+                  `);
+}
 
-    debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
-    const goal = carePlan.goal.title;
-    debugLog("tampermokey goal title ", goal);
-
-    const milestones = carePlan.milestones;
-    milestones.forEach((element) => {
-      debugLog("tampermonkey milestone inserted", element);
-      const milestoneTitle = element.title;
-      if (element.isVisible) {
-        const query = `mutation {
-                                  createGoal(input: {
-                                    name: "${milestoneTitle}",
-                                    user_id: "${patientNumber}",
-                                    repeat: "Once"
-                                  }) {
-                                    goal {
-                                      id
-                                    }
-                                    messages {
-                                      field
-                                      message
-                                    }
-                                  }
-                                }
-                                `;
-        const payload = JSON.stringify({ query });
-        healthieGQL(payload).catch((error) => {
-          debugLog("tampermonkey create milestone goal failed", error);
-        });
-      }
-    });
-
-    const query = `mutation {
-                          createGoal(input: {
-                            name: "${goal}",
-                            user_id: "${patientNumber}",
-                            repeat: "Once"
-                          }) {
-                            goal {
-                              id
-                            }
-                            messages {
-                              field
-                              message
-                            }
-                          }
-                        }
-                        `;
-    const payload = JSON.stringify({ query });
-    healthieGQL(payload).catch((error) => {
-      debugLog("tampermonkey create care plan goal failed", error);
-    });
-
-    const tasks = carePlan.tasks.tasks;
-    debugLog("tampermonkey tasks are ", tasks);
-    tasks.forEach((element) => {
-      debugLog("tampermonkey task is ", element);
-      if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
-        debugLog("tampermonkey motion guide assigned");
-        element.items[0].exercises.forEach((element) => {
-          debugLog("tampermonkey", element);
-          const name = element.contentfulEntityId + " - " + element.side;
-          const query = `mutation {
+function createHealthieGoal(name, repeat) {
+  return healthieGoalQuery(`mutation {
                                   createGoal(input: {
                                     name: "${name}",
                                     user_id: "${patientNumber}",
-                                    repeat: "Daily"
+                                    repeat: "${repeat}"
                                   }) {
                                     goal {
                                       id
@@ -1939,39 +1864,57 @@ function handleCarePlanTmInput(carePlan) {
                                     }
                                   }
                                 }
-                                `;
-          const payload = JSON.stringify({ query });
-          healthieGQL(payload).catch((error) => {
-            debugLog("tampermonkey create exercise goal failed", error);
-          });
-        });
-      } else if (element.isVisible) {
-        debugLog("tampermonkey regular task assigned");
-        const query = `mutation {
-                                  createGoal(input: {
-                                    name: "${element.title}",
-                                    user_id: "${patientNumber}",
-                                    repeat: "Daily"
-                                  }) {
-                                    goal {
-                                      id
-                                    }
-                                    messages {
-                                      field
-                                      message
-                                    }
-                                  }
-                                }
-                                `;
-        const payload = JSON.stringify({ query });
-        healthieGQL(payload).catch((error) => {
-          debugLog("tampermonkey create task goal failed", error);
-        });
-      }
-    });
-  }).catch((error) => {
-    debugLog("tampermonkey care plan goal request failed", error);
+                                `);
+}
+
+function createCarePlanGoals(carePlan) {
+  const requests = [];
+  debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
+  const goal = carePlan.goal.title;
+  debugLog("tampermokey goal title ", goal);
+  carePlan.milestones.forEach((element) => {
+    debugLog("tampermonkey milestone inserted", element);
+    if (element.isVisible) {
+      requests.push(createHealthieGoal(element.title, "Once"));
+    }
   });
+  requests.push(createHealthieGoal(goal, "Once"));
+  const tasks = carePlan.tasks.tasks;
+  debugLog("tampermonkey tasks are ", tasks);
+  tasks.forEach((element) => {
+    debugLog("tampermonkey task is ", element);
+    if (element.contentfulId == "6nJFhYE6FJcnWLc3r1KHPR") {
+      debugLog("tampermonkey motion guide assigned");
+      element.items[0].exercises.forEach((exercise) => {
+        debugLog("tampermonkey", exercise);
+        requests.push(createHealthieGoal(exercise.contentfulEntityId + " - " + exercise.side, "Daily"));
+      });
+    } else if (element.isVisible) {
+      debugLog("tampermonkey regular task assigned");
+      requests.push(createHealthieGoal(element.title, "Daily"));
+    }
+  });
+  return Promise.all(requests);
+}
+
+function handleCarePlanTmInput(carePlan) {
+  const getGoalQuery = `query {
+                    goals(user_id: "${patientNumber}", per_page: 100) {
+                      id,
+                      name
+                    }
+                  }
+                  `;
+  healthieGoalQuery(getGoalQuery)
+    .then((response) => {
+      const allGoals = response.data.goals;
+      debugLog("tampermonkey all goals", response);
+      return Promise.all(allGoals.map((goal) => deleteHealthieGoal(goal.id)));
+    })
+    .then(() => createCarePlanGoals(carePlan))
+    .catch((error) => {
+      debugLog("tampermonkey care plan goal request failed", error);
+    });
 }
 
 function handleRescheduleOrReload(data) {
