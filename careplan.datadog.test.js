@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { test } = require("node:test");
 const vm = require("node:vm");
 
 const source = fs.readFileSync(path.join(__dirname, "careplan.js"), "utf8");
@@ -88,6 +89,7 @@ const context = {
     addEventListener: (type, callback) => documentListeners.set(type, callback),
   },
   URL,
+  crypto: globalThis.crypto,
 };
 
 vm.createContext(context);
@@ -102,7 +104,7 @@ this.datadogApi = {
   chartNoteAction,
   enqueueDatadogLog,
   setupHealthieDatadogLogs,
-  getDatadogState: () => ({ sent: ddSentThisWindow })
+  getDatadogState: () => ({ ...ddSentBySeverity })
 };`,
   context
 );
@@ -119,7 +121,7 @@ const {
   getDatadogState,
 } = context.datadogApi;
 
-(async function run() {
+test("careplan Datadog logging", async function () {
   assert.equal(
     sanitizeForDatadog("user@example.com https://example.com/path?token=secret#fragment"),
     "[email] https://example.com/path"
@@ -166,6 +168,8 @@ const {
   assert.equal(requests.length, 2, "a different message should be sent");
 
   setupHealthieDatadogLogs();
+  runTimers();
+  assert.equal(JSON.parse(requests.at(-1).data)[0].tm_kind, "lifecycle");
   assert.ok(listeners.has("error"));
   assert.ok(listeners.has("unhandledrejection"));
   assert.ok(documentListeners.has("click"));
@@ -191,9 +195,12 @@ const {
   );
   assert.equal(response, nextFetchResponse, "fetch response should pass through unchanged");
   runTimers();
-  const fetchPayload = JSON.parse(requests.at(-1).data);
+  const fetchPayload = JSON.parse(requests.at(-1).data).find((entry) => entry.tm_kind === "http");
+  assert.equal(fetchPayload.status, "error");
+  assert.equal(fetchPayload.tm_severity, "error");
+  assert.equal(fetchPayload.http_status, 500);
   assert.equal(
-    fetchPayload[0].message,
+    fetchPayload.message,
     "[http] GET 500 https://securestaging.gethealthie.com/users/:id/graphql"
   );
 
@@ -213,7 +220,11 @@ const {
   xhr.status = 400;
   xhr.emit("loadend");
   runTimers();
-  assert.match(requests.at(-1).data, /POST 400 https:\/\/securestaging\.gethealthie\.com\/users\/:id\/graphql/);
+  const xhrPayload = JSON.parse(requests.at(-1).data).at(-1);
+  assert.equal(xhrPayload.status, "warn");
+  assert.equal(xhrPayload.tm_severity, "warn");
+  assert.equal(xhrPayload.http_status, 400);
+  assert.match(xhrPayload.message, /POST 400 https:\/\/securestaging\.gethealthie\.com\/users\/:id\/graphql/);
 
   context.unsafeWindow.console.error("patient Jane Doe", new Error("date of birth"));
   assert.equal(originalConsoleErrorCalls, 1, "original console.error should still run");
@@ -230,7 +241,10 @@ const {
   await context.unsafeWindow.fetch("https://securestaging.gethealthie.com/graphql");
   await new Promise((resolve) => setImmediate(resolve));
   runTimers();
-  assert.match(requests.at(-1).data, /\[graphql\] count=1 code=LOCK_FAILED/);
+  const graphqlPayload = JSON.parse(requests.at(-1).data).at(-1);
+  assert.equal(graphqlPayload.status, "warn");
+  assert.equal(graphqlPayload.tm_kind, "graphql");
+  assert.match(graphqlPayload.message, /\[graphql\] count=1 code=LOCK_FAILED/);
 
   listeners.get("error")[0]({
     target: context.unsafeWindow,
@@ -254,21 +268,20 @@ const {
     },
   });
   runTimers();
-  assert.match(requests.at(-1).data, /\[chart-note\] clicked sign and lock/);
+  const clickPayload = JSON.parse(requests.at(-1).data).at(-1);
+  assert.equal(clickPayload.status, "info");
+  assert.equal(clickPayload.tm_kind, "chart-note");
+  assert.match(clickPayload.message, /\[chart-note\] clicked sign and lock/);
 
-  const sentBeforeRateLimitTest = getDatadogState().sent;
+  const sentBeforeRateLimitTest = getDatadogState().info;
   for (let i = 0; i < 31; i++) {
     enqueueDatadogLog("info", "rate-test", "message-" + i);
   }
   runTimers();
-  assert.equal(getDatadogState().sent, 30);
+  assert.equal(getDatadogState().info, 30);
   const rateLogsSent = requests
     .flatMap((request) => JSON.parse(request.data))
     .filter((log) => log.tm_kind === "rate-test");
   assert.equal(rateLogsSent.length, 30 - sentBeforeRateLimitTest);
 
-  console.log("careplan Datadog tests passed");
-})().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
 });

@@ -70,35 +70,46 @@ const DD_LOGS_CLIENT_TOKEN = "pubdf55240f49807c01cd3ed2168506ced8";
 const DD_INTAKE_URL =
   "https://browser-intake-datadoghq.com/api/v2/logs?ddsource=browser&dd-evp-origin=browser&dd-api-key=" +
   DD_LOGS_CLIENT_TOKEN;
-const DD_MAX_PER_MINUTE = 30;
-const ddPageId = Math.random().toString(36).slice(2, 10);
+const DD_LIMITS_PER_MINUTE = { error: 20, warn: 20, info: 30 };
 const ddInstallIdKey = "voriDatadogInstallId";
+
+function randomId(length) {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => (byte % 36).toString(36)).join("");
+}
+
+const ddPageId = randomId(10);
 
 function readInstallId() {
   const existing = GM_getValue(ddInstallIdKey, "");
   if (existing) {
     return existing;
   }
-  const id = Math.random().toString(36).slice(2, 14);
+  const id = randomId(12);
   GM_setValue(ddInstallIdKey, id);
   return id;
 }
 
 const ddInstallId = readInstallId();
 let ddQueue = [];
-let ddSentThisWindow = 0;
+let ddSentBySeverity = { error: 0, warn: 0, info: 0 };
 let ddWindowStarted = Date.now();
 let ddFlushTimer = null;
 let ddHooksInstalled = false;
 let ddLastMessage = "";
 let ddLastAt = 0;
 
+function sanitizeToken(token) {
+  const withoutQuery = token.split("?")[0].split("#")[0];
+  return withoutQuery.includes("@") ? "[email]" : withoutQuery;
+}
+
 function sanitizeForDatadog(value) {
-  return String(value == null ? "" : value)
-    .replace(/https?:\/\/[^\s)"']+/g, function (url) {
-      return url.split("?")[0].split("#")[0];
-    })
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+  return String(value ?? "")
+    .split(/\s+/)
+    .map(sanitizeToken)
+    .join(" ")
     .slice(0, 500);
 }
 
@@ -113,16 +124,19 @@ function safeUrl(rawUrl) {
     const parsed = new URL(String(rawUrl || ""), location.origin);
     return parsed.origin + normalizePath(parsed.pathname);
   } catch (e) {
+    // A malformed URL is reported as a placeholder instead of the raw value.
     return "invalid-url";
   }
 }
 
 function errorFingerprint(value) {
-  const text = String(value == null ? "" : value);
+  const text = String(value ?? "");
   let hash = 2166136261;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
+  for (let i = 0; i < text.length; ) {
+    const codePoint = text.codePointAt(i);
+    hash ^= codePoint;
     hash = Math.imul(hash, 16777619);
+    i += codePoint > 0xffff ? 2 : 1;
   }
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
@@ -133,8 +147,8 @@ function safeErrorName(value) {
 }
 
 function errorSummary(kind, error) {
-  const message = error && typeof error.message === "string" ? error.message : String(error || kind);
-  const name = safeErrorName(error && error.name);
+  const message = typeof error?.message === "string" ? error.message : String(error || kind);
+  const name = safeErrorName(error?.name);
   return kind + "_error name=" + name + " fingerprint=" + errorFingerprint(message);
 }
 
@@ -144,23 +158,32 @@ function rollDatadogWindow() {
     return;
   }
   ddWindowStarted = now;
-  ddSentThisWindow = 0;
+  ddSentBySeverity = { error: 0, warn: 0, info: 0 };
 }
 
-function makeDatadogLog(status, kind, message) {
+function datadogSeverity(status) {
+  return DD_LIMITS_PER_MINUTE[status] ? status : "info";
+}
+
+function makeDatadogLog(status, kind, message, extra) {
+  const severity = datadogSeverity(status);
   const env = isStagingEnv ? "staging" : "prod";
-  return {
-    message: sanitizeForDatadog("[" + kind + "] " + message),
-    status: status,
-    service: "tampermonkey-healthie",
-    ddsource: "browser",
-    ddtags: "env:" + env + ",version:" + TM_VERSION + ",kind:" + kind,
-    tm_version: TM_VERSION,
-    tm_kind: kind,
-    tm_install_id: ddInstallId,
-    healthie_path: normalizePath(location.pathname),
-    page_id: ddPageId,
-  };
+  return Object.assign(
+    {
+      message: sanitizeForDatadog("[" + kind + "] " + message),
+      status: severity,
+      service: "tampermonkey-healthie",
+      ddsource: "browser",
+      ddtags: "env:" + env + ",version:" + TM_VERSION + ",kind:" + kind + ",severity:" + severity,
+      tm_version: TM_VERSION,
+      tm_kind: kind,
+      tm_severity: severity,
+      tm_install_id: ddInstallId,
+      healthie_path: normalizePath(location.pathname),
+      page_id: ddPageId,
+    },
+    extra || {}
+  );
 }
 
 function reportDatadogStatus(onResult, status) {
@@ -186,24 +209,28 @@ function sendDatadogBatch(batch, onResult) {
   });
 }
 
-function enqueueDatadogLog(status, kind, message) {
+function enqueueDatadogLog(status, kind, message, extra) {
   try {
+    const severity = datadogSeverity(status);
     const now = Date.now();
-    if (message === ddLastMessage && now - ddLastAt < 2000) {
+    const dedupeKey = severity + "|" + kind + "|" + message;
+    if (dedupeKey === ddLastMessage && now - ddLastAt < 2000) {
       return;
     }
-    ddLastMessage = message;
+    ddLastMessage = dedupeKey;
     ddLastAt = now;
     rollDatadogWindow();
-    if (ddSentThisWindow >= DD_MAX_PER_MINUTE) {
+    if (ddSentBySeverity[severity] >= DD_LIMITS_PER_MINUTE[severity]) {
       return;
     }
-    ddSentThisWindow += 1;
-    ddQueue.push(makeDatadogLog(status, kind, message));
+    ddSentBySeverity[severity] += 1;
+    ddQueue.push(makeDatadogLog(severity, kind, message, extra));
     if (!ddFlushTimer) {
       ddFlushTimer = window.setTimeout(flushDatadogLogs, 1000);
     }
-  } catch (e) {}
+  } catch (e) {
+    // A logging failure must not interrupt the Healthie page.
+  }
 }
 
 function flushDatadogLogs() {
@@ -225,23 +252,30 @@ function graphqlErrorSummary(text) {
   }
   try {
     const body = JSON.parse(text);
-    const errors = body && body.errors;
-    if (!errors || !errors.length) {
+    const errors = body?.errors;
+    if (!errors?.length) {
       return "";
     }
-    const first = errors[0];
-    const code = first && first.extensions && first.extensions.code;
+    const code = errors[0]?.extensions?.code;
     const codeText = code ? " code=" + safeErrorName(code) : "";
     return "count=" + errors.length + codeText;
   } catch (e) {
+    // Non-JSON bodies are not GraphQL errors.
     return "";
   }
 }
 
+function httpSeverity(status) {
+  return status >= 500 ? "error" : "warn";
+}
+
 function noteHttpResult(method, rawUrl, status) {
-  if (status >= 400) {
-    enqueueDatadogLog("error", "http", method + " " + status + " " + safeUrl(rawUrl));
+  if (status < 400) {
+    return;
   }
+  enqueueDatadogLog(httpSeverity(status), "http", method + " " + status + " " + safeUrl(rawUrl), {
+    http_status: status,
+  });
 }
 
 function noteGraphqlText(rawUrl, text) {
@@ -250,12 +284,12 @@ function noteGraphqlText(rawUrl, text) {
   }
   const summary = graphqlErrorSummary(text);
   if (summary) {
-    enqueueDatadogLog("error", "graphql", summary + " " + safeUrl(rawUrl));
+    enqueueDatadogLog("warn", "graphql", summary + " " + safeUrl(rawUrl));
   }
 }
 
 function requestMethod(input, init) {
-  return ((init && init.method) || (input && input.method) || "GET").toUpperCase();
+  return (init?.method || input?.method || "GET").toUpperCase();
 }
 
 function requestUrl(input) {
@@ -265,7 +299,7 @@ function requestUrl(input) {
   if (input instanceof URL) {
     return input.href;
   }
-  return (input && input.url) || "";
+  return input?.url || "";
 }
 
 function noteFetchResponse(method, rawUrl, response) {
@@ -280,19 +314,25 @@ function noteFetchResponse(method, rawUrl, response) {
       .then(function (text) {
         noteGraphqlText(rawUrl, text);
       })
-      .catch(function () {});
-  } catch (e) {}
+      .catch(function () {
+        // Ignore a response body that cannot be cloned.
+      });
+  } catch (e) {
+    // Observing a response must not change the value returned to Healthie.
+  }
 }
 
 function noteFetchFailure(method, rawUrl, error) {
   try {
-    if (error && error.name === "AbortError") {
+    if (error?.name === "AbortError") {
       return;
     }
     const detail =
-      method + " network_error " + safeUrl(rawUrl) + " fingerprint=" + errorFingerprint(error && error.message);
+      method + " network_error " + safeUrl(rawUrl) + " fingerprint=" + errorFingerprint(error?.message);
     enqueueDatadogLog("error", "http", detail);
-  } catch (e) {}
+  } catch (e) {
+    // A logging failure must not replace the original network error.
+  }
 }
 
 function hookPageFetch() {
@@ -346,7 +386,9 @@ function noteXhrResult(xhr) {
     if (xhr.status === 200 && /graphql/i.test(String(xhr.__vxUrl || ""))) {
       noteGraphqlText(xhr.__vxUrl, xhr.responseText);
     }
-  } catch (e) {}
+  } catch (e) {
+    // Observing XHR must not change the request Healthie sent.
+  }
 }
 
 function isErrorWithMessage(value) {
@@ -378,16 +420,18 @@ function hookPageConsoleError(targetWindow) {
       if (text) {
         enqueueDatadogLog("error", "console", errorSummary("console", { message: text }));
       }
-    } catch (e) {}
+    } catch (e) {
+      // Keep the original console.error working if logging fails.
+    }
     return originalError.apply(this, arguments);
   };
   targetWindow.console.__vxWrapped = true;
 }
 
 function windowErrorDetail(event, fallbackMessage) {
-  const error = event && event.error ? event.error : { message: fallbackMessage };
+  const error = event?.error ? event.error : { message: fallbackMessage };
   let detail = errorSummary("window", error);
-  if (event && event.filename) {
+  if (event?.filename) {
     detail += " @ " + safeUrl(event.filename) + ":" + (event.lineno || "");
   }
   return detail;
@@ -398,14 +442,14 @@ function watchWindowErrors(targetWindow) {
     if (event.target && event.target !== targetWindow) {
       return;
     }
-    const message = event && event.message ? event.message : "error";
+    const message = event?.message ? event.message : "error";
     if (message === "Script error.") {
       return;
     }
     enqueueDatadogLog("error", "window", windowErrorDetail(event, message));
   });
   targetWindow.addEventListener("unhandledrejection", function (event) {
-    const reason = event && event.reason;
+    const reason = event?.reason;
     enqueueDatadogLog("error", "unhandledrejection", errorSummary("unhandledrejection", reason));
   });
 }
@@ -424,8 +468,7 @@ function watchChartNoteActions() {
   document.addEventListener(
     "click",
     function (event) {
-      const target = event.target;
-      const button = target && target.closest && target.closest("button, [role='button']");
+      const button = event.target?.closest?.("button, [role='button']");
       if (!button) {
         return;
       }
@@ -455,12 +498,16 @@ function setupHealthieDatadogLogs() {
     }
     watchChartNoteActions();
     installDatadogSelfTest();
-  } catch (e) {}
+    const apiKeyState = typeof healthieAPIKey === "string" && healthieAPIKey ? "present" : "missing";
+    enqueueDatadogLog("info", "lifecycle", "started version=" + TM_VERSION + " api_key=" + apiKeyState);
+  } catch (e) {
+    // Logging setup must not stop the rest of the userscript.
+  }
 }
 
 function installDatadogSelfTest() {
   unsafeWindow.__voriDatadogTest = function () {
-    const testId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const testId = Date.now().toString(36) + randomId(8);
     const entry = makeDatadogLog("info", "diagnostic", "VX-3525 manual test " + testId);
     entry.test_id = testId;
     return new Promise(function (resolve) {
@@ -2460,6 +2507,7 @@ function observeDOMChanges(mutations, observer) {
     //reset loop flag
     carePlanLoopLock = 0;
     debugLog(`tampermonkey URL changed to ${location.href}`);
+    enqueueDatadogLog("info", "navigation", "path=" + normalizePath(location.pathname));
 
     // Clear all timeouts
     for (let i = 0; i < timeoutIds.length; i++) {
