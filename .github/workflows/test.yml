@@ -14,8 +14,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: node --check careplan.js
       - run: npm test
-      - run: npx playwright-core install --with-deps chromium
+      - run: node node_modules/playwright-core/cli.js install --with-deps chromium
       - run: npm run test:browser

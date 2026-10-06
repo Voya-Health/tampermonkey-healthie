@@ -81,6 +81,7 @@ function randomId(length) {
     crypto.getRandomValues(bytes);
     return Array.from(bytes, (byte) => (byte % 36).toString(36)).join("");
   } catch (e) {
+    // Missing crypto must not stop the userscript.
     return "unavailable";
   }
 }
@@ -169,6 +170,7 @@ function safeUrl(rawUrl) {
     const knownHost = /^(api|staging-api|secure|securestaging|vorihealth)\.gethealthie\.com$/.test(parsed.hostname);
     return (knownHost ? parsed.origin : "[external]") + normalizePath(parsed.pathname);
   } catch (e) {
+    // Malformed diagnostic URLs are omitted.
     return "invalid-url";
   }
 }
@@ -310,6 +312,10 @@ function flushDatadogLogs() {
   }
 }
 
+function isGraphqlValidationMessage(value) {
+  return value && typeof value === "object" && "field" in value && typeof value.message === "string";
+}
+
 function graphqlErrorSummary(text) {
   if (!text || text.length > 200000) {
     return "";
@@ -319,7 +325,8 @@ function graphqlErrorSummary(text) {
     const errors = Array.isArray(body?.errors) ? body.errors.length : 0;
     // Healthie also rejects mutations through data.<mutation>.messages.
     const messages = Object.values(body?.data || {}).reduce(
-      (count, payload) => count + (Array.isArray(payload?.messages) ? payload.messages.length : 0),
+      (count, payload) =>
+        count + (Array.isArray(payload?.messages) ? payload.messages.filter(isGraphqlValidationMessage).length : 0),
       0
     );
     const count = errors + messages;
@@ -411,6 +418,7 @@ function hookPageFetch(targetWindow) {
       method = requestMethod(input, init);
       rawUrl = requestUrl(input);
     } catch (e) {
+      // Preserve the native promise even if optional metadata cannot be read.
       return result;
     }
     return result.then(
@@ -426,6 +434,13 @@ function hookPageFetch(targetWindow) {
   }
   wrappedFetch.__vxWrapped = true;
   targetWindow.fetch = wrappedFetch;
+}
+
+function onXhrLoadEnd() {
+  noteXhrResult(this);
+}
+function onXhrNetworkError() {
+  noteFetchFailure(this.__vxMethod || "GET", this.__vxUrl, { message: "xhr network failure" });
 }
 
 function hookPageXhr() {
@@ -445,18 +460,12 @@ function hookPageXhr() {
     }
     return result;
   };
-  function onLoadEnd() {
-    noteXhrResult(this);
-  }
-  function onNetworkError() {
-    noteFetchFailure(this.__vxMethod || "GET", this.__vxUrl, { message: "xhr network failure" });
-  }
   XHR.prototype.send = function () {
     try {
       // Reusing an XHR must not accumulate observers across sends.
-      this.addEventListener("loadend", onLoadEnd);
-      this.addEventListener("error", onNetworkError);
-      this.addEventListener("timeout", onNetworkError);
+      this.addEventListener("loadend", onXhrLoadEnd);
+      this.addEventListener("error", onXhrNetworkError);
+      this.addEventListener("timeout", onXhrNetworkError);
     } catch (e) {
       // A failed observer must not prevent the native send.
     }
@@ -946,7 +955,7 @@ function waitAppointmentsHome() {
       const getCurrentUserPayload = JSON.stringify({
         query: getCurrentUserQuery,
       });
-      healthieGQL(getCurrentUserPayload).then((response) => {
+      void healthieGQL(getCurrentUserPayload).then((response) => {
         const userId = response.data.user.id;
         //provider-schedule/id
         const iframeSrc = `https://${mishaURL}${routeURLs.providerSchedule}/${userId}`;
@@ -2027,7 +2036,7 @@ function handleCarePlanTmInput(carePlan) {
                   }
                   `;
   const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-  healthieGQL(getGoalPayload).then((response) => {
+  void healthieGQL(getGoalPayload).then((response) => {
     const allGoals = response.data.goals;
     debugLog("tampermonkey all goals", response);
 
@@ -2048,7 +2057,7 @@ function handleCarePlanTmInput(carePlan) {
       const deleteGoalPayload = JSON.stringify({
         query: deleteGoalQuery,
       });
-      healthieGQL(deleteGoalPayload).then((response) => {
+      void healthieGQL(deleteGoalPayload).then((response) => {
         debugLog("tampermonkey deleted goal", response);
       });
     });
@@ -2079,7 +2088,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload);
+        void healthieGQL(payload);
       }
     });
 
@@ -2100,7 +2109,7 @@ function handleCarePlanTmInput(carePlan) {
                         }
                         `;
     const payload = JSON.stringify({ query });
-    healthieGQL(payload);
+    void healthieGQL(payload);
 
     const tasks = carePlan.tasks.tasks;
     debugLog("tampermonkey tasks are ", tasks);
@@ -2128,7 +2137,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
           const payload = JSON.stringify({ query });
-          healthieGQL(payload);
+          void healthieGQL(payload);
         });
       } else if (element.isVisible) {
         debugLog("tampermonkey regular task assigned");
@@ -2149,7 +2158,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload);
+        void healthieGQL(payload);
       }
     });
   });
@@ -2363,7 +2372,7 @@ function waitSettingsAPIpage() {
                             }
                             `;
         const getGoalPayload = JSON.stringify({ query: getGoalQuery });
-        healthieGQL(getGoalPayload).then((response) => {
+        void healthieGQL(getGoalPayload).then((response) => {
           debugLog(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
 
           if (response.errors) {

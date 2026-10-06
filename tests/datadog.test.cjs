@@ -279,7 +279,7 @@ test("pagehide flushes all queued batches without leaving timers behind", () => 
 });
 
 test("fetch cloning preserves the original GraphQL response and ignores aborted requests", async () => {
-  const body = { data: { signNote: { messages: [{ message: "private note" }] } } };
+  const body = { data: { signNote: { messages: [{ field: "note", message: "private note" }] } } };
   const response = new Response(JSON.stringify(body));
   const h = harness({ page: { fetch: async () => response } });
   const actual = await h.page.fetch("/graphql");
@@ -309,4 +309,12 @@ test("care-plan request order stays unchanged while deletes are pending", async 
   assert.match(calls[2], /name: "milestone"/);
   assert.match(calls[3], /name: "goal"/);
   assert.match(calls[4], /name: "task"/);
+});
+
+test("ordinary conversation messages are not GraphQL validation errors", () => {
+  const h = harness();
+  h.run(
+    `noteGraphqlText('/graphql', JSON.stringify({data:{conversation:{messages:[{message:'normal chat',id:'1'}]}}}))`
+  );
+  assert.equal(h.logs().filter((log) => log.tm_kind === "graphql").length, 0);
 });

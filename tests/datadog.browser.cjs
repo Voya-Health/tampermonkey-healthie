@@ -14,7 +14,9 @@ async function browserHarness(t) {
     if (request.url().includes("/graphql")) {
       return route.fulfill({
         contentType: "application/json",
-        body: JSON.stringify({ data: { signNote: { messages: [{ message: "private clinical text" }] } } }),
+        body: JSON.stringify({
+          data: { signNote: { messages: [{ field: "note", message: "private clinical text" }] } },
+        }),
       });
     }
     return route.fulfill({
@@ -34,7 +36,9 @@ async function browserHarness(t) {
     };
     // DOM replacement is outside this test; keep the full userscript's startup intact.
     window.MutationObserver = class {
-      observe() {}
+      observe() {
+        /* The fixture does not run Healthie DOM replacement. */
+      }
     };
     window.jQuery = () => {};
     document.querySelector("#lock").onclick = () => {
@@ -52,8 +56,8 @@ test("native fetch and reused XHR return their original GraphQL bodies while rep
     const fetchBody = await response.json();
     const xhr = new XMLHttpRequest();
     const xhrBodies = [];
-    for (let i = 0; i < 2; i++) {
-      await new Promise((resolve, reject) => {
+    const sendOnce = () =>
+      new Promise((resolve, reject) => {
         xhr.open("POST", "/graphql");
         xhr.onload = () => {
           xhrBodies.push(JSON.parse(xhr.responseText));
@@ -62,7 +66,8 @@ test("native fetch and reused XHR return their original GraphQL bodies while rep
         xhr.onerror = reject;
         xhr.send("synthetic");
       });
-    }
+    await sendOnce();
+    await sendOnce();
     return { fetchBody, xhrBodies };
   });
   assert.equal(result.fetchBody.data.signNote.messages[0].message, "private clinical text");
