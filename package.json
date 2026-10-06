@@ -1,0 +1,11 @@
+{
+  "name": "tampermonkey-healthie",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/datadog.test.cjs",
+    "test:browser": "node --test tests/datadog.browser.cjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.59.1"
+  }
+}
