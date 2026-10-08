@@ -9,6 +9,9 @@ async function browserHarness(t) {
   const browser = await chromium.launch(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {});
   t.after(() => browser.close());
   const page = await browser.newPage();
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  t.after(() => assert.deepEqual(errors, [], "unexpected uncaught browser errors"));
   await page.route("**/*", async (route) => {
     const request = route.request();
     if (request.url().includes("/graphql")) {

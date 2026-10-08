@@ -318,3 +318,13 @@ test("ordinary conversation messages are not GraphQL validation errors", () => {
   );
   assert.equal(h.logs().filter((log) => log.tm_kind === "graphql").length, 0);
 });
+
+test("userscript update version and emitted telemetry version stay aligned", () => {
+  const version = source.match(/^\/\/ @version\s+(\S+)/m)?.[1];
+  assert.ok(version, "userscript update header must be present");
+  const h = harness();
+  assert.equal(h.run("TM_VERSION"), version);
+  const logs = h.logs();
+  assert.ok(logs.length > 0, "initialization emits telemetry");
+  for (const log of logs) assert.equal(log.tm_version, version);
+});
