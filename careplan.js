@@ -296,7 +296,7 @@ function waitAppointmentsHome() {
           const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
           $(appointmentWindowObj).append(iframe);
         }
-      });
+      }).catch(reportHealthieRequestError);
     } else {
       //wait for content load
       debugLog(`tampermonkey waiting appointment view`);
@@ -1399,7 +1399,7 @@ function handleCarePlanTmInput(carePlan) {
       });
       healthieGQL(deleteGoalPayload).then((response) => {
         debugLog("tampermonkey deleted goal", response);
-      });
+      }).catch(reportHealthieRequestError);
     });
 
     debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
@@ -1428,7 +1428,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload);
+        healthieGQL(payload).catch(reportHealthieRequestError);
       }
     });
 
@@ -1449,7 +1449,7 @@ function handleCarePlanTmInput(carePlan) {
                         }
                         `;
     const payload = JSON.stringify({ query });
-    healthieGQL(payload);
+    healthieGQL(payload).catch(reportHealthieRequestError);
 
     const tasks = carePlan.tasks.tasks;
     debugLog("tampermonkey tasks are ", tasks);
@@ -1477,7 +1477,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
           const payload = JSON.stringify({ query });
-          healthieGQL(payload);
+          healthieGQL(payload).catch(reportHealthieRequestError);
         });
       } else if (element.isVisible) {
         debugLog("tampermonkey regular task assigned");
@@ -1498,10 +1498,10 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload);
+        healthieGQL(payload).catch(reportHealthieRequestError);
       }
     });
-  });
+  }).catch(reportHealthieRequestError);
 }
 
 function handleRescheduleOrReload(data) {
@@ -1718,6 +1718,9 @@ function waitSettingsAPIpage() {
             createTimeout(null, 2000);
             window.location.reload();
           }
+        }).catch((error) => {
+          reportHealthieRequestError(error);
+          alert("Unable to verify the API key. Please try again.");
         });
       }
     };
@@ -1916,6 +1919,10 @@ function waitClientList() {
     debugLog(`tampermonkey waiting to update book link`);
     createTimeout(waitClientList, 500);
   }
+}
+
+function reportHealthieRequestError(error) {
+  console.error("tampermonkey Healthie request failed", error);
 }
 
 function healthieGQL(payload) {
