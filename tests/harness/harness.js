@@ -73,7 +73,8 @@ function Clients() {
 
 function renderOverview() {
   revision += 1;
-  ReactDOM.flushSync(() => root.render(mounted ? h(clients ? Clients : Overview, { key: patientId }) : null));
+  const component = clients ? Clients : Overview;
+  ReactDOM.flushSync(() => root.render(mounted ? h(component, { key: patientId }) : null));
 }
 
 function bindAction(id, action) {
