@@ -383,17 +383,31 @@ function waitAppointmentsProfile() {
     return;
   } else {
     // check to see if the appointment view contents have loaded
-    let appointmentWindow = $('[data-testid="cop-appointments-section"] div').filter(function () {
+    let appointmentContents = $('[data-testid="cop-appointments-contents"]');
+    let appointmentWindow = (
+      appointmentContents.length ? appointmentContents : $('[data-testid="cop-appointments-section"] div')
+    ).filter(function () {
       return $(this).find('[data-testid="tab-container"]').length > 0;
     })[0];
     if (appointmentWindow) {
       debugLog(`tampermonkey found appointment view on user profile`);
 
       // Clone the book appointment button BEFORE removing children
-      let bookAppointmentBtn = $('[data-testid="add-appointment-button"]')[0];
+      let appointmentBody = $(appointmentWindow).closest('[data-testid="collapsible-section-body"]');
+      let bookAppointmentBtn =
+        $('[data-testid="add-appointment-button"]')[0] ||
+        appointmentBody
+          .find('[data-testid="cop-appointments-contents"]')
+          .siblings(".mt-3")
+          .find("button")
+          .filter(function () {
+            // Ignore the icon's SVG title when matching the visible label.
+            return $(this).clone().find("svg").remove().end().text().trim() === "Add appointment";
+          })[0];
       let clonedBookBtn = null;
       if (bookAppointmentBtn) {
         clonedBookBtn = $(bookAppointmentBtn).clone();
+        $(bookAppointmentBtn).remove();
         debugLog(`tampermonkey cloned book appointment button`);
       }
 
