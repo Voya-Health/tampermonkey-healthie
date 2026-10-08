@@ -53,11 +53,12 @@ function Overview() {
       h("div", { className: "mt-3" }, h("button", null, "Add appointment")))));
 }
 
+function nativeClientPress() {
+  nativeClicks += 1;
+  document.querySelector('[data-testid="native-clicks"]').textContent = nativeClicks;
+}
+
 function Clients() {
-  function nativePress() {
-    nativeClicks += 1;
-    document.querySelector('[data-testid="native-clicks"]').textContent = nativeClicks;
-  }
   const props = layout === "legacy"
     ? { "data-testid": "new-client-modal-container" }
     : { className: layout === "bare" ? "client-toolbar" : "add-client-container" };
@@ -67,9 +68,9 @@ function Clients() {
     loaded ? h("button", {
       id: `react-aria-client-${revision}`,
       "data-testid": layout === "legacy" ? "primaryButton" : undefined,
-      onClick: nativePress,
-      onPointerUp: nativePress,
-      onKeyDown: nativePress,
+      onClick: nativeClientPress,
+      onPointerUp: nativeClientPress,
+      onKeyDown: nativeClientPress,
     }, h("svg", null, h("title", null, "Add Icon")), "Add client") : h("p", null, "Loading clients"),
     h("button", { "data-testid": "unrelated-client-control" }, "Add client note"));
 }
