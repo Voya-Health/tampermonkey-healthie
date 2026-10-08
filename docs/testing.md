@@ -8,7 +8,7 @@ npm ci --ignore-scripts
 npm test
 ```
 
-`npm test` runs 34 Node tests for Datadog diagnostics and GraphQL request handling,
+`npm test` runs 35 Node tests for Datadog diagnostics and GraphQL request handling,
 then 3 native Chromium telemetry tests and 19 Playwright tests for patient Overview
 appointments and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's

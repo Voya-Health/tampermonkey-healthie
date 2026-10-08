@@ -82,6 +82,7 @@ function randomId(length) {
     return Array.from(bytes, (byte) => (byte % 36).toString(36)).join("");
   } catch (e) {
     // Missing crypto must not stop the userscript.
+    debugLog(errorSummary("crypto", e));
     return "unavailable";
   }
 }
@@ -171,6 +172,7 @@ function safeUrl(rawUrl) {
     return (knownHost ? parsed.origin : "[external]") + normalizePath(parsed.pathname);
   } catch (e) {
     // Malformed diagnostic URLs are omitted.
+    debugLog(errorSummary("diagnostic-url", e));
     return "invalid-url";
   }
 }
@@ -419,6 +421,7 @@ function hookPageFetch(targetWindow) {
       rawUrl = requestUrl(input);
     } catch (e) {
       // Preserve the native promise even if optional metadata cannot be read.
+      debugLog(errorSummary("fetch-metadata", e));
       return result;
     }
     return result.then(

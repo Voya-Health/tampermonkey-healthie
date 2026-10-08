@@ -328,3 +328,23 @@ test("userscript update version and emitted telemetry version stay aligned", () 
   assert.ok(logs.length > 0, "initialization emits telemetry");
   for (const log of logs) assert.equal(log.tm_version, version);
 });
+
+test("diagnostic fallback errors preserve behavior and redact debug output", async () => {
+  const debugMessages = [];
+  const response = { status: 200, ok: true };
+  const h = harness({ page: { fetch: async () => response } });
+  h.page.console.log = (...args) => debugMessages.push(args);
+  h.run("debug = true");
+  h.context.crypto = {
+    getRandomValues() { throw new Error("patient Jane Doe"); },
+  };
+  assert.equal(h.run("randomId(12)"), "unavailable");
+  assert.equal(h.run("safeUrl('http://[')"), "invalid-url");
+  const input = {
+    get method() { throw new Error("private diagnosis for Jane Doe"); },
+  };
+  assert.equal(await h.page.fetch(input), response);
+  assert.equal(debugMessages.length, 3);
+  assert.ok(!JSON.stringify(debugMessages).includes("Jane"));
+  assert.ok(!JSON.stringify(debugMessages).includes("diagnosis"));
+});
