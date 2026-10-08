@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.6
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -390,8 +390,9 @@ function waitAppointmentsProfile() {
     });
     if (appointmentWindow) {
       debugLog(`tampermonkey found appointment view on user profile`);
+      $(appointmentWindow).siblings('[data-testid="misha-appointments"]').remove();
 
-      // Clone the book appointment button BEFORE removing children
+      // Clone the control while keeping Healthie's React-owned nodes attached.
       let appointmentBody = $(appointmentWindow).closest('[data-testid="collapsible-section-body"]');
       let bookAppointmentBtn =
         $('[data-testid="add-appointment-button"]')[0] ??
@@ -405,12 +406,14 @@ function waitAppointmentsProfile() {
           });
       let clonedBookBtn = null;
       if (bookAppointmentBtn) {
-        clonedBookBtn = $(bookAppointmentBtn).clone();
-        $(bookAppointmentBtn).remove();
+        clonedBookBtn = $(bookAppointmentBtn).clone().removeAttr("id")
+          .attr("data-testid", "misha-add-appointment-button").show();
+        $(bookAppointmentBtn).hide().closest(".mt-3").hide();
         debugLog(`tampermonkey cloned book appointment button`);
       }
 
-      $(appointmentWindow).css({ margin: "0", padding: "3px" });
+      const appointmentReplacement = $("<div>", { "data-testid": "misha-appointments" })
+        .css({ margin: "0", padding: "3px" });
       // get the parent with class .column.is-6 and change the width to 100%
       let parent = $(appointmentWindow).closest(".column.is-6");
       parent
@@ -431,12 +434,8 @@ function waitAppointmentsProfile() {
       // also adjust width of packages section
       $('[data-testid="cop-appointments-section"]').closest(".column.is-6").css("width", "100%");
 
-      // remove all children of appointments section
-      while (appointmentWindow.childNodes.length > 0) {
-        let childClassName = appointmentWindow.lastChild.className;
-        debugLog(`tampermonkey removing child `, childClassName);
-        appointmentWindow.removeChild(appointmentWindow.lastChild);
-      }
+      // React must retain its original tree so later renders can update or remove it.
+      $(appointmentWindow).hide().before(appointmentReplacement);
 
       if (clonedBookBtn) {
         const patientNumber = location.href.split("/")[4];
@@ -444,7 +443,7 @@ function waitAppointmentsProfile() {
           e.stopPropagation();
           showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
         });
-        $(appointmentWindow).append(clonedBookBtn);
+        appointmentReplacement.append(clonedBookBtn);
         debugLog(`tampermonkey added book appointment button before iframe`);
       }
 
@@ -452,7 +451,7 @@ function waitAppointmentsProfile() {
       // can also be - https://securestaging.gethealthie.com/users/388687/Overview
       const patientID = location.href.split("/")[4];
       const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
-      $(appointmentWindow).append(iframe);
+      appointmentReplacement.append(iframe);
     } else {
       // wait for content load
       debugLog(`tampermonkey waiting appointment view on user profile`);
