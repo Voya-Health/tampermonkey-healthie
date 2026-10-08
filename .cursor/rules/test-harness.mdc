@@ -1,0 +1,14 @@
+---
+description: Require the committed HTML and Playwright harness to verify userscript DOM behavior and React reconciliation.
+globs: ""
+alwaysApply: true
+---
+
+# Userscript regression tests
+
+- Before changing a DOM integration, read `docs/testing.md` and the committed HTML harness under `tests/harness/`. Run the affected Playwright tests against functions extracted from the current `careplan.js`; do not substitute a copied implementation or stub the behavior under test.
+- Reproduce reported markup and interaction bugs in the React fixture. Add a regression that fails against the broken implementation before claiming the fix works. Exercise real React refresh, restore, patient navigation, and unmount after userscript injection.
+- Cover visible controls, iframe URLs and patient IDs, overlay open/close behavior, legacy selectors, delayed rendering, and repeated injection when relevant. Fail on uncaught browser errors and unexpected external requests; never suppress reconciliation errors to make tests pass.
+- Keep fixtures synthetic. Mock external Misha responses while retaining the actual iframe URLs and actual userscript overlay functions. Document the harness's scope; local fixture results do not establish live Healthie or Misha service behavior.
+- Run `npm test` before publishing. The GitHub Actions `Userscript tests` job runs Node request tests and Chromium Playwright tests on each PR. Verify this job and SonarCloud pass on the latest pushed commit.
+- Update the fixture, automated tests, and `docs/testing.md` when behavior or markup changes. Retain the PR's assigned userscript version across test and review commits.
