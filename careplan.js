@@ -383,9 +383,8 @@ function waitAppointmentsProfile() {
     return;
   } else {
     // check to see if the appointment view contents have loaded
-    let appointmentContents = $('[data-testid="cop-appointments-contents"]');
-    let appointmentWindow = (
-      appointmentContents.length ? appointmentContents : $('[data-testid="cop-appointments-section"] div')
+    let appointmentWindow = $(
+      $('[data-testid="cop-appointments-contents"]')[0] ?? '[data-testid="cop-appointments-section"] div'
     ).toArray().find(function (element) {
       return $(element).find('[data-testid="tab-container"]').length > 0;
     });
