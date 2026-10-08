@@ -8,8 +8,8 @@ npm ci --ignore-scripts
 npm test
 ```
 
-`npm test` runs 15 Node tests for GraphQL request handling, then 12 Chromium
-Playwright tests for the patient Overview appointments integration. GitHub Actions
+`npm test` runs 15 Node tests for GraphQL request handling, then 19 Chromium
+Playwright tests for patient Overview appointments and Add client. GitHub Actions
 runs both suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's
 `Userscript tests` job and SonarCloud result before completing a PR.
@@ -17,7 +17,7 @@ screenshots as the `playwright-results` artifact. Check the latest commit's
 ## Browser coverage
 
 The fixture uses React 18 and jQuery from locked local dependencies. The server
-reads `careplan.js` for each request and extracts the actual appointments route,
+reads `careplan.js` for each request and extracts the actual appointments route, Add client handlers,
 polling, iframe, and overlay functions with their URL and style declarations.
 Missing declarations fail the fixture load. Tests do not maintain a separate
 implementation of those functions.
@@ -30,14 +30,17 @@ Playwright checks:
 - The appointments iframe URL, visible Add appointment control, schedule URL,
   overlay close behavior, and suppression of native and bubbled schedule clicks.
 - Real React refresh, restore, navigation to patient 456, and unmount after injection.
-- Staging's route guard, which skips the production replacement.
+- Staging's route guard, which skips the production appointments replacement.
+- Add client from legacy, `.add-client-container`, and button markup without test IDs;
+  native click prevention, React refresh/restore/unmount, icon and keyboard clicks,
+  repeated setup, hidden duplicate controls, delayed rendering, and staging URLs.
 
 Each browser test fails on uncaught page errors or unexpected external requests.
 The React fixture displays browser errors in its HTML so manual checks also expose
 reconciliation failures. Tests intercept Misha iframe requests and return synthetic
 HTML while checking the actual production URLs. They do not contact patient APIs.
 
-This harness covers the changed appointments feature and request handling. It does
+This harness covers the changed appointments and Add client features and request handling. It does
 not execute the entire userscript router or every unrelated integration. React 18
 fixtures do not establish compatibility with all future Healthie markup. Extend
 the fixture and tests when a change affects another integration.
@@ -59,6 +62,11 @@ Query options include `?layout=legacy`, `?layout=both`, `?buttonTestId=1`,
 Use Load Overview to complete delayed rendering. Restarting the server is not
 necessary after editing `careplan.js`; reload the page to read the new source.
 
+Open http://127.0.0.1:4175/clients/active?clients=1 to exercise Add client.
+Use `layout=legacy` or `layout=bare` query options for alternative markup.
+Inject Add client installs the actual click interception; Refresh and Restore
+replace the native React button without reinstalling the listener.
+
 Run `npm run test:browser:ui` for Playwright's interactive runner, or
 `./node_modules/.bin/playwright show-report` to inspect the latest report.
 
@@ -79,6 +87,19 @@ script removes React-owned nodes. Then run `npm test` without the source overrid
 the fixed version must pass. Keep failure logs out of source control. Do not weaken
 the browser error assertions or hide native tree failures.
 
+To reproduce the Add client failures from the previous PR revision:
+
+```sh
+git show 7056292:careplan.js > .test-fixtures/broken-add-client.js
+HEALTHIE_TEST_SOURCE="$PWD/.test-fixtures/broken-add-client.js" \
+  ./node_modules/.bin/playwright test add-client.spec.cjs
+```
+
+The old handler fails to open Misha for the supported `.add-client-container`
+path or a button without test IDs, and replacing the legacy React button
+breaks refresh. The fixed handler uses one document capture listener,
+re-evaluates the visible control on each click, and preserves the native DOM.
+
 ## Production acceptance
 
 On a production Healthie patient Overview, verify the Misha appointments iframe
@@ -87,6 +108,10 @@ that patient. Refresh or navigate away and confirm no React reconciliation error
 These checks need a signed-in Healthie session and access to Misha. Report them
 separately from local fixture results. Staging skips this path and cannot establish
 production acceptance.
+
+On the Clients list, verify Add client opens Misha's `createPatientDialog`
+instead of Healthie's native dialog. Re-render the Clients list and verify it
+still opens once. Add client uses the staging Misha URL on staging.
 
 Assign one userscript version above the PR base and retain it across review fixes.
 PR #134 uses `2.5`, compared with `2.4` on its base.

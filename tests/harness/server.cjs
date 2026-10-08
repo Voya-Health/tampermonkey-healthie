@@ -21,9 +21,15 @@ function extract(source, pattern, name) {
 function userscriptUnderTest() {
   const source = fs.readFileSync(sourcePath, "utf8");
   const functions = ["debugLog", "createTimeout", "initJQuery", "convertToCSSProperty",
-    "generateIframe", "hideOverlay", "showOverlay", "waitAppointmentsProfile", "handleAppointmentsProfileRoute"];
+    "generateIframe", "hideOverlay", "showOverlay", "waitAppointmentsProfile", "handleAppointmentsProfileRoute",
+    "createPatientDialogIframe", "waitForAddPatientButton"];
   const declarations = functions.map((name) =>
     extract(source, new RegExp(String.raw`^function ${name}\([^]*?^}`, "m"), name));
+  // Earlier revisions lack these helpers; source overrides must still reproduce their failure.
+  for (const name of ["findAddClientButton", "handleAddClientClick"]) {
+    const match = source.match(new RegExp(String.raw`^function ${name}\([^]*?^}`, "m"));
+    if (match) declarations.push(match[0]);
+  }
   for (const name of ["routeURLs", "styles"]) {
     declarations.unshift(extract(source, new RegExp(String.raw`^const ${name} = \{[^]*?^};`, "m"), name));
   }
@@ -42,7 +48,7 @@ const server = http.createServer((request, response) => {
     } else if (assets.has(pathname)) {
       response.setHeader("Content-Type", "text/javascript");
       response.end(fs.readFileSync(assets.get(pathname)));
-    } else if (pathname === "/" || /^\/users\/\d+(?:\/Overview)?$/.test(pathname)) {
+    } else if (pathname === "/" || pathname === "/clients/active" || /^\/users\/\d+(?:\/Overview)?$/.test(pathname)) {
       response.setHeader("Content-Type", "text/html");
       response.end(fs.readFileSync(path.join(__dirname, "index.html")));
     } else {

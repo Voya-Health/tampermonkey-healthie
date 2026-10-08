@@ -1,6 +1,7 @@
 const h = React.createElement;
 const params = new URLSearchParams(location.search);
 const layout = params.get("layout") || "modern";
+const clients = params.has("clients");
 const root = ReactDOM.createRoot(document.getElementById("overview"));
 let patientId = "123";
 let loaded = !params.has("pendingTabs");
@@ -52,9 +53,27 @@ function Overview() {
       h("div", { className: "mt-3" }, h("button", null, "Add appointment")))));
 }
 
+function Clients() {
+  const props = layout === "legacy"
+    ? { "data-testid": "new-client-modal-container" }
+    : { className: layout === "bare" ? "client-toolbar" : "add-client-container" };
+  return h("section", props,
+    params.has("hiddenDecoy") ? h("div", { "data-testid": "new-client-modal-container", style: { display: "none" } },
+      h("button", null, "Add client")) : null,
+    loaded ? h("button", {
+      id: `react-aria-client-${revision}`,
+      "data-testid": layout === "legacy" ? "primaryButton" : undefined,
+      onClick: () => {
+        nativeClicks += 1;
+        document.querySelector('[data-testid="native-clicks"]').textContent = nativeClicks;
+      },
+    }, h("svg", null, h("title", null, "Add Icon")), "Add client") : h("p", null, "Loading clients"),
+    h("button", { "data-testid": "unrelated-client-control" }, "Add client note"));
+}
+
 function renderOverview() {
   revision += 1;
-  ReactDOM.flushSync(() => root.render(mounted ? h(Overview, { key: patientId }) : null));
+  ReactDOM.flushSync(() => root.render(mounted ? h(clients ? Clients : Overview, { key: patientId }) : null));
 }
 
 function bindAction(id, action) {
@@ -64,7 +83,8 @@ function bindAction(id, action) {
   });
 }
 
-bindAction("inject", handleAppointmentsProfileRoute);
+if (clients) document.getElementById("inject").textContent = "Inject Add client";
+bindAction("inject", clients ? waitForAddPatientButton : handleAppointmentsProfileRoute);
 bindAction("refresh", () => { loaded = false; renderOverview(); });
 bindAction("restore", () => { loaded = true; renderOverview(); });
 bindAction("load", () => { mounted = true; loaded = true; renderOverview(); });
@@ -78,7 +98,7 @@ bindAction("patient", () => {
   handleAppointmentsProfileRoute();
 });
 document.addEventListener("click", (event) => {
-  if (event.target.closest('[data-testid="misha-add-appointment-button"]')) {
+  if (event.target instanceof Element && event.target.closest('[data-testid="misha-add-appointment-button"]')) {
     bubbledClicks += 1;
     document.querySelector('[data-testid="bubbled-clicks"]').textContent = bubbledClicks;
   }

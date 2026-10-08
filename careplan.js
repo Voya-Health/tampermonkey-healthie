@@ -328,29 +328,43 @@ function initBookAppointmentButton() {
   }
 }
 
+function findAddClientButton($) {
+  function matchesLabel(element) {
+    return $(element).clone().find("svg").remove().end().text().trim()
+      .replace(/\s+/g, " ").toLowerCase() === "add client";
+  }
+  const scopedButtons = $('[data-testid="new-client-modal-container"] button, .add-client-container button');
+  return scopedButtons.filter(":visible").toArray().find(matchesLabel) ??
+    $("button").filter(":visible").toArray().find(matchesLabel);
+}
+
+function handleAddClientClick(event) {
+  const $ = initJQuery();
+  const button = event.target instanceof Element ? event.target.closest("button") : null;
+  if (!$ || !button || button !== findAddClientButton($)) {
+    return;
+  }
+  // Intercept before React's delegated handler without replacing its button.
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
+}
+
 function createPatientDialogIframe() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jQuery to load`);
-    setTimeout(createPatientDialogIframe, 200);
+    createTimeout(createPatientDialogIframe, 200);
     return;
   }
   debugLog(`jQuery is loaded, attempting to find 'Add Client' button`);
-  let addPatientBtn = $('[data-testid="new-client-modal-container"] [data-testid="primaryButton"]').filter(function () {
-    return $(this).text().toLowerCase().includes("add client");
-  })[0];
+  const addPatientBtn = findAddClientButton($);
   if (addPatientBtn) {
-    debugLog(`'Add Client' button found, proceeding to clone`);
-    let clonedBtn = $(addPatientBtn).clone();
-    $(addPatientBtn).replaceWith(clonedBtn);
-    clonedBtn.on("click", (e) => {
-      debugLog(`Cloned 'Add Client' button clicked`);
-      e.stopPropagation();
-      showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
-    });
+    document.removeEventListener("click", handleAddClientClick, true);
+    document.addEventListener("click", handleAddClientClick, true);
   } else {
     debugLog(`'Add Client' button not found, retrying...`);
-    setTimeout(createPatientDialogIframe, 200);
+    createTimeout(createPatientDialogIframe, 200);
   }
 }
 
@@ -361,17 +375,13 @@ function waitForAddPatientButton() {
     createTimeout(waitForAddPatientButton, 200);
     return;
   }
-  let addPatientBtn = $('[data-testid="new-client-modal-container"] button, .add-client-container button').filter(
-    function () {
-      return $(this).text().toLowerCase().includes("add client");
-    }
-  )[0];
+  const addPatientBtn = findAddClientButton($);
   if (addPatientBtn) {
     debugLog("Add Client Button found");
     createPatientDialogIframe();
   } else {
     debugLog("Waiting for 'Add Client' button");
-    setTimeout(waitForAddPatientButton, 200);
+    createTimeout(waitForAddPatientButton, 200);
   }
 }
 
