@@ -1428,7 +1428,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload).catch(reportHealthieRequestError);
+        submitHealthieGoal(payload);
       }
     });
 
@@ -1449,7 +1449,7 @@ function handleCarePlanTmInput(carePlan) {
                         }
                         `;
     const payload = JSON.stringify({ query });
-    healthieGQL(payload).catch(reportHealthieRequestError);
+    submitHealthieGoal(payload);
 
     const tasks = carePlan.tasks.tasks;
     debugLog("tampermonkey tasks are ", tasks);
@@ -1477,7 +1477,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
           const payload = JSON.stringify({ query });
-          healthieGQL(payload).catch(reportHealthieRequestError);
+          submitHealthieGoal(payload);
         });
       } else if (element.isVisible) {
         debugLog("tampermonkey regular task assigned");
@@ -1498,7 +1498,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload).catch(reportHealthieRequestError);
+        submitHealthieGoal(payload);
       }
     });
   }).catch(reportHealthieRequestError);
@@ -1923,6 +1923,10 @@ function waitClientList() {
 
 function reportHealthieRequestError(error) {
   console.error("tampermonkey Healthie request failed", error);
+}
+
+function submitHealthieGoal(payload) {
+  healthieGQL(payload).catch(reportHealthieRequestError);
 }
 
 function healthieGQL(payload) {

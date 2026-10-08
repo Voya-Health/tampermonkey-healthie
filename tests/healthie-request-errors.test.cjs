@@ -27,7 +27,7 @@ function load(name, overrides = {}) {
     createTimeout() {},
     ...overrides,
   };
-  for (const fn of ["reportHealthieRequestError", name]) {
+  for (const fn of ["reportHealthieRequestError", "submitHealthieGoal", name]) {
     const match = source.match(new RegExp(`^function ${fn}\\([^]*?^}`, "m"));
     if (match) vm.runInNewContext(match[0], context);
   }
