@@ -3,8 +3,8 @@
 Use Node 20 or later. Install the locked dependencies and Chromium:
 
 ```sh
-npm ci
-npx playwright install chromium
+npm ci --ignore-scripts
+./node_modules/.bin/playwright install chromium
 npm test
 ```
 
@@ -60,7 +60,7 @@ Use Load Overview to complete delayed rendering. Restarting the server is not
 necessary after editing `careplan.js`; reload the page to read the new source.
 
 Run `npm run test:browser:ui` for Playwright's interactive runner, or
-`npx playwright show-report` to inspect the latest report.
+`./node_modules/.bin/playwright show-report` to inspect the latest report.
 
 ## Prove the React regression test catches the original crash
 
@@ -71,7 +71,7 @@ the earlier broken PR revision without editing the current userscript:
 mkdir -p .test-fixtures
 git show b80a4cb:careplan.js > .test-fixtures/broken-careplan.js
 HEALTHIE_TEST_SOURCE="$PWD/.test-fixtures/broken-careplan.js" \
-  npx playwright test --grep 'React can refresh'
+  ./node_modules/.bin/playwright test --grep 'React can refresh'
 ```
 
 Expect failure with `removeChild` / `NotFoundError` when React refreshes after the

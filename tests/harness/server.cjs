@@ -23,9 +23,9 @@ function userscriptUnderTest() {
   const functions = ["debugLog", "createTimeout", "initJQuery", "convertToCSSProperty",
     "generateIframe", "hideOverlay", "showOverlay", "waitAppointmentsProfile", "handleAppointmentsProfileRoute"];
   const declarations = functions.map((name) =>
-    extract(source, new RegExp(`^function ${name}\\([^]*?^}`, "m"), name));
+    extract(source, new RegExp(String.raw`^function ${name}\([^]*?^}`, "m"), name));
   for (const name of ["routeURLs", "styles"]) {
-    declarations.unshift(extract(source, new RegExp(`^const ${name} = \\{[^]*?^};`, "m"), name));
+    declarations.unshift(extract(source, new RegExp(String.raw`^const ${name} = \{[^]*?^};`, "m"), name));
   }
   declarations.unshift(extract(source, /^const isStagingEnv = .+;$/m, "isStagingEnv"),
     extract(source, /^let mishaURL = .+;$/m, "mishaURL"));

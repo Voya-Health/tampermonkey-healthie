@@ -5,8 +5,8 @@ Healthie integration with Tampermonkey.
 Install test dependencies and Chromium, then run the request and browser tests:
 
 ```sh
-npm ci
-npx playwright install chromium
+npm ci --ignore-scripts
+./node_modules/.bin/playwright install chromium
 npm test
 ```
 
