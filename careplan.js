@@ -386,24 +386,24 @@ function waitAppointmentsProfile() {
     let appointmentContents = $('[data-testid="cop-appointments-contents"]');
     let appointmentWindow = (
       appointmentContents.length ? appointmentContents : $('[data-testid="cop-appointments-section"] div')
-    ).filter(function () {
-      return $(this).find('[data-testid="tab-container"]').length > 0;
-    })[0];
+    ).toArray().find(function (element) {
+      return $(element).find('[data-testid="tab-container"]').length > 0;
+    });
     if (appointmentWindow) {
       debugLog(`tampermonkey found appointment view on user profile`);
 
       // Clone the book appointment button BEFORE removing children
       let appointmentBody = $(appointmentWindow).closest('[data-testid="collapsible-section-body"]');
       let bookAppointmentBtn =
-        $('[data-testid="add-appointment-button"]')[0] ||
+        $('[data-testid="add-appointment-button"]')[0] ??
         appointmentBody
           .find('[data-testid="cop-appointments-contents"]')
           .siblings(".mt-3")
           .find("button")
-          .filter(function () {
+          .toArray().find(function (element) {
             // Ignore the icon's SVG title when matching the visible label.
-            return $(this).clone().find("svg").remove().end().text().trim() === "Add appointment";
-          })[0];
+            return $(element).clone().find("svg").remove().end().text().trim() === "Add appointment";
+          });
       let clonedBookBtn = null;
       if (bookAppointmentBtn) {
         clonedBookBtn = $(bookAppointmentBtn).clone();
