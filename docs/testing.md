@@ -32,7 +32,7 @@ Playwright checks:
 - Real React refresh, restore, navigation to patient 456, and unmount after injection.
 - Staging's route guard, which skips the production appointments replacement.
 - Add client from legacy, `.add-client-container`, and button markup without test IDs;
-  native click prevention, React refresh/restore/unmount, icon and keyboard clicks,
+  native click and press prevention, React refresh/restore/unmount, icon and keyboard clicks,
   repeated setup, hidden duplicate controls, delayed rendering, and staging URLs.
 
 Each browser test fails on uncaught page errors or unexpected external requests.
@@ -65,7 +65,7 @@ necessary after editing `careplan.js`; reload the page to read the new source.
 Open http://127.0.0.1:4175/clients/active?clients=1 to exercise Add client.
 Use `layout=legacy` or `layout=bare` query options for alternative markup.
 Inject Add client installs the actual click interception; Refresh and Restore
-replace the native React button without reinstalling the listener.
+replace the native React button without reinstalling the handlers.
 
 Run `npm run test:browser:ui` for Playwright's interactive runner, or
 `./node_modules/.bin/playwright show-report` to inspect the latest report.
@@ -97,7 +97,7 @@ HEALTHIE_TEST_SOURCE="$PWD/.test-fixtures/broken-add-client.js" \
 
 The old handler fails to open Misha for the supported `.add-client-container`
 path or a button without test IDs, and replacing the legacy React button
-breaks refresh. The fixed handler uses one document capture listener,
+breaks refresh. The fixed handler uses idempotent document capture handlers,
 re-evaluates the visible control on each click, and preserves the native DOM.
 
 ## Production acceptance

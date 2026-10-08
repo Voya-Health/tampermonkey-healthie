@@ -344,10 +344,15 @@ function handleAddClientClick(event) {
   if (!$ || !button || button !== findAddClientButton($)) {
     return;
   }
-  // Intercept before React's delegated handler without replacing its button.
-  event.preventDefault();
+  if (event.type.startsWith("key") && !["Enter", " "].includes(event.key)) {
+    return;
+  }
+  // Preserve native click generation while blocking earlier React press handlers.
   event.stopImmediatePropagation();
-  showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
+  if (event.type === "click") {
+    event.preventDefault();
+    showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
+  }
 }
 
 function createPatientDialogIframe() {
@@ -360,8 +365,10 @@ function createPatientDialogIframe() {
   debugLog(`jQuery is loaded, attempting to find 'Add Client' button`);
   const addPatientBtn = findAddClientButton($);
   if (addPatientBtn) {
-    document.removeEventListener("click", handleAddClientClick, true);
-    document.addEventListener("click", handleAddClientClick, true);
+    for (const type of ["click", "pointerdown", "pointerup", "mousedown", "mouseup", "keydown", "keyup"]) {
+      document.removeEventListener(type, handleAddClientClick, true);
+      document.addEventListener(type, handleAddClientClick, true);
+    }
   } else {
     debugLog(`'Add Client' button not found, retrying...`);
     createTimeout(createPatientDialogIframe, 200);
