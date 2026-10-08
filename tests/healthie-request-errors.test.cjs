@@ -14,6 +14,9 @@ function load(name, overrides = {}) {
   const context = {
     console: { error: (...args) => errors.push(args) },
     debugLog() {},
+    // Telemetry has its own full-source tests; these fixtures isolate request outcomes.
+    enqueueDatadogLog() {},
+    flushDatadogLogsNow() {},
     location: { href: "https://vorihealth.gethealthie.com/users/123/Overview" },
     patientNumber: "123",
     isStagingEnv: false,

@@ -1,6 +1,6 @@
 # Testing the Healthie userscript
 
-Use Node 20 or later. Install the locked dependencies and Chromium:
+Use Node 22 or later. Install the locked dependencies and Chromium:
 
 ```sh
 npm ci --ignore-scripts
@@ -8,9 +8,9 @@ npm ci --ignore-scripts
 npm test
 ```
 
-`npm test` runs 15 Node tests for GraphQL request handling, then 19 Chromium
-Playwright tests for patient Overview appointments and Add client. GitHub Actions
-runs both suites on each PR and saves Playwright reports, traces, and failure
+`npm test` runs 35 Node tests for Datadog diagnostics and GraphQL request handling,
+then 3 native Chromium telemetry tests and 19 Playwright tests for patient Overview
+appointments and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's
 `Userscript tests` job and SonarCloud result before completing a PR.
 
@@ -19,7 +19,9 @@ screenshots as the `playwright-results` artifact. Check the latest commit's
 The fixture uses React 18 and jQuery from locked local dependencies. The server
 reads `careplan.js` for each request and extracts the actual appointments route, Add client handlers,
 polling, iframe, and overlay functions with their URL and style declarations.
-Missing declarations fail the fixture load. Tests do not maintain a separate
+The fixture also loads the actual Datadog declarations and installs their page
+observers. It simulates extension storage and Datadog transport without contacting
+the intake service. Missing declarations fail the fixture load. Tests do not maintain a separate
 implementation of those functions.
 
 Playwright checks:
@@ -39,6 +41,17 @@ Each browser test fails on uncaught page errors or unexpected external requests.
 The React fixture displays browser errors in its HTML so manual checks also expose
 reconciliation failures. Tests intercept Misha iframe requests and return synthetic
 HTML while checking the actual production URLs. They do not contact patient APIs.
+
+The Datadog Node suite checks URL and error redaction, bounded logging, storage and
+transport failures, daily probes, HTTP/GraphQL observers, independent goal requests,
+and alignment of the userscript update header with the emitted telemetry version.
+The three native browser tests execute the full userscript with simulated extension
+APIs and intercepted requests. They check fetch/XHR response preservation, native
+sign/lock click handlers, and isolation of transport failures, including a failed
+manual diagnostic result. They fail on uncaught browser errors. Request error unit tests
+isolate their callers and stub telemetry collaborators, which the Datadog suite
+checks separately. All fixtures use synthetic data; these checks do not prove that
+Datadog indexes logs or that Healthie fixes intermittent note locking.
 
 This harness covers the changed appointments and Add client features and request handling. It does
 not execute the entire userscript router or every unrelated integration. React 18
@@ -114,4 +127,5 @@ instead of Healthie's native dialog. Re-render the Clients list and verify it
 still opens once. Add client uses the staging Misha URL on staging.
 
 Assign one userscript version above the PR base and retain it across review fixes.
-PR #134 uses `2.5`, compared with `2.4` on its base.
+PR #134 shipped `2.5`. PR #133 uses `2.6`, above the current `main` version `2.5`;
+its Datadog `TM_VERSION` must match the userscript header.

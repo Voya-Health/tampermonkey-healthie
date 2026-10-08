@@ -1,18 +1,22 @@
 {
-  "name": "tampermonkey-healthie-tests",
+  "name": "tampermonkey-healthie",
   "private": true,
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "test": "npm run test:unit && npm run test:browser",
-    "test:unit": "node --test tests/healthie-request-errors.test.cjs",
-    "test:browser": "playwright test",
+    "test:unit": "node --test tests/*.test.cjs",
+    "test:browser": "npm run test:telemetry-browser && playwright test",
     "test:browser:ui": "playwright test --ui",
-    "test:harness": "node tests/harness/server.cjs"
+    "test:harness": "node tests/harness/server.cjs",
+    "test:telemetry-browser": "node --test tests/datadog.browser.cjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",
     "jquery": "3.7.1",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "playwright-core": "1.64.0"
   }
 }
