@@ -7,6 +7,7 @@ alwaysApply: true
 # Userscript version required in every PR
 
 - Every PR in this repository must increase the `@version` in `careplan.js`, including PRs for fixes, refactors, documentation, or rules. Installed Tampermonkey scripts use this version to detect updates.
+- Assign one new release version per PR and keep it throughout review, fixes, and additional commits. Do not bump the version again for each revision of the same PR.
 - Keep the existing numeric version format and increment it above the PR base branch's version, for example `2.4` to `2.5`. Never reuse or decrease a version.
 - Include the version bump with the implementation, even when an issue limits changes to one function. Do not defer it until merge or ask for separate approval.
 - Before pushing or opening/updating a PR, compare the header with the current PR base branch, verify the increase is in the committed diff, and include the old and new versions in the PR description. Recheck after rebasing or updating the base branch.

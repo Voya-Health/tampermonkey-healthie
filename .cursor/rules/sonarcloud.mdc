@@ -10,4 +10,5 @@ alwaysApply: true
 - Fix every reported finding in the PR, including findings in existing code. Treat fixing them as part of PR work without requesting separate approval. Run relevant tests and push the fixes, then verify the new analysis passes.
 - Handle rejected promises at their callers. Use error handling that reports failures and keeps success callbacks from running on failure. Do not add `void`, suppressions, exclusions, or quality-gate changes just to silence findings.
 - Add regression coverage for failure behavior and preserve successful behavior. Keep the required userscript version increase in the PR.
+- For DOM integrations, preserve React-owned nodes and their parent relationships. Hide native UI and render replacements in containers owned by the userscript. Verify a real React render, refresh, and unmount after injection; static markup tests and SonarCloud alone do not exercise reconciliation.
 - If access or service availability blocks verification after concrete attempts, report the exact blocker and leave the check pending. Never claim a passing analysis from local tests or an earlier commit.
