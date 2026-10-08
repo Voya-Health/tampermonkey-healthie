@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.4
+// @version      2.5
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -296,7 +296,7 @@ function waitAppointmentsHome() {
           const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
           $(appointmentWindowObj).append(iframe);
         }
-      });
+      }).catch(reportHealthieRequestError);
     } else {
       //wait for content load
       debugLog(`tampermonkey waiting appointment view`);
@@ -328,29 +328,50 @@ function initBookAppointmentButton() {
   }
 }
 
+function findAddClientButton($) {
+  function matchesLabel(element) {
+    return $(element).clone().find("svg").remove().end().text().trim()
+      .replace(/\s+/g, " ").toLowerCase() === "add client";
+  }
+  const scopedButtons = $('[data-testid="new-client-modal-container"] button, .add-client-container button');
+  return scopedButtons.filter(":visible").toArray().find(matchesLabel) ??
+    $("button").filter(":visible").toArray().find(matchesLabel);
+}
+
+function handleAddClientClick(event) {
+  const $ = initJQuery();
+  const button = event.target instanceof Element ? event.target.closest("button") : null;
+  if (!$ || !button || button !== findAddClientButton($)) {
+    return;
+  }
+  if (event.type.startsWith("key") && !["Enter", " "].includes(event.key)) {
+    return;
+  }
+  // Preserve native click generation while blocking earlier React press handlers.
+  event.stopImmediatePropagation();
+  if (event.type === "click") {
+    event.preventDefault();
+    showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
+  }
+}
+
 function createPatientDialogIframe() {
   const $ = initJQuery();
   if (!$) {
     debugLog(`tampermonkey waiting for jQuery to load`);
-    setTimeout(createPatientDialogIframe, 200);
+    createTimeout(createPatientDialogIframe, 200);
     return;
   }
   debugLog(`jQuery is loaded, attempting to find 'Add Client' button`);
-  let addPatientBtn = $('[data-testid="new-client-modal-container"] [data-testid="primaryButton"]').filter(function () {
-    return $(this).text().toLowerCase().includes("add client");
-  })[0];
+  const addPatientBtn = findAddClientButton($);
   if (addPatientBtn) {
-    debugLog(`'Add Client' button found, proceeding to clone`);
-    let clonedBtn = $(addPatientBtn).clone();
-    $(addPatientBtn).replaceWith(clonedBtn);
-    clonedBtn.on("click", (e) => {
-      debugLog(`Cloned 'Add Client' button clicked`);
-      e.stopPropagation();
-      showOverlay(`${routeURLs.createPatientDialog}`, styles.patientDialogOverlay);
-    });
+    for (const type of ["click", "pointerdown", "pointerup", "mousedown", "mouseup", "keydown", "keyup"]) {
+      document.removeEventListener(type, handleAddClientClick, true);
+      document.addEventListener(type, handleAddClientClick, true);
+    }
   } else {
     debugLog(`'Add Client' button not found, retrying...`);
-    setTimeout(createPatientDialogIframe, 200);
+    createTimeout(createPatientDialogIframe, 200);
   }
 }
 
@@ -361,17 +382,13 @@ function waitForAddPatientButton() {
     createTimeout(waitForAddPatientButton, 200);
     return;
   }
-  let addPatientBtn = $('[data-testid="new-client-modal-container"] button, .add-client-container button').filter(
-    function () {
-      return $(this).text().toLowerCase().includes("add client");
-    }
-  )[0];
+  const addPatientBtn = findAddClientButton($);
   if (addPatientBtn) {
     debugLog("Add Client Button found");
     createPatientDialogIframe();
   } else {
     debugLog("Waiting for 'Add Client' button");
-    setTimeout(waitForAddPatientButton, 200);
+    createTimeout(waitForAddPatientButton, 200);
   }
 }
 
@@ -383,21 +400,37 @@ function waitAppointmentsProfile() {
     return;
   } else {
     // check to see if the appointment view contents have loaded
-    let appointmentWindow = $('[data-testid="cop-appointments-section"] div').filter(function () {
-      return $(this).find('[data-testid="tab-container"]').length > 0;
-    })[0];
+    let appointmentWindow = $(
+      $('[data-testid="cop-appointments-contents"]')[0] ?? '[data-testid="cop-appointments-section"] div'
+    ).toArray().find(function (element) {
+      return $(element).find('[data-testid="tab-container"]').length > 0;
+    });
     if (appointmentWindow) {
       debugLog(`tampermonkey found appointment view on user profile`);
+      $(appointmentWindow).siblings('[data-testid="misha-appointments"]').remove();
 
-      // Clone the book appointment button BEFORE removing children
-      let bookAppointmentBtn = $('[data-testid="add-appointment-button"]')[0];
+      // Clone the control while keeping Healthie's React-owned nodes attached.
+      let appointmentBody = $(appointmentWindow).closest('[data-testid="collapsible-section-body"]');
+      let bookAppointmentBtn =
+        $('[data-testid="add-appointment-button"]')[0] ??
+        appointmentBody
+          .find('[data-testid="cop-appointments-contents"]')
+          .siblings(".mt-3")
+          .find("button")
+          .toArray().find(function (element) {
+            // Ignore the icon's SVG title when matching the visible label.
+            return $(element).clone().find("svg").remove().end().text().trim() === "Add appointment";
+          });
       let clonedBookBtn = null;
       if (bookAppointmentBtn) {
-        clonedBookBtn = $(bookAppointmentBtn).clone();
+        clonedBookBtn = $(bookAppointmentBtn).clone().removeAttr("id")
+          .attr("data-testid", "misha-add-appointment-button").show();
+        $(bookAppointmentBtn).hide().closest(".mt-3").hide();
         debugLog(`tampermonkey cloned book appointment button`);
       }
 
-      $(appointmentWindow).css({ margin: "0", padding: "3px" });
+      const appointmentReplacement = $("<div>", { "data-testid": "misha-appointments" })
+        .css({ margin: "0", padding: "3px" });
       // get the parent with class .column.is-6 and change the width to 100%
       let parent = $(appointmentWindow).closest(".column.is-6");
       parent
@@ -418,12 +451,8 @@ function waitAppointmentsProfile() {
       // also adjust width of packages section
       $('[data-testid="cop-appointments-section"]').closest(".column.is-6").css("width", "100%");
 
-      // remove all children of appointments section
-      while (appointmentWindow.childNodes.length > 0) {
-        let childClassName = appointmentWindow.lastChild.className;
-        debugLog(`tampermonkey removing child `, childClassName);
-        appointmentWindow.removeChild(appointmentWindow.lastChild);
-      }
+      // React must retain its original tree so later renders can update or remove it.
+      $(appointmentWindow).hide().before(appointmentReplacement);
 
       if (clonedBookBtn) {
         const patientNumber = location.href.split("/")[4];
@@ -431,7 +460,7 @@ function waitAppointmentsProfile() {
           e.stopPropagation();
           showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
         });
-        $(appointmentWindow).append(clonedBookBtn);
+        appointmentReplacement.append(clonedBookBtn);
         debugLog(`tampermonkey added book appointment button before iframe`);
       }
 
@@ -439,7 +468,7 @@ function waitAppointmentsProfile() {
       // can also be - https://securestaging.gethealthie.com/users/388687/Overview
       const patientID = location.href.split("/")[4];
       const iframe = generateIframe(`${routeURLs.appointments}/patient/${patientID}`);
-      $(appointmentWindow).append(iframe);
+      appointmentReplacement.append(iframe);
     } else {
       // wait for content load
       debugLog(`tampermonkey waiting appointment view on user profile`);
@@ -1386,7 +1415,7 @@ function handleCarePlanTmInput(carePlan) {
       });
       healthieGQL(deleteGoalPayload).then((response) => {
         debugLog("tampermonkey deleted goal", response);
-      });
+      }).catch(reportHealthieRequestError);
     });
 
     debugLog(`tampermonkey message posted ${patientNumber} care plan status ${JSON.stringify(carePlan)}`);
@@ -1415,7 +1444,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload);
+        submitHealthieGoal(payload);
       }
     });
 
@@ -1436,7 +1465,7 @@ function handleCarePlanTmInput(carePlan) {
                         }
                         `;
     const payload = JSON.stringify({ query });
-    healthieGQL(payload);
+    submitHealthieGoal(payload);
 
     const tasks = carePlan.tasks.tasks;
     debugLog("tampermonkey tasks are ", tasks);
@@ -1464,7 +1493,7 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
           const payload = JSON.stringify({ query });
-          healthieGQL(payload);
+          submitHealthieGoal(payload);
         });
       } else if (element.isVisible) {
         debugLog("tampermonkey regular task assigned");
@@ -1485,10 +1514,10 @@ function handleCarePlanTmInput(carePlan) {
                                 }
                                 `;
         const payload = JSON.stringify({ query });
-        healthieGQL(payload);
+        submitHealthieGoal(payload);
       }
     });
-  });
+  }).catch(reportHealthieRequestError);
 }
 
 function handleRescheduleOrReload(data) {
@@ -1705,6 +1734,9 @@ function waitSettingsAPIpage() {
             createTimeout(null, 2000);
             window.location.reload();
           }
+        }).catch((error) => {
+          reportHealthieRequestError(error);
+          alert("Unable to verify the API key. Please try again.");
         });
       }
     };
@@ -1903,6 +1935,14 @@ function waitClientList() {
     debugLog(`tampermonkey waiting to update book link`);
     createTimeout(waitClientList, 500);
   }
+}
+
+function reportHealthieRequestError(error) {
+  console.error("tampermonkey Healthie request failed", error);
+}
+
+function submitHealthieGoal(payload) {
+  healthieGQL(payload).catch(reportHealthieRequestError);
 }
 
 function healthieGQL(payload) {
