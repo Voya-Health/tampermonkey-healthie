@@ -71,6 +71,8 @@ const DD_INTAKE_URL =
   "https://browser-intake-datadoghq.com/api/v2/logs?ddsource=browser&dd-evp-origin=browser&dd-api-key=" +
   DD_LOGS_CLIENT_TOKEN;
 const DD_LIMITS_PER_MINUTE = { error: 20, warn: 20, info: 30 };
+const DD_REPEAT_QUIET_MS = 2000;
+const DD_REPEAT_MAX_MS = 30000;
 const ddInstallIdKey = "voriDatadogInstallId";
 const ddProbeAtKey = "voriDatadogProbeAt";
 const DD_PROBE_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -109,8 +111,8 @@ let ddSentBySeverity = { error: 0, warn: 0, info: 0 };
 let ddWindowStarted = Date.now();
 let ddFlushTimer = null;
 let ddHooksInstalled = false;
-let ddLastMessage = "";
-let ddLastAt = 0;
+let ddRepeatCounts = new Map();
+let ddSentKeys = new Set();
 
 function sanitizeToken(token) {
   const withoutQuery = token.split("?")[0].split("#")[0];
@@ -277,25 +279,58 @@ function sendDatadogBatch(batch, onResult) {
   }
 }
 
+function datadogRepeatKey(severity, kind, message) {
+  return severity + "|" + kind + "|" + message;
+}
+
+function scheduleDatadogFlush() {
+  if (ddFlushTimer || (!ddQueue.length && !ddRepeatCounts.size)) {
+    return;
+  }
+  ddFlushTimer = window.setTimeout(flushDatadogLogs, 1000);
+}
+
+function releaseDatadogRepeats(force) {
+  const now = Date.now();
+  const ready = [];
+  for (const [key, pending] of ddRepeatCounts) {
+    const quiet = now - pending.lastAt >= DD_REPEAT_QUIET_MS;
+    const aged = now - pending.firstAt >= DD_REPEAT_MAX_MS;
+    if (!force && !quiet && !aged) {
+      continue;
+    }
+    pending.entry.repeat_count = pending.count;
+    ready.push(pending.entry);
+    ddRepeatCounts.delete(key);
+    ddSentKeys.add(key);
+  }
+  return ready;
+}
+
 function enqueueDatadogLog(status, kind, message, extra) {
   try {
     const severity = datadogSeverity(status);
-    const now = Date.now();
-    const dedupeKey = severity + "|" + kind + "|" + message;
-    if (dedupeKey === ddLastMessage && now - ddLastAt < 2000) {
+    const key = datadogRepeatKey(severity, kind, message);
+    if (ddSentKeys.has(key)) {
       return;
     }
-    ddLastMessage = dedupeKey;
-    ddLastAt = now;
+    const now = Date.now();
+    const pending = ddRepeatCounts.get(key);
+    if (pending) {
+      pending.count += 1;
+      pending.lastAt = now;
+      pending.entry.repeat_count = pending.count;
+      return;
+    }
     rollDatadogWindow();
     if (ddSentBySeverity[severity] >= DD_LIMITS_PER_MINUTE[severity]) {
       return;
     }
     ddSentBySeverity[severity] += 1;
-    ddQueue.push(makeDatadogLog(severity, kind, message, extra));
-    if (!ddFlushTimer) {
-      ddFlushTimer = window.setTimeout(flushDatadogLogs, 1000);
-    }
+    const entry = makeDatadogLog(severity, kind, message, extra);
+    entry.repeat_count = 1;
+    ddRepeatCounts.set(key, { count: 1, firstAt: now, lastAt: now, entry });
+    scheduleDatadogFlush();
   } catch (e) {
     // A logging failure must not interrupt the Healthie page.
   }
@@ -303,15 +338,18 @@ function enqueueDatadogLog(status, kind, message, extra) {
 
 function flushDatadogLogs() {
   ddFlushTimer = null;
+  const ready = releaseDatadogRepeats(false);
+  for (let i = 0; i < ready.length; i++) {
+    ddQueue.push(ready[i]);
+  }
   if (!ddQueue.length || typeof GM_xmlhttpRequest !== "function") {
     ddQueue = [];
+    scheduleDatadogFlush();
     return;
   }
   const batch = ddQueue.splice(0, 10);
   sendDatadogBatch(batch);
-  if (ddQueue.length) {
-    ddFlushTimer = window.setTimeout(flushDatadogLogs, 1000);
-  }
+  scheduleDatadogFlush();
 }
 
 function isGraphqlValidationMessage(value) {
@@ -347,7 +385,12 @@ function noteHttpResult(method, rawUrl, status) {
   if (status < 400) {
     return;
   }
-  enqueueDatadogLog(httpSeverity(status), "http", method + " " + status + " " + safeUrl(rawUrl), {
+  const url = safeUrl(rawUrl);
+  // Third-party 401s are auth noise from embedded hosts, not Healthie failures.
+  if (status === 401 && url.startsWith("[external]")) {
+    return;
+  }
+  enqueueDatadogLog(httpSeverity(status), "http", method + " " + status + " " + url, {
     http_status: status,
   });
 }
@@ -584,12 +627,19 @@ function watchChartNoteActions() {
 function flushDatadogLogsNow() {
   if (ddFlushTimer) {
     window.clearTimeout(ddFlushTimer);
+    ddFlushTimer = null;
+  }
+  const ready = releaseDatadogRepeats(true);
+  for (let i = 0; i < ready.length; i++) {
+    ddQueue.push(ready[i]);
   }
   while (ddQueue.length) {
     flushDatadogLogs();
-    if (ddFlushTimer) window.clearTimeout(ddFlushTimer);
+    if (ddFlushTimer) {
+      window.clearTimeout(ddFlushTimer);
+      ddFlushTimer = null;
+    }
   }
-  ddFlushTimer = null;
 }
 
 function routeName(routeURL) {

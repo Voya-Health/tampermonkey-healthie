@@ -235,8 +235,36 @@ test("rate limits separate severities and consecutive duplicates", () => {
   h.run(`enqueueDatadogLog('error', 'test', 'failure'); enqueueDatadogLog('error', 'test', 'failure')`);
   for (let i = 0; i < 5; i++) h.run("flushDatadogLogsNow()");
   const logs = h.sent.flatMap((r) => JSON.parse(r.data));
-  assert.equal(logs.filter((log) => log.tm_kind === "test" && log.status === "error").length, 1);
+  const failures = logs.filter((log) => log.tm_kind === "test" && log.status === "error");
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].repeat_count, 2);
   assert.ok(logs.filter((log) => log.status === "info" && log.tm_kind !== "probe").length <= 30);
+});
+
+test("repeated fingerprints collapse for the page and external 401s are dropped", () => {
+  const h = harness();
+  h.run(`noteHttpResult('POST', 'https://cdn.example.com/assets/app.js', 401)`);
+  h.run(`noteHttpResult('PUT', 'https://cdn.example.com/other.js', 401)`);
+  h.run(`noteHttpResult('POST', 'https://staging-api.gethealthie.com/graphql', 401)`);
+  h.run(`noteHttpResult('POST', 'https://cdn.example.com/assets/app.js', 500)`);
+  for (let i = 0; i < 4; i++) {
+    h.run(`enqueueDatadogLog('error', 'window', 'window_error name=Error fingerprint=168cc1eb')`);
+    h.run(`enqueueDatadogLog('error', 'http', 'POST network_error https://staging-api.gethealthie.com/graphql fingerprint=46df08c9')`);
+  }
+  const logs = h.logs();
+  assert.equal(logs.filter((log) => log.http_status === 401 && String(log.message).includes("[external]")).length, 0);
+  assert.equal(logs.filter((log) => log.http_status === 401).length, 1);
+  assert.equal(logs.filter((log) => log.http_status === 500).length, 1);
+  const windowLogs = logs.filter((log) => log.message.includes("168cc1eb"));
+  const httpLogs = logs.filter((log) => log.message.includes("46df08c9"));
+  assert.equal(windowLogs.length, 1);
+  assert.equal(windowLogs[0].repeat_count, 4);
+  assert.equal(httpLogs.length, 1);
+  assert.equal(httpLogs[0].repeat_count, 4);
+  h.run(`enqueueDatadogLog('error', 'window', 'window_error name=Error fingerprint=168cc1eb')`);
+  const again = h.logs().filter((log) => log.message.includes("168cc1eb"));
+  assert.equal(again.length, 1);
+  assert.equal(again[0].repeat_count, 4);
 });
 
 test("XHR reuse retains one observer and preserves native send when listener setup fails", () => {

@@ -18,7 +18,7 @@ for coverage, regression reproduction, and production checks.
 
 Version 2.6 reports errors and selected navigation, iframe, and chart-note actions to the US Datadog browser intake under `service:tampermonkey-healthie`. It observes page and userscript fetch, page XHR, console errors, window errors, and unhandled promise rejections. GraphQL failures include both top-level errors and Healthie mutation validation messages.
 
-Logs contain static route names, HTTP status, error fingerprints, random installation/page IDs, and event counts. Dynamic URL segments, query values, raw error text, GraphQL payloads, and message contents are excluded. Error, warning, and information events have separate per-minute limits. Logging failures leave native requests and existing care-plan mutation behavior intact. The daily probe records its timestamp only after intake acceptance.
+Logs contain static route names, HTTP status, error fingerprints, random installation/page IDs, and event counts. Dynamic URL segments, query values, raw error text, GraphQL payloads, and message contents are excluded. Error, warning, and information events have separate per-minute limits. Each distinct message is sent once per page, with `repeat_count`. A message that keeps repeating is sent 2 seconds after the last occurrence, or 30 seconds after the first, and later repeats on that page are not sent. HTTP 401 responses from hosts other than Healthie are not sent. Logging failures leave native requests and existing care-plan mutation behavior intact. The daily probe records its timestamp only after intake acceptance.
 
 For a manual intake check in the Healthie page console, run:
 
