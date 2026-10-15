@@ -267,6 +267,7 @@ function loadViewingClinician() {
   } catch (e) {
     // A throw before the request exists must not stop the userscript.
     rememberClinician(null);
+    debugLog(errorSummary("clinician-lookup", e));
   }
 }
 

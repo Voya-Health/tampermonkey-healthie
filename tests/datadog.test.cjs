@@ -470,6 +470,14 @@ test("malformed and unresolved clinician lookups keep logs usable without false 
   const log = pending.logs().find((entry) => entry.tm_kind === "window");
   assert.match(log.message, /Clinician pending/);
   assert.match(log.message, /lookup still pending/);
+  const thrown = harness();
+  const debugMessages = [];
+  thrown.page.console.log = (...args) => debugMessages.push(args);
+  thrown.run(`debug = true; healthieGQL = () => { throw new Error('private lookup failure'); }; loadViewingClinician()`);
+  assert.match(thrown.run(`makeDatadogLog('error','test','sync failure').message`), /Clinician unavailable/);
+  assert.equal(debugMessages.length, 1);
+  assert.match(debugMessages[0][0], /clinician-lookup_error name=Error fingerprint=/);
+  assert.ok(!JSON.stringify(debugMessages).includes("private lookup failure"));
 });
 
 test("oversized detail cannot truncate identity or the path out of content", () => {
