@@ -75,25 +75,27 @@ function harness(overrides = {}) {
   return { run, context, page, sent, timers, storage, listeners, logs };
 }
 
-test("URL telemetry removes names, email addresses, query values and all dynamic route segments", () => {
+test("URL telemetry keeps the full path and drops query tokens", () => {
   const h = harness();
   h.run(
     `noteHttpResult('POST', 'https://api.gethealthie.com/users/JaneDoe/files/medical-report.pdf?token=secret', 500)`
   );
   h.context.location.pathname = "/users/jane%40example.com/private_notes/edit/note-abc";
-  h.run(`enqueueDatadogLog('info', 'navigation', normalizePath(location.pathname))`);
+  h.run(`enqueueDatadogLog('info', 'navigation', pagePath())`);
   const output = JSON.stringify(h.logs());
-  for (const value of ["JaneDoe", "medical-report", "secret", "jane", "note-abc"])
-    assert.ok(!output.includes(value), value);
-  assert.match(output, /private_notes\/edit/);
+  assert.ok(!output.includes("secret"), "query token");
+  for (const value of ["JaneDoe", "medical-report", "jane@example.com", "note-abc", "private_notes/edit"])
+    assert.ok(output.includes(value), value);
 });
 
-test("custom error names and GraphQL error codes cannot carry patient data", () => {
+test("error text and GraphQL messages are sent in full", () => {
   const h = harness();
   h.run(
-    `enqueueDatadogLog('error', 'window', errorSummary('window', {name:'JaneDoe',message:'Jane Doe diagnosis'})); noteGraphqlText('/graphql', JSON.stringify({errors:[{extensions:{code:'JaneDoe'}}]}))`
+    `enqueueDatadogLog('error', 'window', datadogErrorDetail('window', {name:'TypeError',message:'Jane Doe diagnosis'})); noteGraphqlText('/graphql', JSON.stringify({errors:[{message:'Jane Doe diagnosis'}]}))`
   );
-  assert.ok(!JSON.stringify(h.logs()).includes("Jane"));
+  const output = JSON.stringify(h.logs());
+  assert.ok(output.includes("Jane Doe diagnosis"));
+  assert.ok(output.includes("TypeError"));
 });
 
 test("telemetry storage and random ID failures do not prevent userscript initialization", () => {
@@ -160,8 +162,9 @@ test("fetch still reaches the native implementation when telemetry metadata thro
       throw new Error("telemetry metadata");
     },
   };
+  const before = called;
   assert.equal(await h.page.fetch("/graphql", init), response);
-  assert.equal(called, 1);
+  assert.equal(called, before + 1);
 });
 
 test("fetch preserves receiver, arguments, responses, and original rejection", async () => {
@@ -179,8 +182,9 @@ test("fetch preserves receiver, arguments, responses, and original rejection", a
   const init = { method: "POST", body: "sensitive note content" };
   assert.equal(await h.page.fetch("/graphql", init), response);
   await assert.rejects(h.page.fetch("/fail"), (e) => e === failure);
-  assert.equal(calls[0][0], h.page);
-  assert.equal(calls[0][2], init);
+  const tracked = calls.find((call) => call[2] === init);
+  assert.equal(tracked[0], h.page);
+  assert.equal(tracked[2], init);
   assert.ok(!JSON.stringify(h.logs()).includes("sensitive"));
 });
 
@@ -197,7 +201,7 @@ test("userscript fetch failures are captured separately from page fetch", async 
   assert.ok(h.logs().some((log) => log.tm_kind === "http" && log.status === "error"));
 });
 
-test("GraphQL mutation validation messages are counted without recording payloads", () => {
+test("GraphQL mutation validation messages include the message text", () => {
   const h = harness();
   h.run(
     `noteGraphqlText('/graphql', JSON.stringify({data:{signNote:{messages:[{message:'Jane Doe clinical note',field:'name'}]}}}))`
@@ -205,7 +209,7 @@ test("GraphQL mutation validation messages are counted without recording payload
   const logs = h.logs().filter((log) => log.tm_kind === "graphql");
   assert.equal(logs.length, 1);
   assert.match(logs[0].message, /count=1/);
-  assert.ok(!JSON.stringify(logs).includes("Jane"));
+  assert.ok(logs[0].message.includes("Jane Doe clinical note"));
 });
 
 test("one unavailable page hook does not prevent error listeners and startup logging", () => {
@@ -308,8 +312,15 @@ test("pagehide flushes all queued batches without leaving timers behind", () => 
 
 test("fetch cloning preserves the original GraphQL response and ignores aborted requests", async () => {
   const body = { data: { signNote: { messages: [{ field: "note", message: "private note" }] } } };
-  const response = new Response(JSON.stringify(body));
-  const h = harness({ page: { fetch: async () => response } });
+  let response;
+  const h = harness({
+    page: {
+      fetch: async () => {
+        response = new Response(JSON.stringify(body));
+        return response;
+      },
+    },
+  });
   const actual = await h.page.fetch("/graphql");
   assert.equal(actual, response);
   assert.deepEqual(await actual.json(), body);
@@ -345,6 +356,21 @@ test("ordinary conversation messages are not GraphQL validation errors", () => {
     `noteGraphqlText('/graphql', JSON.stringify({data:{conversation:{messages:[{message:'normal chat',id:'1'}]}}}))`
   );
   assert.equal(h.logs().filter((log) => log.tm_kind === "graphql").length, 0);
+});
+
+test("viewing clinician id, email, and name are attached with the script version", async () => {
+  const h = harness();
+  h.run(
+    `healthieGQL = () => Promise.resolve({ data: { user: { id: 42, email: 'ada@vorihealth.com', full_name: 'Ada Lovelace', first_name: 'Wrong' } } }); loadViewingClinician()`
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  h.run(`enqueueDatadogLog('info', 'test', 'viewer check')`);
+  const log = h.logs().find((entry) => entry.message.includes("viewer check"));
+  assert.equal(log.clinician_id, "42");
+  assert.equal(log.clinician_email, "ada@vorihealth.com");
+  assert.equal(log.clinician_name, "Ada Lovelace");
+  assert.equal(log.tm_version, h.run("TM_VERSION"));
+  assert.equal(log.healthie_path, "/users/123/private_notes/edit/456");
 });
 
 test("userscript update version and emitted telemetry version stay aligned", () => {

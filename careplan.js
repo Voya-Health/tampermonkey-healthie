@@ -113,67 +113,34 @@ let ddFlushTimer = null;
 let ddHooksInstalled = false;
 let ddRepeatCounts = new Map();
 let ddSentKeys = new Set();
-
-function sanitizeToken(token) {
-  const withoutQuery = token.split("?")[0].split("#")[0];
-  return withoutQuery.includes("@") ? "[email]" : withoutQuery;
-}
+let ddClinician = null;
 
 function sanitizeForDatadog(value) {
   return String(value ?? "")
-    .split(/\s+/)
-    .map(sanitizeToken)
-    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
     .slice(0, 500);
 }
 
-// Only static route names are sent. IDs, filenames and unknown path segments may contain PHI.
-const DD_ROUTE_SEGMENTS = new Set([
-  "users",
-  "private_notes",
-  "edit",
-  "graphql",
-  "settings",
-  "api_keys",
-  "appointments",
-  "overview",
-  "Overview",
-  "actions",
-  "Actions",
-  "organization",
-  "providers",
-  "clients",
-  "active",
-  "all_plans",
-  "conversations",
-  "custom_nav_items",
-  "schedule",
-  "careplan",
-  "app",
-  "appointment",
-  "patientStatusStandalone",
-  "provider-schedule",
-  "otpVerifyStandalone",
-  "createPatientDialog",
-]);
+function pagePath() {
+  const path = String(location.pathname || "/");
+  try {
+    return decodeURIComponent(path);
+  } catch (e) {
+    return path;
+  }
+}
 
-function normalizePath(pathname) {
-  return String(pathname || "")
-    .split("/")
-    .map((segment) => {
-      if (!segment || DD_ROUTE_SEGMENTS.has(segment)) return segment;
-      return /^\d+$/.test(segment) ? ":id" : ":redacted";
-    })
-    .join("/");
+function isKnownHealthieHost(hostname) {
+  return /^(api|staging-api|secure|securestaging|vorihealth)\.gethealthie\.com$/.test(hostname);
 }
 
 function safeUrl(rawUrl) {
   try {
     const parsed = new URL(String(rawUrl || ""), location.origin);
-    const knownHost = /^(api|staging-api|secure|securestaging|vorihealth)\.gethealthie\.com$/.test(parsed.hostname);
-    return (knownHost ? parsed.origin : "[external]") + normalizePath(parsed.pathname);
+    return parsed.origin + parsed.pathname;
   } catch (e) {
-    // Malformed diagnostic URLs are omitted.
+    // Malformed diagnostic URLs are omitted. Query strings stay off every URL because they carry tokens.
     debugLog(errorSummary("diagnostic-url", e));
     return "invalid-url";
   }
@@ -218,6 +185,60 @@ function errorSummary(kind, error) {
   return kind + "_error name=" + name + " fingerprint=" + errorFingerprint(message);
 }
 
+function datadogErrorDetail(kind, error) {
+  const message = typeof error?.message === "string" ? error.message : String(error || kind);
+  const name = typeof error?.name === "string" && error.name ? error.name.slice(0, 120) : "Error";
+  return kind + "_error name=" + name + " " + message;
+}
+
+function clinicianLogFields() {
+  if (!ddClinician) {
+    return {};
+  }
+  const fields = {};
+  if (ddClinician.id) fields.clinician_id = ddClinician.id;
+  if (ddClinician.email) fields.clinician_email = ddClinician.email;
+  if (ddClinician.name) fields.clinician_name = ddClinician.name;
+  return fields;
+}
+
+function rememberClinician(user) {
+  if (!user || typeof user !== "object") {
+    return;
+  }
+  const combined = [user.first_name, user.last_name].filter((part) => typeof part === "string" && part.trim()).join(" ");
+  const fullName = typeof user.full_name === "string" ? user.full_name.trim() : "";
+  ddClinician = {
+    id: user.id == null ? "" : String(user.id),
+    email: typeof user.email === "string" ? user.email : "",
+    name: fullName || combined,
+  };
+  const fields = clinicianLogFields();
+  for (let i = 0; i < ddQueue.length; i++) {
+    Object.assign(ddQueue[i], fields);
+  }
+  for (const pending of ddRepeatCounts.values()) {
+    Object.assign(pending.entry, fields);
+  }
+}
+
+function loadViewingClinician() {
+  try {
+    const payload = JSON.stringify({
+      query: "query tampermonkeyViewer { user(or_current_user: true) { id email full_name first_name last_name } }",
+    });
+    Promise.resolve(healthieGQL(payload))
+      .then(function (response) {
+        rememberClinician(response && response.data ? response.data.user : null);
+      })
+      .catch(function () {
+        // A missing API key or a failed viewer lookup must not drop the log.
+      });
+  } catch (e) {
+    // A throw before the request exists must not stop the userscript.
+  }
+}
+
 function rollDatadogWindow() {
   const now = Date.now();
   if (now - ddWindowStarted < 60000) {
@@ -244,13 +265,10 @@ function makeDatadogLog(status, kind, message, extra) {
     tm_kind: kind,
     tm_severity: severity,
     tm_install_id: ddInstallId,
-    healthie_path: normalizePath(location.pathname),
+    healthie_path: pagePath(),
     page_id: ddPageId,
   };
-  if (!extra) {
-    return entry;
-  }
-  return { ...entry, ...extra };
+  return { ...(extra ? { ...entry, ...extra } : entry), ...clinicianLogFields() };
 }
 
 function reportDatadogStatus(onResult, status) {
@@ -362,15 +380,19 @@ function graphqlErrorSummary(text) {
   }
   try {
     const body = JSON.parse(text);
-    const errors = Array.isArray(body?.errors) ? body.errors.length : 0;
+    const texts = [];
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
+    for (let i = 0; i < errors.length; i++) {
+      if (typeof errors[i]?.message === "string") texts.push(errors[i].message);
+    }
     // Healthie also rejects mutations through data.<mutation>.messages.
-    const messages = Object.values(body?.data || {}).reduce(
-      (count, payload) =>
-        count + (Array.isArray(payload?.messages) ? payload.messages.filter(isGraphqlValidationMessage).length : 0),
-      0
-    );
-    const count = errors + messages;
-    return count ? "count=" + count : "";
+    const validation = Object.values(body?.data || {}).reduce((items, payload) => {
+      if (!Array.isArray(payload?.messages)) return items;
+      return items.concat(payload.messages.filter(isGraphqlValidationMessage));
+    }, []);
+    for (let i = 0; i < validation.length; i++) texts.push(validation[i].message);
+    const count = errors.length + validation.length;
+    return count ? "count=" + count + (texts.length ? " " + texts.join(" | ") : "") : "";
   } catch (error) {
     debugLog("tampermonkey skipped non-json graphql body", error);
     return "";
@@ -385,11 +407,17 @@ function noteHttpResult(method, rawUrl, status) {
   if (status < 400) {
     return;
   }
-  const url = safeUrl(rawUrl);
+  let external = false;
+  try {
+    external = !isKnownHealthieHost(new URL(String(rawUrl || ""), location.origin).hostname);
+  } catch (e) {
+    external = true;
+  }
   // Third-party 401s are auth noise from embedded hosts, not Healthie failures.
-  if (status === 401 && url.startsWith("[external]")) {
+  if (status === 401 && external) {
     return;
   }
+  const url = safeUrl(rawUrl);
   enqueueDatadogLog(httpSeverity(status), "http", method + " " + status + " " + url, {
     http_status: status,
   });
@@ -444,7 +472,7 @@ function noteFetchFailure(method, rawUrl, error) {
     if (error?.name === "AbortError") {
       return;
     }
-    const detail = method + " network_error " + safeUrl(rawUrl) + " fingerprint=" + errorFingerprint(error?.message);
+    const detail = method + " network_error " + safeUrl(rawUrl) + " " + datadogErrorDetail("network", error);
     enqueueDatadogLog("error", "http", detail);
   } catch (e) {
     // A logging failure must not replace the original network error.
@@ -559,7 +587,7 @@ function hookPageConsoleError(targetWindow) {
     try {
       const text = consoleErrorText(arguments);
       if (text) {
-        enqueueDatadogLog("error", "console", errorSummary("console", { message: text }));
+        enqueueDatadogLog("error", "console", datadogErrorDetail("console", { message: text }));
       }
     } catch (e) {
       // Keep the original console.error working if logging fails.
@@ -571,7 +599,7 @@ function hookPageConsoleError(targetWindow) {
 
 function windowErrorDetail(event, fallbackMessage) {
   const error = event?.error ? event.error : { message: fallbackMessage };
-  let detail = errorSummary("window", error);
+  let detail = datadogErrorDetail("window", error);
   if (event?.filename) {
     detail += " @ " + safeUrl(event.filename) + ":" + (event.lineno || "");
   }
@@ -591,7 +619,7 @@ function watchWindowErrors(targetWindow) {
   });
   targetWindow.addEventListener("unhandledrejection", function (event) {
     const reason = event?.reason;
-    enqueueDatadogLog("error", "unhandledrejection", errorSummary("unhandledrejection", reason));
+    enqueueDatadogLog("error", "unhandledrejection", datadogErrorDetail("unhandledrejection", reason));
   });
 }
 
@@ -646,7 +674,7 @@ function routeName(routeURL) {
   const path = String(routeURL || "")
     .split("?")[0]
     .split("#")[0];
-  return normalizePath("/" + path).replace(/^\/+/, "") || "root";
+  return path.replace(/^\/+/, "") || "root";
 }
 
 function noteRetryExhausted(giveUpMessage, attempts) {
@@ -748,6 +776,7 @@ function setupHealthieDatadogLogs() {
     () => window.addEventListener("pagehide", flushDatadogLogsNow),
     installDatadogSelfTest,
     maybeSendDailyProbe,
+    loadViewingClinician,
   ];
   for (const hook of hooks) {
     try {
@@ -2816,7 +2845,7 @@ function observeDOMChanges(mutations, observer) {
     //reset loop flag
     carePlanLoopLock = 0;
     debugLog(`tampermonkey URL changed to ${location.href}`);
-    enqueueDatadogLog("info", "navigation", "path=" + normalizePath(location.pathname));
+    enqueueDatadogLog("info", "navigation", "path=" + pagePath());
 
     // Clear all timeouts
     for (let i = 0; i < timeoutIds.length; i++) {

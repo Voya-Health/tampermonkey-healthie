@@ -77,10 +77,10 @@ test("native fetch and reused XHR return their original GraphQL bodies while rep
   assert.equal(result.xhrBodies.length, 2);
   await page.waitForFunction(() => window.__logs.some((log) => log.tm_kind === "graphql"));
   const logs = await page.evaluate(() => window.__logs);
-  assert.ok(!JSON.stringify(logs).includes("private clinical text"));
+  assert.ok(JSON.stringify(logs).includes("private clinical text"));
 });
 
-test("charting click and error observers retain native handlers and redact error contents", async (t) => {
+test("charting click and error observers retain native handlers and record error text", async (t) => {
   const page = await browserHarness(t);
   await page.click("#sign");
   await page.click("#lock");
@@ -109,7 +109,13 @@ test("charting click and error observers retain native handlers and redact error
       kind
     );
   assert.equal(logs.filter((log) => log.tm_kind === "chart-note").length, 2);
-  assert.ok(!/Jane|diagnosis|private chart|private rejection/.test(JSON.stringify(logs)));
+  const output = JSON.stringify(logs);
+  assert.match(output, /Jane Doe/);
+  assert.match(output, /sensitive diagnosis/);
+  assert.match(output, /private chart text/);
+  assert.match(output, /private rejection/);
+  assert.match(output, /\/users\/123\/private_notes\/edit\/456/);
+  assert.ok(logs.some((log) => log.tm_version));
 });
 
 test("blocked telemetry transport leaves native fetch and charting clicks working", async (t) => {

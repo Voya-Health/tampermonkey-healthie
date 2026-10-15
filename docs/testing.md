@@ -42,7 +42,7 @@ The React fixture displays browser errors in its HTML so manual checks also expo
 reconciliation failures. Tests intercept Misha iframe requests and return synthetic
 HTML while checking the actual production URLs. They do not contact patient APIs.
 
-The Datadog Node suite checks URL and error redaction, bounded logging, storage and
+The Datadog Node suite checks full paths, clinician identity, error text, bounded logging, storage and
 transport failures, daily probes, HTTP/GraphQL observers, independent goal requests,
 and alignment of the userscript update header with the emitted telemetry version.
 The three native browser tests execute the full userscript with simulated extension
