@@ -148,17 +148,18 @@ test("charting click and error observers retain native handlers and record error
 
 test("Datadog content identifies the clinician on every click and keeps failures on their original patient page", async (t) => {
   const page = await browserHarness(t);
+  const nextPath = "/users/999/private_notes/edit/" + "long-path-segment/".repeat(50) + "789";
   // Wait for the real startup lookup to finish; only its network response is synthetic.
   await page.waitForFunction(() => ddClinician?.id === "42");
   await page.click("#lock");
   await page.click("#lock");
-  await page.evaluate(() => {
+  await page.evaluate((path) => {
     window.dispatchEvent(new ErrorEvent("error", {message: "Healthie failed", error: new TypeError("Healthie failed")}));
     window.dispatchEvent(new ErrorEvent("error", {message: "Healthie failed", error: new TypeError("Healthie failed")}));
-    history.pushState({}, "", "/users/999/private_notes/edit/789");
+    history.pushState({}, "", path);
     window.dispatchEvent(new ErrorEvent("error", {message: "Healthie failed", error: new TypeError("Healthie failed")}));
     window.dispatchEvent(new Event("pagehide"));
-  });
+  }, nextPath);
   await page.click("#lock");
   await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
   assert.equal(await page.locator("#result").textContent(), "native click handled");
@@ -166,11 +167,11 @@ test("Datadog content identifies the clinician on every click and keeps failures
   const clicks = logs.filter((entry) => entry.tm_kind === "chart-note");
   assert.equal(clicks.length, 3, "repeat clicks must remain separate events");
   assert.equal(clicks[0].message, "[INFO] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [chart-note] clicked lock | path=/users/123/private_notes/edit/456");
-  assert.match(clicks[2].message, /path=\/users\/999\/private_notes\/edit\/789$/);
+  assert.ok(clicks[2].message.endsWith("path=" + nextPath), "click Content includes the full long path");
   const failures = logs.filter((entry) => entry.tm_kind === "window");
   assert.equal(failures.length, 2, "each patient page needs its own failure");
   assert.equal(failures[0].message, "[ERROR] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] window_error name=TypeError Healthie failed | path=/users/123/private_notes/edit/456 | repeats=2");
-  assert.match(failures[1].message, /path=\/users\/999\/private_notes\/edit\/789$/);
+  assert.ok(failures[1].message.endsWith("path=" + nextPath), "error Content includes the full long path");
   const startup = logs.find((entry) => entry.tm_kind === "lifecycle");
   assert.match(startup.message, /Ada Lovelace/);
   for (const log of [...clicks, ...failures]) {

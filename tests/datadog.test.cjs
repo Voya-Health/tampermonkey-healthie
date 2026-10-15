@@ -619,6 +619,22 @@ test("oversized detail cannot truncate identity or the path out of content", () 
   assert.equal(log.tm_detail.length, 500);
 });
 
+test("Content retains the full path beyond 500 characters alongside clinician, action, error, and version", () => {
+  const h = harness();
+  const path = "/users/123/private_notes/edit/" + "long-path-segment/".repeat(50) + "note-456";
+  h.context.location.pathname = path;
+  h.run(`rememberClinician({id:42,email:'ada@vorihealth.com',full_name:'Ada Lovelace'}); enqueueDatadogLog('info','chart-note','clicked sign and lock'); enqueueDatadogLog('error','window','TypeError: Cannot read id')`);
+  const logs = h.logs().filter((entry) => entry.tm_kind === "chart-note" || entry.tm_kind === "window");
+  assert.equal(logs.length, 2);
+  for (const log of logs) {
+    assert.ok(log.message.includes("[TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42)"));
+    assert.ok(log.message.endsWith(" | path=" + path), "Content must contain the complete path");
+    assert.equal(log.healthie_path, path);
+  }
+  assert.ok(logs[0].message.includes("[chart-note] clicked sign and lock"));
+  assert.ok(logs[1].message.includes("[window] TypeError: Cannot read id"));
+});
+
 test("userscript update version and emitted telemetry version stay aligned", () => {
   const version = source.match(/^\/\/ @version\s+(\S+)/m)?.[1];
   assert.ok(version, "userscript update header must be present");

@@ -8,7 +8,7 @@ npm ci --ignore-scripts
 npm test
 ```
 
-`npm test` runs 51 Node tests for Datadog diagnostics and GraphQL request handling,
+`npm test` runs 52 Node tests for Datadog diagnostics and GraphQL request handling,
 then 10 native Chromium telemetry tests and 19 Playwright tests for patient Overview
 appointments and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's
@@ -101,8 +101,10 @@ Structured clinician fields, `tm_version`, `tm_kind`, `tm_severity`, and
 `healthie_path` remain available for filtering. `tm_detail` keeps the event detail
 apart from the display prefix. `timestamp` records the first occurrence in Unix
 milliseconds; `last_seen_at` records the latest captured repeat. Detail has a
-500-character limit. Content bounds each component separately so a long error
-cannot remove the clinician or path; `healthie_path` retains the full path.
+500-character limit. Content bounds error detail and identity separately so a long
+error cannot remove the clinician or path. Both Content and `healthie_path` retain
+the full path, including paths longer than 500 characters; Node and Chromium
+regressions check this for actions and errors.
 Query strings and the API key value stay out of URL attributes.
 
 Info events retain individual actions within the existing 30-per-minute limit.

@@ -123,11 +123,14 @@ let ddViewerRetryAfter = 0;
 const DD_VIEWER_TIMEOUT_MS = 10000;
 const DD_VIEWER_RETRY_MS = 30000;
 
-function sanitizeForDatadog(value) {
+function normalizeDatadogText(value) {
   return String(value ?? "")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 500);
+    .trim();
+}
+
+function sanitizeForDatadog(value) {
+  return normalizeDatadogText(value).slice(0, 500);
 }
 
 function pagePath() {
@@ -219,7 +222,7 @@ function formatDatadogMessage(entry) {
   }
   const repeats = entry.repeat_count > 1 ? " | repeats=" + entry.repeat_count : "";
   entry.message = "[" + entry.status.toUpperCase() + "] [TM v" + entry.tm_version + "] " + clinician +
-    " | [" + entry.tm_kind + "] " + entry.tm_detail + " | path=" + sanitizeForDatadog(entry.healthie_path) + repeats;
+    " | [" + entry.tm_kind + "] " + entry.tm_detail + " | path=" + normalizeDatadogText(entry.healthie_path) + repeats;
   return entry;
 }
 
