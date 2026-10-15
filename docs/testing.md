@@ -8,8 +8,8 @@ npm ci --ignore-scripts
 npm test
 ```
 
-`npm test` runs 44 Node tests for Datadog diagnostics and GraphQL request handling,
-then 4 native Chromium telemetry tests and 19 Playwright tests for patient Overview
+`npm test` runs 51 Node tests for Datadog diagnostics and GraphQL request handling,
+then 10 native Chromium telemetry tests and 19 Playwright tests for patient Overview
 appointments and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's
 `Userscript tests` job and SonarCloud result before completing a PR.
@@ -45,7 +45,7 @@ HTML while checking the actual production URLs. They do not contact patient APIs
 The Datadog Node suite checks full paths, clinician identity, error text, bounded logging, storage and
 transport failures, daily probes, HTTP/GraphQL observers, independent goal requests,
 and alignment of the userscript update header with the emitted telemetry version.
-The four native browser tests execute the full userscript with simulated extension
+The ten native browser tests execute the full userscript with simulated extension
 APIs and intercepted requests. They check fetch/XHR response preservation, native
 sign/lock click handlers, and isolation of transport failures, including a failed
 manual diagnostic result. They also verify the clinician and version in Content,
@@ -66,12 +66,36 @@ event detail, and the path at the time of the event. For example, with synthetic
 [ERROR] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] TypeError: Cannot read id | path=/users/123/private_notes/edit/456 | repeats=4
 ```
 
-Identity comes from `user(or_current_user: true)` through the stored Healthie API
-key. It identifies the key's owner; a shared key cannot establish who is signed
-into the browser. `clinician_identity_source` records `healthie_api_key`.
-Content shows `Clinician pending` until the lookup completes, or `Clinician
-unavailable` if it fails or returns no user ID. Queued events pick up the lookup
-result without changing their original path or an identity they already had.
+Identity comes from Healthie's authenticated browser session through `currentUser`.
+The lookup runs globally, independent of route, Misha iframes, and the saved
+userscript API key. It reads Healthie's `blog:token` and `blog:source` from
+localStorage, with sessionStorage as a fallback, and makes a read-only request
+to the matching Healthie API using Bearer authentication. The session token stays
+in memory and request headers. `clinician_identity_source` records
+`healthie_browser_session`; the API key owner is never a viewer fallback.
+
+Normal batches, daily probes, and manual diagnostics wait for identity resolution,
+up to a ten-second deadline. Missing, expired, blocked, malformed, or patient
+sessions show `Clinician unavailable`. Failed lookups retry after a 30-second
+cooldown when another event or focus check occurs. The script checks the session
+before each event and on storage/focus changes. A session change clears the old
+clinician and ignores late responses from the previous session. Queued events
+pick up identity only within their original session context; their path and any
+identity already assigned remain unchanged. A forced pagehide flush may send an
+unresolved event as `Clinician pending` rather than assign a different user.
+
+The browser fixtures verify the actual startup lookup on Home, Clients, Calendar,
+Settings, Overview, and chart-note routes with no iframe and no userscript API
+key. Unit tests cover a shared API key owned by a different person, localStorage
+and sessionStorage, account switching, stale responses, logout, patient identities,
+expired/malformed responses, timeout, and bounded retry.
+
+Live staging verification on October 15, 2026 executed the actual source telemetry
+declarations in an isolated scope on Home, Clients, Calendar, Settings, and a chart
+page. Each returned the signed-in clinician's Healthie ID, name, and email using
+the browser session with no userscript API key in that scope. This verifies the
+identity lookup against Healthie's real API. It does not establish installation
+of the PR's full userscript, production compatibility, or live Datadog indexing.
 
 Structured clinician fields, `tm_version`, `tm_kind`, `tm_severity`, and
 `healthie_path` remain available for filtering. `tm_detail` keeps the event detail
@@ -100,9 +124,21 @@ USERSCRIPT_PATH=.test-fixtures/before-readable-content.js node --test tests/data
 USERSCRIPT_PATH=.test-fixtures/before-readable-content.js node --test --test-name-pattern='Datadog content identifies' tests/datadog.browser.cjs
 ```
 
-The old code fails seven Node regressions. The browser regression receives one
+The old code fails the Content and repeat-click regressions. The browser regression receives one
 click event instead of three. Run `npm test` against the current source to verify
 the fix. Local failed-run evidence stays under `.test-fixtures/`.
+
+To reproduce the missing browser-session identity against the earlier key-owner
+implementation, use the current tests with:
+
+```sh
+git show 021cf37:careplan.js > .test-fixtures/before-session-viewer.js
+USERSCRIPT_PATH=.test-fixtures/before-session-viewer.js node --test --test-name-pattern='browser session identifies|shared API key|session switches|session lookup rejects|lookup timeout' tests/datadog.test.cjs
+USERSCRIPT_PATH=.test-fixtures/before-session-viewer.js node --test --test-name-pattern='session clinician.*on /clients/active$' tests/datadog.browser.cjs
+```
+
+The five Node regressions fail there. The browser regression times out waiting
+for a clinician, because the old code ignores the browser session.
 
 This harness covers the changed appointments and Add client features and request handling. It does
 not execute the entire userscript router or every unrelated integration. React 18

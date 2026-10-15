@@ -9,6 +9,8 @@ function harness(overrides = {}) {
   const sent = [],
     timers = new Map(),
     storage = new Map(),
+    browserStorage = new Map(Object.entries(overrides.browserStorage || {})),
+    tabStorage = new Map(Object.entries(overrides.tabStorage || {})),
     listeners = {};
   let timerId = 0;
   class XHR extends EventTarget {
@@ -21,6 +23,8 @@ function harness(overrides = {}) {
     }
   }
   const page = {
+    localStorage: { getItem: (key) => browserStorage.get(key) ?? null },
+    sessionStorage: { getItem: (key) => tabStorage.get(key) ?? null },
     jQuery() {},
     fetch: async () => ({ status: 200, ok: true }),
     XMLHttpRequest: XHR,
@@ -32,6 +36,7 @@ function harness(overrides = {}) {
   };
   const context = vm.createContext({
     URL,
+    AbortController,
     crypto: webcrypto,
     console: page.console,
     location: {
@@ -72,8 +77,136 @@ function harness(overrides = {}) {
     run("flushDatadogLogsNow()");
     return sent.flatMap((r) => JSON.parse(r.data));
   };
-  return { run, context, page, sent, timers, storage, listeners, logs };
+  return { run, context, page, sent, timers, storage, browserStorage, tabStorage, listeners, logs };
 }
+
+test("browser session identifies the viewer on all routes without a userscript API key or iframe", async () => {
+  for (const path of ["/", "/clients/active", "/appointments", "/settings/account", "/users/123/Overview", "/users/123/private_notes/edit/456"]) {
+    const requests = [];
+    const h = harness({
+      browserStorage: {"blog:token": "viewer-session", "blog:source": "Web"},
+      globals: { location: {origin:"https://vorihealth.gethealthie.com", pathname:path, href:"https://vorihealth.gethealthie.com" + path} },
+      page: {fetch: async (url, init) => {
+        requests.push({url, init});
+        return new Response(JSON.stringify({data: {currentUser: {id:"42", email:"ada@vorihealth.com", full_name:"Ada Lovelace", is_patient:false}}}));
+      }},
+    });
+    h.run(`enqueueDatadogLog('error','window','route failure')`);
+    h.run("flushDatadogLogs()");
+    assert.equal(h.sent.length, 0, "normal batches wait for the session identity");
+    await h.run("loadViewingClinician()");
+    const log = h.logs().find((entry) => entry.tm_kind === "window");
+    assert.equal(log.clinician_id, "42", path);
+    assert.equal(log.clinician_identity_source, "healthie_browser_session");
+    assert.equal(log.healthie_path, path);
+    assert.match(log.message, /Ada Lovelace <ada@vorihealth.com>/);
+    assert.equal(requests.length, 1, "one lookup per session");
+    assert.equal(requests[0].init.headers.Authorization, "Bearer viewer-session");
+    assert.equal(requests[0].init.headers.AuthorizationSource, "Web");
+    assert.match(JSON.parse(requests[0].init.body).query, /currentUser/);
+    const probe = h.logs().find((entry) => entry.tm_kind === "probe");
+    assert.equal(probe.clinician_id, "42", "daily probe waits for identity");
+    assert.ok(!JSON.stringify(h.logs()).includes("viewer-session"), "session token stays out of logs");
+  }
+});
+
+test("shared API key owner cannot replace the authenticated browser clinician", async () => {
+  const h = harness({
+    tabStorage: {"blog:token":"session-clinician"},
+    globals: {GM_getValue: (key, fallback) => key === "healthieApiKey" ? "shared-api-key" : fallback},
+    page: {fetch: async (_, init) => new Response(JSON.stringify({data: {
+      currentUser: init.headers.Authorization === "Bearer session-clinician" ? {id:"42",full_name:"Actual Viewer"} : {id:"999",full_name:"API Key Owner"},
+      user: {id:"999",full_name:"API Key Owner"},
+    }}))},
+  });
+  await h.run("loadViewingClinician()");
+  await new Promise((resolve) => setImmediate(resolve));
+  const log = h.run(`makeDatadogLog('info','navigation','viewer')`);
+  assert.equal(log.clinician_id, "42");
+  assert.match(log.message, /Actual Viewer/);
+  assert.ok(!JSON.stringify(h.logs()).includes("API Key Owner"));
+});
+
+test("session switches clear the old clinician and ignore late responses from the previous session", async () => {
+  const resolveByToken = new Map();
+  const h = harness({
+    browserStorage: {"blog:token":"session-a"},
+    page: {fetch: (_, init) => new Promise((resolve) => resolveByToken.set(init.headers.Authorization, resolve))},
+  });
+  h.run(`enqueueDatadogLog('info','test','session-a action')`);
+  await new Promise((resolve) => setImmediate(resolve));
+  h.browserStorage.set("blog:token", "session-b");
+  h.run(`enqueueDatadogLog('info','test','session-b action')`);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(h.run("ddClinician"), null);
+  resolveByToken.get("Bearer session-b")(new Response(JSON.stringify({data:{currentUser:{id:"43",full_name:"Grace"}}})));
+  await h.run("loadViewingClinician()");
+  resolveByToken.get("Bearer session-a")(new Response(JSON.stringify({data:{currentUser:{id:"42",full_name:"Ada"}}})));
+  await new Promise((resolve) => setImmediate(resolve));
+  const logs = h.logs();
+  assert.equal(logs.find((log) => log.tm_detail === "session-a action").clinician_id, undefined);
+  assert.equal(logs.find((log) => log.tm_detail === "session-b action").clinician_id, "43");
+  h.browserStorage.delete("blog:token");
+  const logout = h.run(`makeDatadogLog('info','test','signed out')`);
+  assert.equal(logout.clinician_id, undefined);
+  assert.equal(logout.clinician_identity_status, "unavailable");
+});
+
+test("session lookup rejects patient identities and retries failures only after its cooldown", async () => {
+  let now = 100000;
+  class TestDate extends Date { static now() { return now; } }
+  let calls = 0;
+  const h = harness({
+    browserStorage: {"blog:token":"session"},
+    globals: {Date: TestDate},
+    page: {fetch: async () => { calls++; return new Response(JSON.stringify({data:{currentUser:{id:"123",full_name:"Patient",is_patient:true}}})); }},
+  });
+  await h.run("loadViewingClinician()");
+  assert.equal(h.run("ddClinician"), null);
+  for (let i=0;i<50;i++) h.run(`makeDatadogLog('info','test','failed lookup')`);
+  assert.equal(calls, 1);
+  now += 30000;
+  h.page.fetch = async () => {calls++; return new Response(JSON.stringify({data:{currentUser:{id:"42",full_name:"Clinician"}}}));};
+  await h.run("loadViewingClinician()");
+  assert.equal(calls, 2);
+  assert.equal(h.run("ddClinician.id"), "42");
+});
+
+test("lookup timeout is bounded even when the fetch promise ignores abort", async () => {
+  const h = harness({browserStorage:{"blog:token":"session"},page:{fetch:()=>new Promise(()=>{})}});
+  h.run(`enqueueDatadogLog('error','window','lookup timed out')`);
+  const timeout = Array.from(h.timers.values()).find((timer) => timer.delay === 10000);
+  assert.ok(timeout, "identity lookup needs a deadline");
+  timeout.fn();
+  await h.run("ddViewerLookup");
+  const log = h.logs().find((entry) => entry.tm_kind === "window");
+  assert.equal(log.clinician_identity_status, "unavailable");
+  assert.equal(log.clinician_id, undefined);
+});
+
+test("expired, partial, and malformed session responses never use the API key owner", async () => {
+  for (const response of [
+    new Response('{}', {status:401}),
+    new Response(JSON.stringify({data:{user:{id:"999",full_name:"API key owner"}}})),
+    new Response(JSON.stringify({errors:[{message:"session expired"}]})),
+    new Response('not json'),
+  ]) {
+    const h = harness({browserStorage:{"blog:token":"expired"},page:{fetch:async()=>response}});
+    await h.run("loadViewingClinician()");
+    const log = h.run(`makeDatadogLog('error','test','expired session')`);
+    assert.equal(log.clinician_identity_status, "unavailable");
+    assert.equal(log.clinician_id, undefined);
+  }
+});
+
+test("blocked persistent storage falls back to the active tab session", async () => {
+  const h = harness({tabStorage:{"blog:token":"tab-session"},page:{
+    localStorage:{getItem(){throw new Error("storage blocked");}},
+    fetch:async()=>new Response(JSON.stringify({data:{currentUser:{id:"42",full_name:"Ada"}}})),
+  }});
+  await h.run("loadViewingClinician()");
+  assert.equal(h.run("ddClinician.id"), "42");
+});
 
 test("URL telemetry keeps the full path and drops query tokens", () => {
   const h = harness();
@@ -359,11 +492,8 @@ test("ordinary conversation messages are not GraphQL validation errors", () => {
 });
 
 test("viewing clinician id, email, and name are attached with the script version", async () => {
-  const h = harness();
-  h.run(
-    `healthieGQL = () => Promise.resolve({ data: { user: { id: 42, email: 'ada@vorihealth.com', full_name: 'Ada Lovelace', first_name: 'Wrong' } } }); loadViewingClinician()`
-  );
-  await new Promise((resolve) => setImmediate(resolve));
+  const h = harness({browserStorage:{"blog:token":"session"}, page:{fetch:async () => new Response(JSON.stringify({data:{currentUser:{id:42,email:"ada@vorihealth.com",full_name:"Ada Lovelace",first_name:"Wrong"}}}))}});
+  await h.run("loadViewingClinician()");
   h.run(`enqueueDatadogLog('info', 'test', 'viewer check')`);
   const log = h.logs().find((entry) => entry.message.includes("viewer check"));
   assert.equal(log.clinician_id, "42");
@@ -380,7 +510,7 @@ test("content shows clinician, version, severity, action, original path, and rep
   h.run(`rememberClinician({id:42,email:'ada@vorihealth.com',full_name:'Ada Lovelace'})`);
   const log = h.logs().find((entry) => entry.tm_kind === "window");
   assert.equal(log.message, "[ERROR] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] TypeError: Cannot read id | path=/users/123/private_notes/edit/456 | repeats=2");
-  assert.equal(log.clinician_identity_source, "healthie_api_key");
+  assert.equal(log.clinician_identity_source, "healthie_browser_session");
   assert.equal(log.tm_detail, "TypeError: Cannot read id");
   assert.ok(log.last_seen_at >= log.timestamp);
 });
@@ -416,11 +546,10 @@ test("failure collapse separates page paths and clinicians and keeps the event i
 });
 
 test("lookup failure is visible and never invents a clinician from a patient route", async () => {
-  const h = harness();
+  const h = harness({browserStorage:{"blog:token":"session"}, page:{fetch:async () => {throw new Error("lookup failed");}}});
   const pending = h.run(`makeDatadogLog('info','test','before lookup')`);
   assert.match(pending.message, /Clinician pending/);
-  h.run(`healthieGQL = () => Promise.reject(new Error('lookup failed')); loadViewingClinician()`);
-  await new Promise((resolve) => setImmediate(resolve));
+  await h.run("loadViewingClinician()");
   const log = h.logs().find((entry) => entry.tm_kind === "lifecycle");
   assert.match(log.message, /Clinician unavailable/);
   assert.equal(log.clinician_identity_status, "unavailable");
@@ -456,7 +585,7 @@ test("repeat windows use the original timestamp and show the final count in cont
   assert.equal(h.sent.flatMap((r) => JSON.parse(r.data)).filter((entry) => entry.tm_kind === "console").length, 1);
 });
 
-test("malformed and unresolved clinician lookups keep logs usable without false attribution", () => {
+test("malformed and unresolved clinician lookups keep logs usable without false attribution", async () => {
   const h = harness();
   for (const user of [null, {}, [], {id: " "}, {id: {}}, {id: NaN}]) {
     h.context.lookupUser = user;
@@ -465,15 +594,16 @@ test("malformed and unresolved clinician lookups keep logs usable without false 
     assert.match(log.message, /Clinician unavailable/);
     assert.equal(log.clinician_id, undefined);
   }
-  const pending = harness();
-  pending.run(`healthieGQL = () => new Promise(() => {}); loadViewingClinician(); enqueueDatadogLog('error','window','lookup still pending')`);
+  const pending = harness({browserStorage:{"blog:token":"session"}, page:{fetch:() => new Promise(() => {})}});
+  pending.run(`enqueueDatadogLog('error','window','lookup still pending')`);
   const log = pending.logs().find((entry) => entry.tm_kind === "window");
   assert.match(log.message, /Clinician pending/);
   assert.match(log.message, /lookup still pending/);
-  const thrown = harness();
+  const thrown = harness({browserStorage:{"blog:token":"session"}, page:{fetch:() => {throw new Error("private lookup failure");}}});
   const debugMessages = [];
   thrown.page.console.log = (...args) => debugMessages.push(args);
-  thrown.run(`debug = true; healthieGQL = () => { throw new Error('private lookup failure'); }; loadViewingClinician()`);
+  thrown.run(`debug = true`);
+  await thrown.run("loadViewingClinician()");
   assert.match(thrown.run(`makeDatadogLog('error','test','sync failure').message`), /Clinician unavailable/);
   assert.equal(debugMessages.length, 1);
   assert.match(debugMessages[0][0], /clinician-lookup_error name=Error fingerprint=/);

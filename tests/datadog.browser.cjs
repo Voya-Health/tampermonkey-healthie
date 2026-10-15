@@ -5,7 +5,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright-core")
 const source = readFileSync(process.env.USERSCRIPT_PATH || "careplan.js", "utf8");
 
 // Real browser APIs, synthetic page and extension APIs. No Healthie or Datadog requests leave the test.
-async function browserHarness(t, expectedConsoleErrors = []) {
+async function browserHarness(t, expectedConsoleErrors = [], path = "/users/123/private_notes/edit/456") {
   const browser = await chromium.launch(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {});
   t.after(() => browser.close());
   const page = await browser.newPage();
@@ -29,10 +29,12 @@ async function browserHarness(t, expectedConsoleErrors = []) {
     const request = route.request();
     const url = new URL(request.url());
     if (url.pathname === "/graphql" && ["api.gethealthie.com", "vorihealth.gethealthie.com"].includes(url.hostname)) {
-      if (request.postData()?.includes("tampermonkeyViewer")) {
+      if (request.postData()?.includes("tampermonkeySessionViewer")) {
+        assert.equal(request.headers().authorization, "Bearer synthetic-browser-session");
+        assert.equal(request.headers().authorizationsource, "Web");
         return route.fulfill({
           contentType: "application/json",
-          body: JSON.stringify({data: {user: {id: "42", email: "ada@vorihealth.com", full_name: "Ada Lovelace"}}}),
+          body: JSON.stringify({data: {currentUser: {id: "42", email: "ada@vorihealth.com", full_name: "Ada Lovelace", is_patient:false}}}),
         });
       }
       return route.fulfill({
@@ -42,7 +44,7 @@ async function browserHarness(t, expectedConsoleErrors = []) {
         }),
       });
     }
-    if (url.hostname !== "vorihealth.gethealthie.com" || !/^\/users\/\d+\/private_notes\/edit\/\d+$/.test(url.pathname)) {
+    if (url.hostname !== "vorihealth.gethealthie.com" || url.pathname !== path) {
       unexpectedRequests.push(request.url());
       return route.abort();
     }
@@ -51,12 +53,14 @@ async function browserHarness(t, expectedConsoleErrors = []) {
       body: '<button id="sign">Sign and lock</button><button id="lock">Lock Note</button><output id="result"></output>',
     });
   });
-  await page.goto("https://vorihealth.gethealthie.com/users/123/private_notes/edit/456");
+  await page.goto("https://vorihealth.gethealthie.com" + path);
   await page.evaluate(() => {
     window.__logs = [];
     window.unsafeWindow = window;
     window.GM_getValue = (_, fallback) => fallback;
     window.GM_setValue = () => {};
+    localStorage.setItem("blog:token", "synthetic-browser-session");
+    localStorage.setItem("blog:source", "Web");
     window.GM_xmlhttpRequest = (options) => {
       window.__logs.push(...JSON.parse(options.data));
       options.onload({ status: 202 });
@@ -172,10 +176,31 @@ test("Datadog content identifies the clinician on every click and keeps failures
   for (const log of [...clicks, ...failures]) {
     assert.equal(log.tm_version, "2.6");
     assert.equal(log.clinician_id, "42");
-    assert.equal(log.clinician_identity_source, "healthie_api_key");
+    assert.equal(log.clinician_identity_source, "healthie_browser_session");
     assert.ok(Number.isFinite(log.timestamp));
   }
 });
+
+for (const path of ["/", "/clients/active", "/appointments", "/settings/account", "/users/123/Overview", "/users/123/private_notes/edit/456"]) {
+  test(`session clinician is available without API key or iframe on ${path}`, async (t) => {
+    const page = await browserHarness(t, [], path);
+    await page.waitForFunction(() => ddClinician?.id === "42", null, {timeout:5000});
+    assert.equal(await page.locator("iframe").count(), 0);
+    await page.evaluate(() => {
+      window.dispatchEvent(new ErrorEvent("error", {message:"global page failure",error:new Error("global page failure")}));
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    const logs = await page.evaluate(() => window.__logs);
+    const error = logs.find((entry) => entry.tm_kind === "window");
+    assert.equal(error.clinician_id, "42");
+    assert.equal(error.clinician_email, "ada@vorihealth.com");
+    assert.equal(error.healthie_path, path);
+    assert.equal(error.clinician_identity_source, "healthie_browser_session");
+    assert.match(error.message, /Ada Lovelace.*Healthie ID: 42/);
+    assert.ok(logs.some((entry) => entry.tm_kind === "lifecycle" && entry.tm_detail.includes("api_key=missing")));
+    assert.ok(!JSON.stringify(logs).includes("synthetic-browser-session"));
+  });
+}
 
 test("blocked telemetry transport leaves native fetch and charting clicks working", async (t) => {
   const page = await browserHarness(t);

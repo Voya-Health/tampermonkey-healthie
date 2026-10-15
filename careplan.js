@@ -116,6 +116,12 @@ let ddSentKeys = new Set();
 let ddClinician = null;
 let ddClinicianStatus = "pending";
 let ddClinicianContext = 0;
+let ddViewerSessionToken = null;
+let ddViewerSessionSource = "";
+let ddViewerLookup = null;
+let ddViewerRetryAfter = 0;
+const DD_VIEWER_TIMEOUT_MS = 10000;
+const DD_VIEWER_RETRY_MS = 30000;
 
 function sanitizeForDatadog(value) {
   return String(value ?? "")
@@ -195,7 +201,7 @@ function datadogErrorDetail(kind, error) {
 
 function clinicianLogFields() {
   const fields = {
-    clinician_identity_source: "healthie_api_key",
+    clinician_identity_source: "healthie_browser_session",
     clinician_identity_status: ddClinicianStatus,
   };
   if (ddClinician?.id) fields.clinician_id = ddClinician.id;
@@ -221,7 +227,7 @@ function enrichPendingClinician() {
   const fields = clinicianLogFields();
   const entries = ddQueue.concat(Array.from(ddRepeatCounts.values(), (pending) => pending.entry));
   for (const entry of entries) {
-    if (entry.clinician_identity_status !== "identified") {
+    if (entry.tm_clinician_context === ddClinicianContext && entry.clinician_identity_status !== "identified") {
       Object.assign(entry, fields);
       formatDatadogMessage(entry);
     }
@@ -232,7 +238,7 @@ function rememberClinician(user) {
   const rawId = user?.id;
   const hasId = typeof rawId === "string" || (typeof rawId === "number" && Number.isFinite(rawId));
   const id = hasId ? sanitizeForDatadog(rawId).slice(0, 80) : "";
-  if (!id) {
+  if (!id || user.is_patient === true) {
     if (!ddClinician) {
       ddClinicianStatus = "unavailable";
       enrichPendingClinician();
@@ -251,24 +257,85 @@ function rememberClinician(user) {
   enrichPendingClinician();
 }
 
-function loadViewingClinician() {
-  try {
-    const payload = JSON.stringify({
-      query: "query tampermonkeyViewer { user(or_current_user: true) { id email full_name first_name last_name } }",
-    });
-    Promise.resolve(healthieGQL(payload))
-      .then(function (response) {
-        rememberClinician(response?.data?.user);
-      })
-      .catch(function () {
-        // A missing API key or a failed viewer lookup must not drop the log.
-        rememberClinician(null);
-      });
-  } catch (e) {
-    // A throw before the request exists must not stop the userscript.
-    rememberClinician(null);
-    debugLog(errorSummary("clinician-lookup", e));
+function readHealthieBrowserSession() {
+  // These are Healthie's own browser-session keys, independent of the userscript API key.
+  // Keep the token in memory and request headers only; never include it in telemetry.
+  for (const storageName of ["localStorage", "sessionStorage"]) {
+    try {
+      const storage = unsafeWindow[storageName];
+      const token = storage?.getItem("blog:token");
+      const source = storage?.getItem("blog:source") || "Web";
+      if (typeof token === "string" && token && source.toLowerCase() !== "api") return { token, source };
+    } catch (e) {
+      // Storage can be blocked; try the other session store without stopping the page.
+    }
   }
+  return { token: "", source: "Web" };
+}
+
+async function requestViewingClinician(session) {
+  const controller = new AbortController();
+  let timer;
+  try {
+    const deadline = new Promise((_, reject) => {
+      timer = window.setTimeout(() => {
+        controller.abort();
+        reject(new Error("clinician lookup timed out"));
+      }, DD_VIEWER_TIMEOUT_MS);
+    });
+    const response = Promise.resolve().then(() => unsafeWindow.fetch(
+      "https://" + (isStagingEnv ? "staging-api" : "api") + ".gethealthie.com/graphql", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + session.token,
+          AuthorizationSource: session.source,
+          "content-type": "application/json",
+        },
+        signal: controller.signal,
+        body: JSON.stringify({query: "query tampermonkeySessionViewer { currentUser { id email full_name first_name last_name is_patient } }"}),
+      }
+    )).then((result) => {
+      if (!result.ok) throw new Error("clinician lookup HTTP " + result.status);
+      return result.json();
+    });
+    const body = await Promise.race([response, deadline]);
+    return body?.data?.currentUser;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function loadViewingClinician() {
+  const session = readHealthieBrowserSession();
+  if (session.token !== ddViewerSessionToken || session.source !== ddViewerSessionSource) {
+    if (ddViewerSessionToken !== null) ddClinicianContext += 1;
+    ddViewerSessionToken = session.token;
+    ddViewerSessionSource = session.source;
+    ddClinician = null;
+    ddClinicianStatus = session.token ? "pending" : "unavailable";
+    ddViewerLookup = null;
+    ddViewerRetryAfter = 0;
+    enrichPendingClinician();
+  }
+  if (!session.token || ddClinician || ddViewerLookup || Date.now() < ddViewerRetryAfter) {
+    return ddViewerLookup || Promise.resolve(null);
+  }
+  const context = ddClinicianContext;
+  ddClinicianStatus = "pending";
+  ddViewerRetryAfter = Date.now() + DD_VIEWER_RETRY_MS;
+  const request = requestViewingClinician(session)
+    .then((user) => {
+      if (context === ddClinicianContext) rememberClinician(user);
+    })
+    .catch((error) => {
+      if (context === ddClinicianContext) rememberClinician(null);
+      debugLog(errorSummary("clinician-lookup", error));
+    })
+    .finally(() => {
+      if (ddViewerLookup === request) ddViewerLookup = null;
+    });
+  ddViewerLookup = request;
+  return ddViewerLookup;
 }
 
 function rollDatadogWindow() {
@@ -285,6 +352,7 @@ function datadogSeverity(status) {
 }
 
 function makeDatadogLog(status, kind, message, extra) {
+  loadViewingClinician();
   const severity = datadogSeverity(status);
   const env = isStagingEnv ? "staging" : "prod";
   const now = Date.now();
@@ -300,6 +368,7 @@ function makeDatadogLog(status, kind, message, extra) {
     tm_kind: kind,
     tm_severity: severity,
     tm_install_id: ddInstallId,
+    tm_clinician_context: ddClinicianContext,
     healthie_path: pagePath(),
     page_id: ddPageId,
   };
@@ -362,6 +431,7 @@ function releaseDatadogRepeats(force) {
 
 function enqueueDatadogLog(status, kind, message, extra) {
   try {
+    loadViewingClinician();
     const severity = datadogSeverity(status);
     const key = datadogRepeatKey(severity, kind, message);
     const collapse = severity !== "info";
@@ -395,8 +465,12 @@ function enqueueDatadogLog(status, kind, message, extra) {
   }
 }
 
-function flushDatadogLogs() {
+function flushDatadogLogs(force = false) {
   ddFlushTimer = null;
+  if (!force && ddViewerLookup) {
+    scheduleDatadogFlush();
+    return;
+  }
   const ready = releaseDatadogRepeats(false);
   for (const entry of ready) {
     ddQueue.push(entry);
@@ -705,7 +779,7 @@ function flushDatadogLogsNow() {
     ddQueue.push(entry);
   }
   while (ddQueue.length) {
-    flushDatadogLogs();
+    flushDatadogLogs(true);
     if (ddFlushTimer) {
       window.clearTimeout(ddFlushTimer);
       ddFlushTimer = null;
@@ -792,12 +866,12 @@ function maybeSendDailyProbe() {
   if (Date.now() - lastProbeAt < DD_PROBE_INTERVAL_MS) {
     return;
   }
-  const entry = makeDatadogLog("info", "probe", "daily probe version=" + TM_VERSION);
-  sendDatadogBatch([entry], function (status) {
-    if (status >= 200 && status < 300) {
-      GM_setValue(ddProbeAtKey, Date.now());
-    }
-  });
+  loadViewingClinician().then(() => {
+    const entry = makeDatadogLog("info", "probe", "daily probe version=" + TM_VERSION);
+    sendDatadogBatch([entry], function (status) {
+      if (status >= 200 && status < 300) GM_setValue(ddProbeAtKey, Date.now());
+    });
+  }).catch((error) => debugLog(errorSummary("daily-probe", error)));
 }
 
 function setupHealthieDatadogLogs() {
@@ -816,6 +890,8 @@ function setupHealthieDatadogLogs() {
       if (unsafeWindow !== window) watchWindowErrors(window);
     },
     watchChartNoteActions,
+    () => window.addEventListener("storage", loadViewingClinician),
+    () => window.addEventListener("focus", loadViewingClinician),
     () => window.addEventListener("pagehide", flushDatadogLogsNow),
     installDatadogSelfTest,
     maybeSendDailyProbe,
@@ -833,7 +909,8 @@ function setupHealthieDatadogLogs() {
 }
 
 function installDatadogSelfTest() {
-  unsafeWindow.__voriDatadogTest = function () {
+  unsafeWindow.__voriDatadogTest = async function () {
+    await loadViewingClinician();
     const testId = Date.now().toString(36) + randomId(8);
     const entry = makeDatadogLog("info", "diagnostic", "VX-3525 manual test " + testId);
     entry.test_id = testId;
