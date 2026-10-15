@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.6
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -11,6 +11,8 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_openInTab
+// @grant        GM_xmlhttpRequest
+// @connect      browser-intake-datadoghq.com
 // ==/UserScript==
 
 /* globals contentful */
@@ -60,6 +62,878 @@ function debugLog(...messages) {
     unsafeWindow.console.log(...messages);
   }
 }
+
+// Same public browser logs token as DATADOG_LOGS_CLIENT_TOKEN in
+// voya-cust web-misha/core-lib/config/envs.ts. Not the server API key.
+const TM_VERSION = "2.6";
+const DD_LOGS_CLIENT_TOKEN = "pubdf55240f49807c01cd3ed2168506ced8";
+const DD_INTAKE_URL =
+  "https://browser-intake-datadoghq.com/api/v2/logs?ddsource=browser&dd-evp-origin=browser&dd-api-key=" +
+  DD_LOGS_CLIENT_TOKEN;
+const DD_LIMITS_PER_MINUTE = { error: 20, warn: 20, info: 30 };
+const DD_REPEAT_QUIET_MS = 2000;
+const DD_REPEAT_MAX_MS = 30000;
+const ddInstallIdKey = "voriDatadogInstallId";
+const ddProbeAtKey = "voriDatadogProbeAt";
+const DD_PROBE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+function randomId(length) {
+  try {
+    const bytes = new Uint8Array(length);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => (byte % 36).toString(36)).join("");
+  } catch (e) {
+    // Missing crypto must not stop the userscript.
+    debugLog(errorSummary("crypto", e));
+    return "unavailable";
+  }
+}
+
+const ddPageId = randomId(10);
+
+function readInstallId() {
+  const id = randomId(12);
+  try {
+    const existing = GM_getValue(ddInstallIdKey, "");
+    if (typeof existing === "string" && /^[a-z0-9]{12}$/.test(existing)) {
+      return existing;
+    }
+    GM_setValue(ddInstallIdKey, id);
+  } catch (e) {
+    // Telemetry storage must not prevent the userscript from starting.
+  }
+  return id;
+}
+
+const ddInstallId = readInstallId();
+let ddQueue = [];
+let ddSentBySeverity = { error: 0, warn: 0, info: 0 };
+let ddWindowStarted = Date.now();
+let ddFlushTimer = null;
+let ddHooksInstalled = false;
+let ddRepeatCounts = new Map();
+let ddSentKeys = new Set();
+let ddClinician = null;
+let ddClinicianStatus = "pending";
+let ddClinicianContext = 0;
+let ddViewerSessionToken = null;
+let ddViewerSessionSource = "";
+let ddViewerLookup = null;
+let ddViewerRetryAfter = 0;
+const DD_VIEWER_TIMEOUT_MS = 10000;
+const DD_VIEWER_RETRY_MS = 30000;
+
+function normalizeDatadogText(value) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sanitizeForDatadog(value) {
+  return normalizeDatadogText(value).slice(0, 500);
+}
+
+function pagePath() {
+  const path = String(location.pathname || "/");
+  try {
+    return decodeURIComponent(path);
+  } catch (e) {
+    return path;
+  }
+}
+
+function isKnownHealthieHost(hostname) {
+  return /^(api|staging-api|secure|securestaging|vorihealth)\.gethealthie\.com$/.test(hostname);
+}
+
+function safeUrl(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || ""), location.origin);
+    return parsed.origin + parsed.pathname;
+  } catch (e) {
+    // Malformed diagnostic URLs are omitted. Query strings stay off every URL because they carry tokens.
+    debugLog(errorSummary("diagnostic-url", e));
+    return "invalid-url";
+  }
+}
+
+function errorFingerprint(value) {
+  const text = String(value ?? "");
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; ) {
+    const codePoint = text.codePointAt(i);
+    hash ^= codePoint;
+    hash = Math.imul(hash, 16777619);
+    i += codePoint > 0xffff ? 2 : 1;
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function safeErrorName(value) {
+  const names = [
+    "Error",
+    "TypeError",
+    "RangeError",
+    "ReferenceError",
+    "SyntaxError",
+    "URIError",
+    "EvalError",
+    "AggregateError",
+    "AbortError",
+    "NetworkError",
+    "TimeoutError",
+    "SecurityError",
+    "InvalidStateError",
+    "GraphQLError",
+    "ApolloError",
+  ];
+  return names.includes(value) ? value : "Error";
+}
+
+function errorSummary(kind, error) {
+  const message = typeof error?.message === "string" ? error.message : String(error || kind);
+  const name = safeErrorName(error?.name);
+  return kind + "_error name=" + name + " fingerprint=" + errorFingerprint(message);
+}
+
+function datadogErrorDetail(kind, error) {
+  const message = typeof error?.message === "string" ? error.message : String(error || kind);
+  const name = typeof error?.name === "string" && error.name ? error.name.slice(0, 120) : "Error";
+  return kind + "_error name=" + name + " " + message;
+}
+
+function clinicianLogFields() {
+  const fields = {
+    clinician_identity_source: "healthie_browser_session",
+    clinician_identity_status: ddClinicianStatus,
+  };
+  if (ddClinician?.id) fields.clinician_id = ddClinician.id;
+  if (ddClinician?.email) fields.clinician_email = ddClinician.email;
+  if (ddClinician?.name) fields.clinician_name = ddClinician.name;
+  return fields;
+}
+
+function formatDatadogMessage(entry) {
+  let clinician = "Clinician " + entry.clinician_identity_status;
+  if (entry.clinician_id) {
+    clinician = entry.clinician_name || entry.clinician_email || "Clinician";
+    if (entry.clinician_name && entry.clinician_email) clinician += " <" + entry.clinician_email + ">";
+    clinician += " (Healthie ID: " + entry.clinician_id + ")";
+  }
+  const repeats = entry.repeat_count > 1 ? " | repeats=" + entry.repeat_count : "";
+  entry.message = "[" + entry.status.toUpperCase() + "] [TM v" + entry.tm_version + "] " + clinician +
+    " | [" + entry.tm_kind + "] " + entry.tm_detail + " | path=" + normalizeDatadogText(entry.healthie_path) + repeats;
+  return entry;
+}
+
+function enrichPendingClinician() {
+  const fields = clinicianLogFields();
+  const entries = ddQueue.concat(Array.from(ddRepeatCounts.values(), (pending) => pending.entry));
+  for (const entry of entries) {
+    if (entry.tm_clinician_context === ddClinicianContext && entry.clinician_identity_status !== "identified") {
+      Object.assign(entry, fields);
+      formatDatadogMessage(entry);
+    }
+  }
+}
+
+function rememberClinician(user) {
+  const rawId = user?.id;
+  const hasId = typeof rawId === "string" || (typeof rawId === "number" && Number.isFinite(rawId));
+  const id = hasId ? sanitizeForDatadog(rawId).slice(0, 80) : "";
+  if (!id || user.is_patient === true) {
+    if (!ddClinician) {
+      ddClinicianStatus = "unavailable";
+      enrichPendingClinician();
+    }
+    return;
+  }
+  const combined = [user.first_name, user.last_name].filter((part) => typeof part === "string" && part.trim()).join(" ");
+  const fullName = typeof user.full_name === "string" ? user.full_name.trim() : "";
+  if (ddClinician && ddClinician.id !== id) ddClinicianContext += 1;
+  ddClinician = {
+    id,
+    email: typeof user.email === "string" ? sanitizeForDatadog(user.email).slice(0, 160) : "",
+    name: sanitizeForDatadog(fullName || combined).slice(0, 120),
+  };
+  ddClinicianStatus = "identified";
+  enrichPendingClinician();
+}
+
+function readHealthieBrowserSession() {
+  // These are Healthie's own browser-session keys, independent of the userscript API key.
+  // Keep the token in memory and request headers only; never include it in telemetry.
+  for (const storageName of ["localStorage", "sessionStorage"]) {
+    try {
+      const storage = unsafeWindow[storageName];
+      const token = storage?.getItem("blog:token");
+      const source = storage?.getItem("blog:source") || "Web";
+      if (typeof token === "string" && token && source.toLowerCase() !== "api") return { token, source };
+    } catch (e) {
+      // Storage can be blocked; try the other session store without stopping the page.
+    }
+  }
+  return { token: "", source: "Web" };
+}
+
+async function requestViewingClinician(session) {
+  const controller = new AbortController();
+  let timer;
+  try {
+    const deadline = new Promise((_, reject) => {
+      timer = window.setTimeout(() => {
+        controller.abort();
+        reject(new Error("clinician lookup timed out"));
+      }, DD_VIEWER_TIMEOUT_MS);
+    });
+    const response = Promise.resolve().then(() => unsafeWindow.fetch(
+      "https://" + (isStagingEnv ? "staging-api" : "api") + ".gethealthie.com/graphql", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + session.token,
+          AuthorizationSource: session.source,
+          "content-type": "application/json",
+        },
+        signal: controller.signal,
+        body: JSON.stringify({query: "query tampermonkeySessionViewer { currentUser { id email full_name first_name last_name is_patient } }"}),
+      }
+    )).then((result) => {
+      if (!result.ok) throw new Error("clinician lookup HTTP " + result.status);
+      return result.json();
+    });
+    const body = await Promise.race([response, deadline]);
+    return body?.data?.currentUser;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function loadViewingClinician() {
+  const session = readHealthieBrowserSession();
+  if (session.token !== ddViewerSessionToken || session.source !== ddViewerSessionSource) {
+    if (ddViewerSessionToken !== null) ddClinicianContext += 1;
+    ddViewerSessionToken = session.token;
+    ddViewerSessionSource = session.source;
+    ddClinician = null;
+    ddClinicianStatus = session.token ? "pending" : "unavailable";
+    ddViewerLookup = null;
+    ddViewerRetryAfter = 0;
+    enrichPendingClinician();
+  }
+  if (!session.token || ddClinician || ddViewerLookup || Date.now() < ddViewerRetryAfter) {
+    return ddViewerLookup || Promise.resolve(null);
+  }
+  const context = ddClinicianContext;
+  ddClinicianStatus = "pending";
+  ddViewerRetryAfter = Date.now() + DD_VIEWER_RETRY_MS;
+  const request = requestViewingClinician(session)
+    .then((user) => {
+      if (context === ddClinicianContext) rememberClinician(user);
+    })
+    .catch((error) => {
+      if (context === ddClinicianContext) rememberClinician(null);
+      debugLog(errorSummary("clinician-lookup", error));
+    })
+    .finally(() => {
+      if (ddViewerLookup === request) ddViewerLookup = null;
+    });
+  ddViewerLookup = request;
+  return ddViewerLookup;
+}
+
+function rollDatadogWindow() {
+  const now = Date.now();
+  if (now - ddWindowStarted < 60000) {
+    return;
+  }
+  ddWindowStarted = now;
+  ddSentBySeverity = { error: 0, warn: 0, info: 0 };
+}
+
+function datadogSeverity(status) {
+  return DD_LIMITS_PER_MINUTE[status] ? status : "info";
+}
+
+function makeDatadogLog(status, kind, message, extra) {
+  loadViewingClinician();
+  const severity = datadogSeverity(status);
+  const env = isStagingEnv ? "staging" : "prod";
+  const now = Date.now();
+  const entry = {
+    tm_detail: sanitizeForDatadog(message),
+    timestamp: now,
+    last_seen_at: now,
+    status: severity,
+    service: "tampermonkey-healthie",
+    ddsource: "browser",
+    ddtags: "env:" + env + ",version:" + TM_VERSION + ",kind:" + kind + ",severity:" + severity,
+    tm_version: TM_VERSION,
+    tm_kind: kind,
+    tm_severity: severity,
+    tm_install_id: ddInstallId,
+    tm_clinician_context: ddClinicianContext,
+    healthie_path: pagePath(),
+    page_id: ddPageId,
+  };
+  return formatDatadogMessage({ ...entry, ...extra, ...clinicianLogFields() });
+}
+
+function reportDatadogStatus(onResult, status) {
+  try {
+    if (onResult) onResult(status);
+  } catch (e) {
+    // Even a failed probe timestamp write must stay inside telemetry.
+  }
+}
+
+function sendDatadogBatch(batch, onResult) {
+  try {
+    GM_xmlhttpRequest({
+      method: "POST",
+      url: DD_INTAKE_URL,
+      headers: { "Content-Type": "application/json" },
+      data: JSON.stringify(batch.map(formatDatadogMessage)),
+      timeout: 10000,
+      onload: (response) => reportDatadogStatus(onResult, response.status),
+      onerror: () => reportDatadogStatus(onResult, 0),
+      ontimeout: () => reportDatadogStatus(onResult, 0),
+      onabort: () => reportDatadogStatus(onResult, 0),
+    });
+  } catch (e) {
+    reportDatadogStatus(onResult, 0);
+  }
+}
+
+function datadogRepeatKey(severity, kind, message) {
+  return JSON.stringify([severity, kind, message, pagePath(), ddClinicianContext]);
+}
+
+function scheduleDatadogFlush() {
+  if (ddFlushTimer || (!ddQueue.length && !ddRepeatCounts.size)) {
+    return;
+  }
+  ddFlushTimer = window.setTimeout(flushDatadogLogs, 1000);
+}
+
+function releaseDatadogRepeats(force) {
+  const now = Date.now();
+  const ready = [];
+  for (const [key, pending] of ddRepeatCounts) {
+    const quiet = now - pending.lastAt >= DD_REPEAT_QUIET_MS;
+    const aged = now - pending.firstAt >= DD_REPEAT_MAX_MS;
+    if (!force && !quiet && !aged) {
+      continue;
+    }
+    pending.entry.repeat_count = pending.count;
+    ready.push(pending.entry);
+    ddRepeatCounts.delete(key);
+    ddSentKeys.add(key);
+  }
+  return ready;
+}
+
+function enqueueDatadogLog(status, kind, message, extra) {
+  try {
+    loadViewingClinician();
+    const severity = datadogSeverity(status);
+    const key = datadogRepeatKey(severity, kind, message);
+    const collapse = severity !== "info";
+    if (collapse && ddSentKeys.has(key)) {
+      return;
+    }
+    const now = Date.now();
+    const pending = collapse ? ddRepeatCounts.get(key) : null;
+    if (pending) {
+      pending.count += 1;
+      pending.lastAt = now;
+      pending.entry.repeat_count = pending.count;
+      pending.entry.last_seen_at = now;
+      return;
+    }
+    rollDatadogWindow();
+    if (ddSentBySeverity[severity] >= DD_LIMITS_PER_MINUTE[severity]) {
+      return;
+    }
+    ddSentBySeverity[severity] += 1;
+    const entry = makeDatadogLog(severity, kind, message, extra);
+    entry.repeat_count = 1;
+    if (collapse) {
+      ddRepeatCounts.set(key, { count: 1, firstAt: now, lastAt: now, entry });
+    } else {
+      ddQueue.push(entry);
+    }
+    scheduleDatadogFlush();
+  } catch (e) {
+    // A logging failure must not interrupt the Healthie page.
+  }
+}
+
+function flushDatadogLogs(force = false) {
+  ddFlushTimer = null;
+  if (!force && ddViewerLookup) {
+    scheduleDatadogFlush();
+    return;
+  }
+  const ready = releaseDatadogRepeats(false);
+  for (const entry of ready) {
+    ddQueue.push(entry);
+  }
+  if (!ddQueue.length || typeof GM_xmlhttpRequest !== "function") {
+    ddQueue = [];
+    scheduleDatadogFlush();
+    return;
+  }
+  const batch = ddQueue.splice(0, 10);
+  sendDatadogBatch(batch);
+  scheduleDatadogFlush();
+}
+
+function isGraphqlValidationMessage(value) {
+  return value && typeof value === "object" && "field" in value && typeof value.message === "string";
+}
+
+function graphqlErrorSummary(text) {
+  if (!text || text.length > 200000) {
+    return "";
+  }
+  try {
+    const body = JSON.parse(text);
+    const texts = [];
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
+    for (const error of errors) {
+      if (typeof error?.message === "string") texts.push(error.message);
+    }
+    // Healthie also rejects mutations through data.<mutation>.messages.
+    const validation = Object.values(body?.data || {}).reduce((items, payload) => {
+      if (!Array.isArray(payload?.messages)) return items;
+      return items.concat(payload.messages.filter(isGraphqlValidationMessage));
+    }, []);
+    for (const item of validation) texts.push(item.message);
+    const count = errors.length + validation.length;
+    if (!count) return "";
+    const detail = texts.length ? " " + texts.join(" | ") : "";
+    return "count=" + count + detail;
+  } catch (error) {
+    debugLog("tampermonkey skipped non-json graphql body", error);
+    return "";
+  }
+}
+
+function httpSeverity(status) {
+  return status >= 500 ? "error" : "warn";
+}
+
+function noteHttpResult(method, rawUrl, status) {
+  if (status < 400) {
+    return;
+  }
+  let external = false;
+  try {
+    external = !isKnownHealthieHost(new URL(String(rawUrl || ""), location.origin).hostname);
+  } catch (e) {
+    external = true;
+  }
+  // Third-party 401s are auth noise from embedded hosts, not Healthie failures.
+  if (status === 401 && external) {
+    return;
+  }
+  const url = safeUrl(rawUrl);
+  enqueueDatadogLog(httpSeverity(status), "http", method + " " + status + " " + url, {
+    http_status: status,
+  });
+}
+
+function noteGraphqlText(rawUrl, text) {
+  if (!/graphql/i.test(String(rawUrl || ""))) {
+    return;
+  }
+  const summary = graphqlErrorSummary(text);
+  if (summary) {
+    enqueueDatadogLog("warn", "graphql", summary + " " + safeUrl(rawUrl));
+  }
+}
+
+function requestMethod(input, init) {
+  return String(init?.method || input?.method || "GET").toUpperCase();
+}
+
+function requestUrl(input) {
+  if (typeof input === "string") {
+    return input;
+  }
+  if (input instanceof URL) {
+    return input.href;
+  }
+  return input?.url || "";
+}
+
+function noteFetchResponse(method, rawUrl, response) {
+  try {
+    noteHttpResult(method, rawUrl, response.status);
+    if (!response.ok || !response.clone || !/graphql/i.test(rawUrl)) {
+      return;
+    }
+    response
+      .clone()
+      .text()
+      .then(function (text) {
+        noteGraphqlText(rawUrl, text);
+      })
+      .catch(function () {
+        // Ignore a response body that cannot be cloned.
+      });
+  } catch (e) {
+    // Observing a response must not change the value returned to Healthie.
+  }
+}
+
+function noteFetchFailure(method, rawUrl, error) {
+  try {
+    if (error?.name === "AbortError") {
+      return;
+    }
+    const detail = method + " network_error " + safeUrl(rawUrl) + " " + datadogErrorDetail("network", error);
+    enqueueDatadogLog("error", "http", detail);
+  } catch (e) {
+    // A logging failure must not replace the original network error.
+  }
+}
+
+function hookPageFetch(targetWindow) {
+  const pageFetch = targetWindow.fetch;
+  if (!pageFetch || pageFetch.__vxWrapped) {
+    return;
+  }
+  function wrappedFetch(input, init) {
+    const result = pageFetch.apply(this, arguments);
+    let method, rawUrl;
+    try {
+      method = requestMethod(input, init);
+      rawUrl = requestUrl(input);
+    } catch (e) {
+      // Preserve the native promise even if optional metadata cannot be read.
+      debugLog(errorSummary("fetch-metadata", e));
+      return result;
+    }
+    return result.then(
+      function (response) {
+        noteFetchResponse(method, rawUrl, response);
+        return response;
+      },
+      function (error) {
+        noteFetchFailure(method, rawUrl, error);
+        throw error;
+      }
+    );
+  }
+  wrappedFetch.__vxWrapped = true;
+  targetWindow.fetch = wrappedFetch;
+}
+
+function onXhrLoadEnd() {
+  noteXhrResult(this);
+}
+function onXhrNetworkError() {
+  noteFetchFailure(this.__vxMethod || "GET", this.__vxUrl, { message: "xhr network failure" });
+}
+
+function hookPageXhr() {
+  const XHR = unsafeWindow.XMLHttpRequest;
+  if (!XHR || XHR.__vxWrapped) {
+    return;
+  }
+  const origOpen = XHR.prototype.open;
+  const origSend = XHR.prototype.send;
+  XHR.prototype.open = function (method, url) {
+    const result = origOpen.apply(this, arguments);
+    try {
+      this.__vxMethod = method;
+      this.__vxUrl = url;
+    } catch (e) {
+      // Request metadata is optional.
+    }
+    return result;
+  };
+  XHR.prototype.send = function () {
+    try {
+      // Reusing an XHR must not accumulate observers across sends.
+      this.addEventListener("loadend", onXhrLoadEnd);
+      this.addEventListener("error", onXhrNetworkError);
+      this.addEventListener("timeout", onXhrNetworkError);
+    } catch (e) {
+      // A failed observer must not prevent the native send.
+    }
+    return origSend.apply(this, arguments);
+  };
+  XHR.__vxWrapped = true;
+}
+
+function noteXhrResult(xhr) {
+  try {
+    const method = (xhr.__vxMethod || "GET").toUpperCase();
+    noteHttpResult(method, xhr.__vxUrl, xhr.status);
+    if (xhr.status === 200 && /graphql/i.test(String(xhr.__vxUrl || ""))) {
+      noteGraphqlText(xhr.__vxUrl, xhr.responseText);
+    }
+  } catch (e) {
+    // Observing XHR must not change the request Healthie sent.
+  }
+}
+
+function isErrorWithMessage(value) {
+  return Boolean(value && typeof value.message === "string" && (typeof value.stack === "string" || value.name));
+}
+
+function consoleErrorText(args) {
+  const parts = [];
+  const limit = Math.min(args.length, 3);
+  for (let i = 0; i < limit; i++) {
+    const value = args[i];
+    if (isErrorWithMessage(value)) {
+      parts.push(value.message);
+    } else if (typeof value === "string") {
+      parts.push(value);
+    }
+  }
+  return parts.join(" ");
+}
+
+function hookPageConsoleError(targetWindow) {
+  if (!targetWindow.console || targetWindow.console.__vxWrapped) {
+    return;
+  }
+  const originalError = targetWindow.console.error;
+  targetWindow.console.error = function () {
+    try {
+      const text = consoleErrorText(arguments);
+      if (text) {
+        enqueueDatadogLog("error", "console", datadogErrorDetail("console", { message: text }));
+      }
+    } catch (e) {
+      // Keep the original console.error working if logging fails.
+    }
+    return originalError.apply(this, arguments);
+  };
+  targetWindow.console.__vxWrapped = true;
+}
+
+function windowErrorDetail(event, fallbackMessage) {
+  const error = event?.error ? event.error : { message: fallbackMessage };
+  let detail = datadogErrorDetail("window", error);
+  if (event?.filename) {
+    detail += " @ " + safeUrl(event.filename) + ":" + (event.lineno || "");
+  }
+  return detail;
+}
+
+function watchWindowErrors(targetWindow) {
+  targetWindow.addEventListener("error", function (event) {
+    if (event.target && event.target !== targetWindow) {
+      return;
+    }
+    const message = event?.message ? event.message : "error";
+    if (message === "Script error.") {
+      return;
+    }
+    enqueueDatadogLog("error", "window", windowErrorDetail(event, message));
+  });
+  targetWindow.addEventListener("unhandledrejection", function (event) {
+    const reason = event?.reason;
+    enqueueDatadogLog("error", "unhandledrejection", datadogErrorDetail("unhandledrejection", reason));
+  });
+}
+
+function chartNoteAction(label) {
+  if (label.includes("sign and lock") || label.includes("sign & lock")) {
+    return "sign and lock";
+  }
+  if (label === "lock" || label === "lock note") return "lock";
+  if (label === "sign" || label === "sign note") return "sign";
+  return "";
+}
+
+function watchChartNoteActions() {
+  document.addEventListener(
+    "click",
+    function (event) {
+      const button = event.target?.closest?.("button, [role='button']");
+      if (!button) {
+        return;
+      }
+      const label = (button.innerText || "").replace(/\s+/g, " ").trim().toLowerCase();
+      const action = chartNoteAction(label);
+      if (!action) {
+        return;
+      }
+      enqueueDatadogLog("info", "chart-note", "clicked " + action);
+    },
+    true
+  );
+}
+
+// Call before a page reload so queued logs are not lost with the page.
+function flushDatadogLogsNow() {
+  if (ddFlushTimer) {
+    window.clearTimeout(ddFlushTimer);
+    ddFlushTimer = null;
+  }
+  const ready = releaseDatadogRepeats(true);
+  for (const entry of ready) {
+    ddQueue.push(entry);
+  }
+  while (ddQueue.length) {
+    flushDatadogLogs(true);
+    if (ddFlushTimer) {
+      window.clearTimeout(ddFlushTimer);
+      ddFlushTimer = null;
+    }
+  }
+}
+
+function routeName(routeURL) {
+  const path = String(routeURL || "")
+    .split("?")[0]
+    .split("#")[0];
+  return path.replace(/^\/+/, "") || "root";
+}
+
+function noteRetryExhausted(giveUpMessage, attempts) {
+  enqueueDatadogLog("warn", "retry-exhausted", String(giveUpMessage || "").replace("tampermonkey ", ""), {
+    retry_attempts: attempts,
+  });
+}
+
+// Cross-origin iframes rarely fire "error", so a missing "load" is the failure signal.
+// Normal loads are not logged so they can't use up the info cap that chart-note relies on.
+const DD_IFRAME_LOAD_TIMEOUT_MS = 20000;
+const DD_IFRAME_SLOW_MS = 5000;
+
+function watchIframeLoad(iframeNode, routeURL) {
+  if (!iframeNode?.addEventListener) {
+    return;
+  }
+  const route = routeName(routeURL);
+  const startedAt = Date.now();
+  let settled = false;
+  const settle = function (status, outcome) {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    const loadMs = Date.now() - startedAt;
+    if (outcome === "loaded" && loadMs < DD_IFRAME_SLOW_MS) {
+      return;
+    }
+    enqueueDatadogLog(status, "iframe", outcome + " " + route, { load_ms: loadMs });
+  };
+  iframeNode.addEventListener("load", function () {
+    settle("info", "loaded");
+  });
+  iframeNode.addEventListener("error", function () {
+    settle("warn", "failed");
+  });
+  window.setTimeout(function () {
+    if (iframeNode.isConnected) {
+      settle("warn", "timeout");
+    }
+  }, DD_IFRAME_LOAD_TIMEOUT_MS);
+}
+
+// Leaves out basicInformationHeight and the verification status updates, which Misha
+// sends often enough to use up the per-minute info cap.
+const MISHA_MESSAGE_TYPES = [
+  "tmInput",
+  "reschedule",
+  "reload",
+  "closeWindow",
+  "patientProfile",
+  "newChartNoteId",
+  "patientGroupName",
+  "healthieActionsTab",
+  "verifyEmail",
+  "verifyPhone",
+];
+
+function noteMishaMessage(data) {
+  if (typeof data !== "object") {
+    return;
+  }
+  const types = MISHA_MESSAGE_TYPES.filter((type) => data[type] !== undefined);
+  if (types.length) {
+    enqueueDatadogLog("info", "misha-message", "received " + types.join(","));
+  }
+}
+
+function maybeSendDailyProbe() {
+  const lastProbeAt = Number(GM_getValue(ddProbeAtKey, 0)) || 0;
+  if (Date.now() - lastProbeAt < DD_PROBE_INTERVAL_MS) {
+    return;
+  }
+  loadViewingClinician().then(() => {
+    const entry = makeDatadogLog("info", "probe", "daily probe version=" + TM_VERSION);
+    sendDatadogBatch([entry], function (status) {
+      if (status >= 200 && status < 300) GM_setValue(ddProbeAtKey, Date.now());
+    });
+  }).catch((error) => debugLog(errorSummary("daily-probe", error)));
+}
+
+function setupHealthieDatadogLogs() {
+  if (ddHooksInstalled) {
+    return;
+  }
+  ddHooksInstalled = true;
+  const hooks = [
+    () => hookPageFetch(unsafeWindow),
+    () => hookPageFetch(window),
+    hookPageXhr,
+    () => hookPageConsoleError(unsafeWindow),
+    () => hookPageConsoleError(window),
+    () => watchWindowErrors(unsafeWindow),
+    () => {
+      if (unsafeWindow !== window) watchWindowErrors(window);
+    },
+    watchChartNoteActions,
+    () => window.addEventListener("storage", loadViewingClinician),
+    () => window.addEventListener("focus", loadViewingClinician),
+    () => window.addEventListener("pagehide", flushDatadogLogsNow),
+    installDatadogSelfTest,
+    maybeSendDailyProbe,
+    loadViewingClinician,
+  ];
+  for (const hook of hooks) {
+    try {
+      hook();
+    } catch (e) {
+      // One unavailable API must not disable the remaining observers or the userscript.
+    }
+  }
+  const apiKeyState = typeof healthieAPIKey === "string" && healthieAPIKey ? "present" : "missing";
+  enqueueDatadogLog("info", "lifecycle", "started version=" + TM_VERSION + " api_key=" + apiKeyState);
+}
+
+function installDatadogSelfTest() {
+  unsafeWindow.__voriDatadogTest = async function () {
+    await loadViewingClinician();
+    const testId = Date.now().toString(36) + randomId(8);
+    const entry = makeDatadogLog("info", "diagnostic", "VX-3525 manual test " + testId);
+    entry.test_id = testId;
+    return new Promise(function (resolve) {
+      sendDatadogBatch([entry], function (status) {
+        const result = {
+          accepted: status >= 200 && status < 300,
+          status: status,
+          test_id: testId,
+          service: "tampermonkey-healthie",
+          tm_install_id: ddInstallId,
+          page_id: ddPageId,
+        };
+        unsafeWindow.__voriDatadogLastStatus = result;
+        resolve(result);
+      });
+    });
+  };
+}
+
 const routeURLs = {
   schedule: "schedule",
   careplan: "careplan",
@@ -125,6 +999,7 @@ function scheduleRetryOrStop(retryFn, attempt, maxAttempts, delay, giveUpMessage
     return;
   }
   debugLog(giveUpMessage);
+  noteRetryExhausted(giveUpMessage, attempt);
 }
 
 function waitForJQueryOrRetry(retryFn, attempt, giveUpMessage, waitingMessage) {
@@ -247,6 +1122,7 @@ function generateIframe(routeURL, options = {}) {
       src: `https://${mishaURL}${routeURL}`,
     });
     iframeElement.append(iframeContent);
+    watchIframeLoad(iframeContent[0], routeURL);
     debugLog(`tampermonkey generated iframe for ${routeURL}`);
     return iframeElement;
   }
@@ -779,8 +1655,10 @@ function setupMishaPostMessageListener() {
     const patientId = data.patientId;
     if (!patientId || typeof patientId !== "string" || !/^\d+$/.test(patientId)) {
       debugLog("tampermonkey OPEN_SCHEDULE: invalid or missing patientId", patientId);
+      enqueueDatadogLog("warn", "misha-message", "rejected OPEN_SCHEDULE invalid patientId");
       return;
     }
+    enqueueDatadogLog("info", "misha-message", "received OPEN_SCHEDULE");
     showOverlay(`${routeURLs.schedule}/${patientId}`, styles.scheduleOverlay);
   });
 }
@@ -1576,6 +2454,10 @@ function handleMishaWindowMessage(event) {
     return;
   }
   debugLog("tampermonkey received misha event", event, "event.data", data);
+  noteMishaMessage(data);
+  if (data.tmInput !== undefined && patientNumber === "") {
+    enqueueDatadogLog("warn", "misha-message", "rejected tmInput without patient");
+  }
   if (data.tmInput !== undefined && patientNumber !== "") {
     handleCarePlanTmInput(data.tmInput);
   }
@@ -1708,6 +2590,7 @@ function waitSettingsAPIpage() {
     newButton.onclick = function () {
       let apiKey = newInput.value.trim(); // Trim whitespace from the input value
       if (apiKey === "") {
+        enqueueDatadogLog("warn", "api-key", "rejected empty key");
         alert("Please enter a valid API key!");
       } else {
         const patientNumber = location.href.split("/")[location.href.split("/").length - 2];
@@ -1727,9 +2610,12 @@ function waitSettingsAPIpage() {
           debugLog(`tampermonkey api key goals response: ${JSON.stringify(response)}`);
 
           if (response.errors) {
+            enqueueDatadogLog("warn", "api-key", "validation failed errors=" + response.errors.length);
             alert("That is not a valid API key. Please verify the key and try again.");
           } else {
             GM_setValue(isStagingEnv ? "healthieStagingApiKey" : "healthieApiKey", apiKey);
+            enqueueDatadogLog("info", "api-key", "saved");
+            flushDatadogLogsNow();
             alert("API key saved successfully!");
             createTimeout(null, 2000);
             window.location.reload();
@@ -1996,6 +2882,7 @@ function addMembershipAndOnboarding(retryCount = 0, maxRetries = 25) {
     }, 500);
   } else {
     debugLog(`tampermonkey addMembershipAndOnboarding failed after ${maxRetries} retries`);
+    noteRetryExhausted("tampermonkey stopped waiting for patient status phone column", retryCount);
   }
 }
 
@@ -2062,6 +2949,7 @@ function verifyEmailPhoneButtons(isEmail) {
         style: buttonStyleString,
         type: "button",
         click: function () {
+          enqueueDatadogLog("info", "verify", "opened " + (isEmail ? "email" : "phone") + " from healthie");
           showOverlay(verifyOverlayURL, styles.otpOverlay);
         },
       });
@@ -2080,6 +2968,7 @@ function observeDOMChanges(mutations, observer) {
     //reset loop flag
     carePlanLoopLock = 0;
     debugLog(`tampermonkey URL changed to ${location.href}`);
+    enqueueDatadogLog("info", "navigation", "path=" + pagePath());
 
     // Clear all timeouts
     for (let i = 0; i < timeoutIds.length; i++) {
@@ -2385,6 +3274,7 @@ function replaceBasicInformationSection(retryCount = 0) {
       createTimeout(() => replaceBasicInformationSection(retryCount + 1), 300 * (retryCount + 1));
     } else if (retryCount >= maxRetries) {
       debugLog(`tampermonkey max retries (${maxRetries}) exceeded for basic info handling`);
+      noteRetryExhausted("tampermonkey stopped replacing basic information section", retryCount);
     } else {
       debugLog(`tampermonkey patient changed during retry, aborting basic info handling`);
     }
@@ -2396,6 +3286,7 @@ const config = { subtree: true, childList: true };
 const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
 setupMishaPostMessageListener();
+setupHealthieDatadogLogs();
 
 function updatePatientStatusIframeHeight(patientId, contentHeight) {
   const $ = initJQuery();

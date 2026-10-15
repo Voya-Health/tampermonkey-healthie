@@ -7,6 +7,7 @@ const reactRoot = path.dirname(require.resolve("react/package.json"));
 const reactDomRoot = path.dirname(require.resolve("react-dom/package.json"));
 const assets = new Map([
   ["/harness.js", path.join(__dirname, "harness.js")],
+  ["/extension-api.js", path.join(__dirname, "extension-api.js")],
   ["/vendor/jquery.js", require.resolve("jquery/dist/jquery.js")],
   ["/vendor/react.js", path.join(reactRoot, "umd/react.development.js")],
   ["/vendor/react-dom.js", path.join(reactDomRoot, "umd/react-dom.development.js")],
@@ -35,7 +36,15 @@ function userscriptUnderTest() {
   }
   declarations.unshift(extract(source, /^const isStagingEnv = .+;$/m, "isStagingEnv"),
     extract(source, /^let mishaURL = .+;$/m, "mishaURL"));
-  return `let debug = false; let timeoutIds = [];\n${declarations.join("\n")}`;
+  // Load the actual telemetry declarations when present, including iframe observers.
+  // Older source overrides omit telemetry so they can still reproduce DOM regressions.
+  const telemetryStart = source.indexOf('const TM_VERSION =');
+  const telemetryEnd = source.indexOf('const routeURLs =');
+  const telemetry = telemetryStart >= 0
+    ? source.slice(telemetryStart, telemetryEnd)
+    : "";
+  const setup = telemetry ? "\nsetupHealthieDatadogLogs();" : "";
+  return `let debug = false; let timeoutIds = [];\n${telemetry}\n${declarations.join("\n")}${setup}`;
 }
 
 const server = http.createServer((request, response) => {
