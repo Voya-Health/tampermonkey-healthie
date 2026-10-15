@@ -114,6 +114,8 @@ let ddHooksInstalled = false;
 let ddRepeatCounts = new Map();
 let ddSentKeys = new Set();
 let ddClinician = null;
+let ddClinicianStatus = "pending";
+let ddClinicianContext = 0;
 
 function sanitizeForDatadog(value) {
   return String(value ?? "")
@@ -192,34 +194,61 @@ function datadogErrorDetail(kind, error) {
 }
 
 function clinicianLogFields() {
-  if (!ddClinician) {
-    return {};
-  }
-  const fields = {};
-  if (ddClinician.id) fields.clinician_id = ddClinician.id;
-  if (ddClinician.email) fields.clinician_email = ddClinician.email;
-  if (ddClinician.name) fields.clinician_name = ddClinician.name;
+  const fields = {
+    clinician_identity_source: "healthie_api_key",
+    clinician_identity_status: ddClinicianStatus,
+  };
+  if (ddClinician?.id) fields.clinician_id = ddClinician.id;
+  if (ddClinician?.email) fields.clinician_email = ddClinician.email;
+  if (ddClinician?.name) fields.clinician_name = ddClinician.name;
   return fields;
 }
 
+function formatDatadogMessage(entry) {
+  let clinician = "Clinician " + entry.clinician_identity_status;
+  if (entry.clinician_id) {
+    clinician = entry.clinician_name || entry.clinician_email || "Clinician";
+    if (entry.clinician_name && entry.clinician_email) clinician += " <" + entry.clinician_email + ">";
+    clinician += " (Healthie ID: " + entry.clinician_id + ")";
+  }
+  const repeats = entry.repeat_count > 1 ? " | repeats=" + entry.repeat_count : "";
+  entry.message = "[" + entry.status.toUpperCase() + "] [TM v" + entry.tm_version + "] " + clinician +
+    " | [" + entry.tm_kind + "] " + entry.tm_detail + " | path=" + sanitizeForDatadog(entry.healthie_path) + repeats;
+  return entry;
+}
+
+function enrichPendingClinician() {
+  const fields = clinicianLogFields();
+  const entries = ddQueue.concat(Array.from(ddRepeatCounts.values(), (pending) => pending.entry));
+  for (const entry of entries) {
+    if (entry.clinician_identity_status !== "identified") {
+      Object.assign(entry, fields);
+      formatDatadogMessage(entry);
+    }
+  }
+}
+
 function rememberClinician(user) {
-  if (!user || typeof user !== "object") {
+  const rawId = user?.id;
+  const hasId = typeof rawId === "string" || (typeof rawId === "number" && Number.isFinite(rawId));
+  const id = hasId ? sanitizeForDatadog(rawId).slice(0, 80) : "";
+  if (!id) {
+    if (!ddClinician) {
+      ddClinicianStatus = "unavailable";
+      enrichPendingClinician();
+    }
     return;
   }
   const combined = [user.first_name, user.last_name].filter((part) => typeof part === "string" && part.trim()).join(" ");
   const fullName = typeof user.full_name === "string" ? user.full_name.trim() : "";
+  if (ddClinician && ddClinician.id !== id) ddClinicianContext += 1;
   ddClinician = {
-    id: user.id == null ? "" : String(user.id),
-    email: typeof user.email === "string" ? user.email : "",
-    name: fullName || combined,
+    id,
+    email: typeof user.email === "string" ? sanitizeForDatadog(user.email).slice(0, 160) : "",
+    name: sanitizeForDatadog(fullName || combined).slice(0, 120),
   };
-  const fields = clinicianLogFields();
-  for (let i = 0; i < ddQueue.length; i++) {
-    Object.assign(ddQueue[i], fields);
-  }
-  for (const pending of ddRepeatCounts.values()) {
-    Object.assign(pending.entry, fields);
-  }
+  ddClinicianStatus = "identified";
+  enrichPendingClinician();
 }
 
 function loadViewingClinician() {
@@ -229,13 +258,15 @@ function loadViewingClinician() {
     });
     Promise.resolve(healthieGQL(payload))
       .then(function (response) {
-        rememberClinician(response && response.data ? response.data.user : null);
+        rememberClinician(response?.data?.user);
       })
       .catch(function () {
         // A missing API key or a failed viewer lookup must not drop the log.
+        rememberClinician(null);
       });
   } catch (e) {
     // A throw before the request exists must not stop the userscript.
+    rememberClinician(null);
   }
 }
 
@@ -255,8 +286,11 @@ function datadogSeverity(status) {
 function makeDatadogLog(status, kind, message, extra) {
   const severity = datadogSeverity(status);
   const env = isStagingEnv ? "staging" : "prod";
+  const now = Date.now();
   const entry = {
-    message: sanitizeForDatadog("[" + kind + "] " + message),
+    tm_detail: sanitizeForDatadog(message),
+    timestamp: now,
+    last_seen_at: now,
     status: severity,
     service: "tampermonkey-healthie",
     ddsource: "browser",
@@ -268,7 +302,7 @@ function makeDatadogLog(status, kind, message, extra) {
     healthie_path: pagePath(),
     page_id: ddPageId,
   };
-  return { ...(extra ? { ...entry, ...extra } : entry), ...clinicianLogFields() };
+  return formatDatadogMessage({ ...entry, ...extra, ...clinicianLogFields() });
 }
 
 function reportDatadogStatus(onResult, status) {
@@ -285,7 +319,7 @@ function sendDatadogBatch(batch, onResult) {
       method: "POST",
       url: DD_INTAKE_URL,
       headers: { "Content-Type": "application/json" },
-      data: JSON.stringify(batch),
+      data: JSON.stringify(batch.map(formatDatadogMessage)),
       timeout: 10000,
       onload: (response) => reportDatadogStatus(onResult, response.status),
       onerror: () => reportDatadogStatus(onResult, 0),
@@ -298,7 +332,7 @@ function sendDatadogBatch(batch, onResult) {
 }
 
 function datadogRepeatKey(severity, kind, message) {
-  return severity + "|" + kind + "|" + message;
+  return JSON.stringify([severity, kind, message, pagePath(), ddClinicianContext]);
 }
 
 function scheduleDatadogFlush() {
@@ -329,15 +363,17 @@ function enqueueDatadogLog(status, kind, message, extra) {
   try {
     const severity = datadogSeverity(status);
     const key = datadogRepeatKey(severity, kind, message);
-    if (ddSentKeys.has(key)) {
+    const collapse = severity !== "info";
+    if (collapse && ddSentKeys.has(key)) {
       return;
     }
     const now = Date.now();
-    const pending = ddRepeatCounts.get(key);
+    const pending = collapse ? ddRepeatCounts.get(key) : null;
     if (pending) {
       pending.count += 1;
       pending.lastAt = now;
       pending.entry.repeat_count = pending.count;
+      pending.entry.last_seen_at = now;
       return;
     }
     rollDatadogWindow();
@@ -347,7 +383,11 @@ function enqueueDatadogLog(status, kind, message, extra) {
     ddSentBySeverity[severity] += 1;
     const entry = makeDatadogLog(severity, kind, message, extra);
     entry.repeat_count = 1;
-    ddRepeatCounts.set(key, { count: 1, firstAt: now, lastAt: now, entry });
+    if (collapse) {
+      ddRepeatCounts.set(key, { count: 1, firstAt: now, lastAt: now, entry });
+    } else {
+      ddQueue.push(entry);
+    }
     scheduleDatadogFlush();
   } catch (e) {
     // A logging failure must not interrupt the Healthie page.
@@ -357,8 +397,8 @@ function enqueueDatadogLog(status, kind, message, extra) {
 function flushDatadogLogs() {
   ddFlushTimer = null;
   const ready = releaseDatadogRepeats(false);
-  for (let i = 0; i < ready.length; i++) {
-    ddQueue.push(ready[i]);
+  for (const entry of ready) {
+    ddQueue.push(entry);
   }
   if (!ddQueue.length || typeof GM_xmlhttpRequest !== "function") {
     ddQueue = [];
@@ -382,17 +422,19 @@ function graphqlErrorSummary(text) {
     const body = JSON.parse(text);
     const texts = [];
     const errors = Array.isArray(body?.errors) ? body.errors : [];
-    for (let i = 0; i < errors.length; i++) {
-      if (typeof errors[i]?.message === "string") texts.push(errors[i].message);
+    for (const error of errors) {
+      if (typeof error?.message === "string") texts.push(error.message);
     }
     // Healthie also rejects mutations through data.<mutation>.messages.
     const validation = Object.values(body?.data || {}).reduce((items, payload) => {
       if (!Array.isArray(payload?.messages)) return items;
       return items.concat(payload.messages.filter(isGraphqlValidationMessage));
     }, []);
-    for (let i = 0; i < validation.length; i++) texts.push(validation[i].message);
+    for (const item of validation) texts.push(item.message);
     const count = errors.length + validation.length;
-    return count ? "count=" + count + (texts.length ? " " + texts.join(" | ") : "") : "";
+    if (!count) return "";
+    const detail = texts.length ? " " + texts.join(" | ") : "";
+    return "count=" + count + detail;
   } catch (error) {
     debugLog("tampermonkey skipped non-json graphql body", error);
     return "";
@@ -658,8 +700,8 @@ function flushDatadogLogsNow() {
     ddFlushTimer = null;
   }
   const ready = releaseDatadogRepeats(true);
-  for (let i = 0; i < ready.length; i++) {
-    ddQueue.push(ready[i]);
+  for (const entry of ready) {
+    ddQueue.push(entry);
   }
   while (ddQueue.length) {
     flushDatadogLogs();

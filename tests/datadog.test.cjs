@@ -373,6 +373,114 @@ test("viewing clinician id, email, and name are attached with the script version
   assert.equal(log.healthie_path, "/users/123/private_notes/edit/456");
 });
 
+test("content shows clinician, version, severity, action, original path, and repeat count", () => {
+  const h = harness();
+  h.run(`enqueueDatadogLog('error', 'window', 'TypeError: Cannot read id'); enqueueDatadogLog('error', 'window', 'TypeError: Cannot read id')`);
+  h.context.location.pathname = "/users/999/Overview";
+  h.run(`rememberClinician({id:42,email:'ada@vorihealth.com',full_name:'Ada Lovelace'})`);
+  const log = h.logs().find((entry) => entry.tm_kind === "window");
+  assert.equal(log.message, "[ERROR] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] TypeError: Cannot read id | path=/users/123/private_notes/edit/456 | repeats=2");
+  assert.equal(log.clinician_identity_source, "healthie_api_key");
+  assert.equal(log.tm_detail, "TypeError: Cannot read id");
+  assert.ok(log.last_seen_at >= log.timestamp);
+});
+
+test("each sign and lock click is retained, including after navigation", () => {
+  const h = harness();
+  h.run(`rememberClinician({id:42,first_name:'Ada',last_name:'Lovelace'})`);
+  const click = () => h.listeners["document:click"][0]({ target: { closest: () => ({ innerText: "Sign and lock" }) } });
+  click();
+  click();
+  h.logs();
+  click();
+  h.context.location.pathname = "/users/999/private_notes/edit/789";
+  click();
+  const logs = h.logs().filter((entry) => entry.tm_kind === "chart-note");
+  assert.equal(logs.length, 4);
+  assert.equal(logs[0].message, "[INFO] [TM v2.6] Ada Lovelace (Healthie ID: 42) | [chart-note] clicked sign and lock | path=/users/123/private_notes/edit/456");
+  assert.equal(logs[3].healthie_path, "/users/999/private_notes/edit/789");
+  for (const log of logs) assert.equal(log.repeat_count, 1);
+});
+
+test("failure collapse separates page paths and clinicians and keeps the event identity", () => {
+  const h = harness();
+  h.run(`rememberClinician({id:42,full_name:'Ada'}); enqueueDatadogLog('error','window','same failure')`);
+  h.context.location.pathname = "/users/999/Overview";
+  h.run(`enqueueDatadogLog('error','window','same failure'); rememberClinician({id:43,full_name:'Grace'}); enqueueDatadogLog('error','window','same failure')`);
+  const logs = h.logs().filter((entry) => entry.tm_kind === "window");
+  assert.equal(logs.length, 3);
+  assert.equal(logs[0].clinician_name, "Ada");
+  assert.equal(logs[1].clinician_name, "Ada");
+  assert.equal(logs[2].clinician_name, "Grace");
+  assert.match(logs[0].message, /Ada .*path=\/users\/123\//);
+});
+
+test("lookup failure is visible and never invents a clinician from a patient route", async () => {
+  const h = harness();
+  const pending = h.run(`makeDatadogLog('info','test','before lookup')`);
+  assert.match(pending.message, /Clinician pending/);
+  h.run(`healthieGQL = () => Promise.reject(new Error('lookup failed')); loadViewingClinician()`);
+  await new Promise((resolve) => setImmediate(resolve));
+  const log = h.logs().find((entry) => entry.tm_kind === "lifecycle");
+  assert.match(log.message, /Clinician unavailable/);
+  assert.equal(log.clinician_identity_status, "unavailable");
+  assert.equal(log.clinician_id, undefined);
+  h.run(`rememberClinician({id:7,email:'only@example.com'})`);
+  assert.match(h.run(`makeDatadogLog('warn','test','email only').message`), /only@example.com.*Healthie ID: 7/);
+});
+
+test("repeat windows use the original timestamp and show the final count in content", () => {
+  let now = 100000;
+  class TestDate extends Date { static now() { return now; } }
+  const h = harness({ globals: { Date: TestDate } });
+  h.run(`enqueueDatadogLog('error','window','continuous')`);
+  for (let second = 1; second <= 30; second++) {
+    now = 100000 + second * 1000;
+    h.run(`enqueueDatadogLog('error','window','continuous'); flushDatadogLogs()`);
+  }
+  const log = h.sent.flatMap((r) => JSON.parse(r.data)).find((entry) => entry.tm_kind === "window");
+  assert.ok(log, "continuous repeats must send at 30 seconds");
+  assert.equal(log.repeat_count, 31);
+  assert.equal(log.timestamp, 100000);
+  assert.equal(log.last_seen_at, 130000);
+  assert.match(log.message, /repeats=31$/);
+  h.run(`enqueueDatadogLog('error','window','continuous')`);
+  assert.equal(h.logs().filter((entry) => entry.tm_kind === "window").length, 1);
+
+  h.run(`enqueueDatadogLog('error','console','quiet')`);
+  now += 1999;
+  h.run(`flushDatadogLogs()`);
+  assert.equal(h.sent.flatMap((r) => JSON.parse(r.data)).filter((entry) => entry.tm_kind === "console").length, 0);
+  now += 1;
+  h.run(`flushDatadogLogs()`);
+  assert.equal(h.sent.flatMap((r) => JSON.parse(r.data)).filter((entry) => entry.tm_kind === "console").length, 1);
+});
+
+test("malformed and unresolved clinician lookups keep logs usable without false attribution", () => {
+  const h = harness();
+  for (const user of [null, {}, [], {id: " "}, {id: {}}, {id: NaN}]) {
+    h.context.lookupUser = user;
+    h.run(`rememberClinician(lookupUser)`);
+    const log = h.run(`makeDatadogLog('error','test','lookup unavailable')`);
+    assert.match(log.message, /Clinician unavailable/);
+    assert.equal(log.clinician_id, undefined);
+  }
+  const pending = harness();
+  pending.run(`healthieGQL = () => new Promise(() => {}); loadViewingClinician(); enqueueDatadogLog('error','window','lookup still pending')`);
+  const log = pending.logs().find((entry) => entry.tm_kind === "window");
+  assert.match(log.message, /Clinician pending/);
+  assert.match(log.message, /lookup still pending/);
+});
+
+test("oversized detail cannot truncate identity or the path out of content", () => {
+  const h = harness();
+  h.run(`rememberClinician({id:42,email:'ada@vorihealth.com',full_name:'Ada Lovelace'}); enqueueDatadogLog('error','console','x'.repeat(10000))`);
+  const log = h.logs().find((entry) => entry.tm_kind === "console");
+  assert.match(log.message, /^\[ERROR\] \[TM v2.6\] Ada Lovelace/);
+  assert.match(log.message, /path=\/users\/123\/private_notes\/edit\/456$/);
+  assert.equal(log.tm_detail.length, 500);
+});
+
 test("userscript update version and emitted telemetry version stay aligned", () => {
   const version = source.match(/^\/\/ @version\s+(\S+)/m)?.[1];
   assert.ok(version, "userscript update header must be present");
