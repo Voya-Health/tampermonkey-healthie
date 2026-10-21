@@ -1135,7 +1135,7 @@ function generateIframe(routeURL, options = {}) {
 function clearHomeAppointments() {
   if (!homeAppointmentsState) return;
   homeAppointmentsState.replacement?.remove();
-  homeAppointmentsState.area.removeAttribute("data-misha-home-active");
+  delete homeAppointmentsState.area.dataset.mishaHomeActive;
   homeAppointmentsState = null;
 }
 
@@ -1171,13 +1171,13 @@ function renderHomeAppointments(state) {
     return;
   }
   const replacement = generateIframe(`${routeURLs.providerSchedule}/${userId}`)[0];
-  replacement.setAttribute("data-testid", "misha-home-appointments");
+  replacement.dataset.testid = "misha-home-appointments";
   const style = document.createElement("style");
   // Keep the header and all React-owned nodes. CSS also covers children added by later renders.
   style.textContent = '.provider-home-appointments[data-misha-home-active] > :not(:first-child) { display: none !important; }';
   replacement.appendChild(style);
   state.area.after(replacement);
-  state.area.setAttribute("data-misha-home-active", "");
+  state.area.dataset.mishaHomeActive = "";
   state.replacement = replacement;
   state.pending = false;
 }

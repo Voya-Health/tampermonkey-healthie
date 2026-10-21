@@ -87,7 +87,8 @@ function Home() {
 
 function renderOverview() {
   revision += 1;
-  const component = home ? Home : clients ? Clients : Overview;
+  let component = clients ? Clients : Overview;
+  if (home) component = Home;
   ReactDOM.flushSync(() => root.render(mounted ? h(component, { key: patientId }) : null));
 }
 
@@ -99,7 +100,9 @@ function bindAction(id, action) {
 }
 
 if (clients) document.getElementById("inject").textContent = "Inject Add client";
-bindAction("inject", home ? waitAppointmentsHome : clients ? waitForAddPatientButton : handleAppointmentsProfileRoute);
+let injectAction = clients ? waitForAddPatientButton : handleAppointmentsProfileRoute;
+if (home) injectAction = waitAppointmentsHome;
+bindAction("inject", injectAction);
 bindAction("refresh", () => { loaded = false; renderOverview(); });
 bindAction("restore", () => { loaded = true; renderOverview(); });
 bindAction("load", () => { mounted = true; loaded = true; renderOverview(); });
