@@ -8,8 +8,8 @@ npm ci --ignore-scripts
 npm test
 ```
 
-`npm test` runs 52 Node tests for Datadog diagnostics and GraphQL request handling,
-then 10 native Chromium telemetry tests and 19 Playwright tests for patient Overview
+`npm test` runs 49 Node tests for Datadog diagnostics and GraphQL request handling,
+then 10 native Chromium telemetry tests and 35 Playwright tests for Home, patient Overview
 appointments and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's
 `Userscript tests` job and SonarCloud result before completing a PR.
@@ -17,7 +17,7 @@ screenshots as the `playwright-results` artifact. Check the latest commit's
 ## Browser coverage
 
 The fixture uses React 18 and jQuery from locked local dependencies. The server
-reads `careplan.js` for each request and extracts the actual appointments route, Add client handlers,
+reads `careplan.js` for each request and extracts the actual Home and patient appointments functions, Add client handlers,
 polling, iframe, and overlay functions with their URL and style declarations.
 The fixture also loads the actual Datadog declarations and installs their page
 observers. It simulates extension storage and Datadog transport without contacting
@@ -55,6 +55,42 @@ The console observer test expects only the error it injects. Request error unit 
 isolate their callers and stub telemetry collaborators, which the Datadog suite
 checks separately. All fixtures use synthetic data; these checks do not prove that
 Datadog indexes logs or that Healthie fixes intermittent note locking.
+
+## Home appointments
+
+Home shares the browser-session clinician lookup with telemetry. It no longer uses
+`user(or_current_user: true)` with the saved API key. A rejected or incomplete lookup
+keeps Healthie's native schedule visible and usable. The shared lookup has a ten-second
+deadline; Home makes at most three attempts per mounted section/session, with thirty
+seconds between failed attempts. A successful response creates one Misha schedule
+for the signed-in provider. The script hides the native content with CSS and retains
+its header and React-owned nodes. Session changes remove the old replacement.
+
+Sixteen Home browser regressions cover production and staging URLs, GraphQL errors,
+partial and missing responses, missing sessions, patient accounts, malformed and
+oversized IDs, pending and repeated injection, bounded retries and recovery, account
+switching and logout, late replies after navigation/unmount, and React refresh/restore.
+They execute the actual source functions and fail on browser errors, console errors,
+and failed or unexpected requests. The three earlier Home unit tests now have browser
+coverage, including a native control that remains clickable after rejection. Existing
+session lookup tests cover HTTP failures, malformed JSON and the ten-second deadline.
+
+The Home rejection and React refresh tests fail against `b268df6`: rejection removes
+the native schedule, and refresh throws `removeChild` errors. Reproduce with:
+
+```sh
+mkdir -p .test-fixtures
+git show b268df6:careplan.js > .test-fixtures/before-home-fix.js
+HEALTHIE_TEST_SOURCE="$PWD/.test-fixtures/before-home-fix.js" \
+  ./node_modules/.bin/playwright test home-appointments --grep 'GraphQL rejection|React refresh'
+```
+
+The October 21 local run used Node 24 and Chromium. `HEALTHIE_TEST_PORT=4186 npm test`
+passed all 94 tests; port 4175 was occupied by a separate Misha preview. Set
+`HEALTHIE_TEST_PORT` when the default harness port is occupied. Failed-run logs and
+browser traces are retained locally in `.test-fixtures/home-before.log` and
+`.test-fixtures/home-before-results/`. These fixtures use synthetic Healthie and
+Misha responses; they do not establish live Home integration or installed-script behavior.
 
 ## Datadog Content
 

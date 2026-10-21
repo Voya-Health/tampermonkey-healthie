@@ -26,6 +26,7 @@ let searchInterceptorUrl = "";
 //Keep track of timeouts
 let timeoutIds = [];
 let intervalIds = [];
+let homeAppointmentsState = null;
 const maxWaitAttempts = 25;
 // Shorter bound than maxWaitAttempts: this poll runs at 1s and its target only
 // renders once the header search is used, so a long wait would just idle.
@@ -302,7 +303,10 @@ async function requestViewingClinician(session) {
       return result.json();
     });
     const body = await Promise.race([response, deadline]);
-    return body?.data?.currentUser;
+    if (body?.errors?.length) throw new Error("clinician lookup returned GraphQL errors");
+    const user = body?.data?.currentUser;
+    if (user && !/^\d{1,80}$/.test(String(user.id ?? ""))) throw new Error("clinician lookup returned an invalid provider ID");
+    return user;
   } finally {
     window.clearTimeout(timer);
   }
@@ -1128,57 +1132,83 @@ function generateIframe(routeURL, options = {}) {
   }
 }
 
-function waitAppointmentsHome() {
-  const $ = initJQuery();
-  if (!$) {
-    debugLog(`tampermonkey jquery not loaded`);
-    createTimeout(waitAppointmentsHome, 200);
-    return;
-  } else {
-    //check to see if the appointment view contents has loaded
-    let appointmentWindow = document.getElementsByClassName("provider-home-appointments");
-    if (appointmentWindow.length > 0) {
-      debugLog(`tampermonkey found appointment view`, appointmentWindow.length);
-      let appointmentWindowObj = appointmentWindow[0];
-      //remove all except first child
-      while (appointmentWindowObj.childNodes.length > 1) {
-        let childClassName = appointmentWindowObj.lastChild.className;
-        debugLog(`tampermonkey removing child `, childClassName);
-        appointmentWindowObj.removeChild(appointmentWindowObj.lastChild);
-      }
+function clearHomeAppointments() {
+  if (!homeAppointmentsState) return;
+  homeAppointmentsState.replacement?.remove();
+  homeAppointmentsState.area.removeAttribute("data-misha-home-active");
+  homeAppointmentsState = null;
+}
 
-      // get the patient number from the URL
-      patientNumber = location.href.split("/")[location.href.split("/").length - 1];
+function setupHomeAppointments() {
+  window.addEventListener("focus", () => waitAppointmentsHome());
+  window.addEventListener("storage", () => waitAppointmentsHome());
+}
 
-      // get the user data for provider id
-      const getCurrentUserQuery = `query user{
-        user(or_current_user: true){
-         id
-       }
-       }`;
-
-      const getCurrentUserPayload = JSON.stringify({
-        query: getCurrentUserQuery,
-      });
-      healthieGQL(getCurrentUserPayload).then((response) => {
-        const userId = response.data.user.id;
-        //provider-schedule/id
-        const iframeSrc = `https://${mishaURL}${routeURLs.providerSchedule}/${userId}`;
-
-        // Check if the iframe already exists
-        let existingIframe = document.querySelector(`iframe[src="${iframeSrc}"]`);
-        // If the iframe doesn't exist, create a new one
-        if (!existingIframe) {
-          const iframe = generateIframe(`${routeURLs.providerSchedule}/${userId}`);
-          $(appointmentWindowObj).append(iframe);
-        }
-      }).catch(reportHealthieRequestError);
-    } else {
-      //wait for content load
-      debugLog(`tampermonkey waiting appointment view`);
-      createTimeout(waitAppointmentsHome, 200);
-    }
+function retryHomeAppointments(state) {
+  if (homeAppointmentsState !== state) return;
+  state.pending = false;
+  // Share the session lookup's cooldown and bound automatic retries per mounted section/session.
+  state.retryAfter = Date.now() + DD_VIEWER_RETRY_MS;
+  if (state.attempts < 3) {
+    createTimeout(() => {
+      if (homeAppointmentsState === state) waitAppointmentsHome();
+    }, DD_VIEWER_RETRY_MS);
   }
+}
+
+function renderHomeAppointments(state) {
+  if (homeAppointmentsState !== state || !state.area.isConnected) return;
+  const session = readHealthieBrowserSession();
+  if (!["/", "/overview"].includes(location.pathname) ||
+      session.token !== state.token || session.source !== state.source) {
+    clearHomeAppointments();
+    return;
+  }
+  const userId = ddClinician?.id;
+  if (!userId || !/^\d{1,80}$/.test(userId)) {
+    enqueueDatadogLog("warn", "home-appointments", "Provider unavailable; keeping native appointments");
+    retryHomeAppointments(state);
+    return;
+  }
+  const replacement = generateIframe(`${routeURLs.providerSchedule}/${userId}`)[0];
+  replacement.setAttribute("data-testid", "misha-home-appointments");
+  const style = document.createElement("style");
+  // Keep the header and all React-owned nodes. CSS also covers children added by later renders.
+  style.textContent = '.provider-home-appointments[data-misha-home-active] > :not(:first-child) { display: none !important; }';
+  replacement.appendChild(style);
+  state.area.after(replacement);
+  state.area.setAttribute("data-misha-home-active", "");
+  state.replacement = replacement;
+  state.pending = false;
+}
+
+function waitAppointmentsHome(attempt = 0) {
+  if (!["/", "/overview"].includes(location.pathname)) {
+    clearHomeAppointments();
+    return;
+  }
+  const $ = initJQuery();
+  const area = document.querySelector(".provider-home-appointments");
+  if (!$ || !area) {
+    clearHomeAppointments();
+    if (attempt < maxWaitAttempts) createTimeout(() => waitAppointmentsHome(attempt + 1), 200);
+    return;
+  }
+  const session = readHealthieBrowserSession();
+  if (homeAppointmentsState?.area !== area || homeAppointmentsState?.token !== session.token ||
+      homeAppointmentsState?.source !== session.source) {
+    clearHomeAppointments();
+    homeAppointmentsState = { area, ...session, pending: false, attempts: 0, retryAfter: 0, replacement: null };
+  }
+  const state = homeAppointmentsState;
+  if (state.pending || state.replacement?.isConnected || Date.now() < state.retryAfter || state.attempts >= 3) return;
+  state.pending = true;
+  state.attempts += 1;
+  // Reuse the bounded, session-aware lookup; an API key's owner is not necessarily the viewer.
+  loadViewingClinician().then(() => renderHomeAppointments(state)).catch((error) => {
+    retryHomeAppointments(state);
+    reportHealthieRequestError(error);
+  });
 }
 
 function initBookAppointmentButton() {
@@ -3052,10 +3082,7 @@ function observeDOMChanges(mutations, observer) {
       waitCalendar(); //Function to handle clicking on empty appointment slots
     }
 
-    if (urlValidation.appointmentsHome.test(location.href)) {
-      debugLog("tampermonkey calls waitAppointmentsHome");
-      waitAppointmentsHome();
-    }
+    waitAppointmentsHome();
 
     if (urlValidation.conversations.test(location.href)) {
       debugLog("tampermonkey calls waitAppointmentSidebar and waitInfo");
@@ -3287,6 +3314,7 @@ const observer = new MutationObserver(observeDOMChanges);
 observer.observe(document, config);
 setupMishaPostMessageListener();
 setupHealthieDatadogLogs();
+setupHomeAppointments();
 
 function updatePatientStatusIframeHeight(patientId, contentHeight) {
   const $ = initJQuery();

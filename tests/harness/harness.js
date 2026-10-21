@@ -2,6 +2,7 @@ const h = React.createElement;
 const params = new URLSearchParams(location.search);
 const layout = params.get("layout") || "modern";
 const clients = params.has("clients");
+const home = ["/", "/overview"].includes(location.pathname);
 const root = ReactDOM.createRoot(document.getElementById("overview"));
 let patientId = "123";
 let loaded = !params.has("pendingTabs");
@@ -75,9 +76,18 @@ function Clients() {
     h("button", { "data-testid": "unrelated-client-control" }, "Add client note"));
 }
 
+function Home() {
+  return h("div", { className: "provider-home-content" },
+    h("section", { className: "provider-home-appointments" },
+      h("h2", null, "Your appointments"),
+      loaded ? h("div", { "data-testid": "home-tabs", key: "tabs" }, "Today / Upcoming") : null,
+      loaded ? h("button", { "data-testid": "home-native", key: "native", onClick: nativeClientPress }, "Native schedule")
+        : h("p", { "data-testid": "home-refreshed", key: "refreshed" }, "Appointments refreshed")));
+}
+
 function renderOverview() {
   revision += 1;
-  const component = clients ? Clients : Overview;
+  const component = home ? Home : clients ? Clients : Overview;
   ReactDOM.flushSync(() => root.render(mounted ? h(component, { key: patientId }) : null));
 }
 
@@ -89,7 +99,7 @@ function bindAction(id, action) {
 }
 
 if (clients) document.getElementById("inject").textContent = "Inject Add client";
-bindAction("inject", clients ? waitForAddPatientButton : handleAppointmentsProfileRoute);
+bindAction("inject", home ? waitAppointmentsHome : clients ? waitForAddPatientButton : handleAppointmentsProfileRoute);
 bindAction("refresh", () => { loaded = false; renderOverview(); });
 bindAction("restore", () => { loaded = true; renderOverview(); });
 bindAction("load", () => { mounted = true; loaded = true; renderOverview(); });

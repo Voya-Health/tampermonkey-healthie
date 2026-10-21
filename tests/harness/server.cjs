@@ -23,11 +23,11 @@ function userscriptUnderTest() {
   const source = fs.readFileSync(sourcePath, "utf8");
   const functions = ["debugLog", "createTimeout", "initJQuery", "convertToCSSProperty",
     "generateIframe", "hideOverlay", "showOverlay", "waitAppointmentsProfile", "handleAppointmentsProfileRoute",
-    "createPatientDialogIframe", "waitForAddPatientButton"];
+    "createPatientDialogIframe", "waitForAddPatientButton", "waitAppointmentsHome", "healthieGQL", "reportHealthieRequestError"];
   const declarations = functions.map((name) =>
     extract(source, new RegExp(String.raw`^function ${name}\([^]*?^}`, "m"), name));
   // Earlier revisions lack these helpers; source overrides must still reproduce their failure.
-  for (const name of ["findAddClientButton", "handleAddClientClick"]) {
+  for (const name of ["findAddClientButton", "handleAddClientClick", "clearHomeAppointments", "renderHomeAppointments", "retryHomeAppointments", "setupHomeAppointments"]) {
     const match = source.match(new RegExp(String.raw`^function ${name}\([^]*?^}`, "m"));
     if (match) declarations.push(match[0]);
   }
@@ -43,8 +43,9 @@ function userscriptUnderTest() {
   const telemetry = telemetryStart >= 0
     ? source.slice(telemetryStart, telemetryEnd)
     : "";
-  const setup = telemetry ? "\nsetupHealthieDatadogLogs();" : "";
-  return `let debug = false; let timeoutIds = [];\n${telemetry}\n${declarations.join("\n")}${setup}`;
+  const setup = (telemetry ? "\nsetupHealthieDatadogLogs();" : "") +
+    (source.includes("function setupHomeAppointments(") ? "\nsetupHomeAppointments();" : "");
+  return `let debug = false; let timeoutIds = []; let homeAppointmentsState = null; const maxWaitAttempts = 25; let auth = "Basic synthetic-api-key";\n${telemetry}\n${declarations.join("\n")}${setup}`;
 }
 
 const server = http.createServer((request, response) => {
@@ -57,7 +58,7 @@ const server = http.createServer((request, response) => {
     } else if (assets.has(pathname)) {
       response.setHeader("Content-Type", "text/javascript");
       response.end(fs.readFileSync(assets.get(pathname)));
-    } else if (pathname === "/" || pathname === "/clients/active" || /^\/users\/\d+(?:\/Overview)?$/.test(pathname)) {
+    } else if (pathname === "/" || pathname === "/overview" || pathname === "/clients/active" || /^\/users\/\d+(?:\/Overview)?$/.test(pathname)) {
       response.setHeader("Content-Type", "text/html");
       response.end(fs.readFileSync(path.join(__dirname, "index.html")));
     } else {
@@ -69,6 +70,7 @@ const server = http.createServer((request, response) => {
   }
 });
 
-server.listen(4175, "127.0.0.1", () => {
-  console.log("Healthie test harness: http://127.0.0.1:4175/users/123/Overview");
+const port = Number(process.env.HEALTHIE_TEST_PORT || 4175);
+server.listen(port, "127.0.0.1", () => {
+  console.log(`Healthie test harness: http://127.0.0.1:${port}/users/123/Overview`);
 });
