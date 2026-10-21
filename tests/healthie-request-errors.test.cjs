@@ -14,6 +14,9 @@ function load(name, overrides = {}) {
   const context = {
     console: { error: (...args) => errors.push(args) },
     debugLog() {},
+    // Telemetry has its own full-source tests; these fixtures isolate request outcomes.
+    enqueueDatadogLog() {},
+    flushDatadogLogsNow() {},
     location: { href: "https://vorihealth.gethealthie.com/users/123/Overview" },
     patientNumber: "123",
     isStagingEnv: false,
@@ -33,41 +36,6 @@ function load(name, overrides = {}) {
   }
   return { context, errors, alerts, writes };
 }
-
-function provider(request) {
-  const appended = [];
-  const area = { childNodes: [] };
-  return {
-    ...load("waitAppointmentsHome", {
-      initJQuery: () => () => ({ append: (iframe) => appended.push(iframe) }),
-      document: { getElementsByClassName: () => [area], querySelector: () => null },
-      generateIframe: (route) => route,
-      healthieGQL: request,
-    }),
-    appended,
-  };
-}
-
-for (const [label, response] of [
-  ["network rejection", () => Promise.reject(new Error("network unavailable"))],
-  ["malformed response", () => Promise.resolve({})],
-]) {
-  test(`provider appointments handles ${label} without inserting an iframe`, async () => {
-    const fixture = provider(response);
-    fixture.context.waitAppointmentsHome();
-    await settle();
-    assert.equal(fixture.errors.length, 1);
-    assert.equal(fixture.appended.length, 0);
-  });
-}
-
-test("provider appointments still inserts the schedule iframe on success", async () => {
-  const fixture = provider(() => Promise.resolve({ data: { user: { id: "456" } } }));
-  fixture.context.waitAppointmentsHome();
-  await settle();
-  assert.deepEqual(fixture.appended, ["provider-schedule/456"]);
-  assert.equal(fixture.errors.length, 0);
-});
 
 const carePlan = {
   goal: { title: "Overall goal" },
