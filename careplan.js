@@ -1134,8 +1134,15 @@ function generateIframe(routeURL, options = {}) {
 
 function clearHomeAppointments() {
   if (!homeAppointmentsState) return;
-  homeAppointmentsState.replacement?.remove();
-  delete homeAppointmentsState.area.dataset.mishaHomeActive;
+  const { area, replacement, watcher } = homeAppointmentsState;
+  watcher?.disconnect();
+  replacement?.remove();
+  if (area) {
+    delete area.dataset.mishaHomeActive;
+    area.style.removeProperty("display");
+    area.style.removeProperty("flex-direction");
+    area.style.removeProperty("align-items");
+  }
   homeAppointmentsState = null;
 }
 
@@ -1173,10 +1180,31 @@ function renderHomeAppointments(state) {
   const replacement = generateIframe(`${routeURLs.providerSchedule}/${userId}`)[0];
   replacement.dataset.testid = "misha-home-appointments";
   const style = document.createElement("style");
-  // Keep the header and all React-owned nodes. CSS also covers children added by later renders.
-  style.textContent = '.provider-home-appointments[data-misha-home-active] > :not(:first-child) { display: none !important; }';
+  // Healthie lays .provider-home-appointments out in a row. Inserting the schedule
+  // after that section makes it the next column, so appointments run left to right.
+  // Keep the header and React-owned nodes, and stack the schedule under the header.
+  style.textContent = [
+    ".provider-home-appointments[data-misha-home-active] { display: flex !important; flex-direction: column !important; align-items: stretch !important; }",
+    ".provider-home-appointments[data-misha-home-active] > :not(:first-child):not([data-testid='misha-home-appointments']) { display: none !important; }",
+    ".provider-home-appointments[data-misha-home-active] > [data-testid='misha-home-appointments'] { display: block !important; width: 100%; }",
+  ].join(" ");
   replacement.appendChild(style);
-  state.area.after(replacement);
+  state.area.style.setProperty("display", "flex", "important");
+  state.area.style.setProperty("flex-direction", "column", "important");
+  state.area.style.setProperty("align-items", "stretch", "important");
+  // React refresh drops nodes it does not own. Put the schedule back without another lookup.
+  const watcher = new MutationObserver(() => {
+    if (homeAppointmentsState !== state) {
+      watcher.disconnect();
+      return;
+    }
+    if (state.area.isConnected && !replacement.isConnected) {
+      state.area.append(replacement);
+    }
+  });
+  watcher.observe(state.area, { childList: true });
+  state.watcher = watcher;
+  state.area.append(replacement);
   state.area.dataset.mishaHomeActive = "";
   state.replacement = replacement;
   state.pending = false;

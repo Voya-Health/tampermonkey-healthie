@@ -39,6 +39,21 @@ async function expectHome(page, host = "misha.vorihealth.com", id = "42") {
   await expect(page.getByTestId("home-native")).toBeHidden();
 }
 
+test("Home stacks the provider schedule under the heading", async ({ page }) => {
+  const fixture = await homeFixture(page);
+  await injectHome(page);
+  await expectHome(page);
+  const heading = page.getByRole("heading", { name: "Your appointments" });
+  const schedule = page.getByTestId("misha-home-appointments");
+  await expect(page.locator(".provider-home-appointments")).toHaveCSS("flex-direction", "column");
+  await expect(page.locator(".provider-home-appointments > [data-testid='misha-home-appointments']")).toHaveCount(1);
+  const headingBox = await heading.boundingBox();
+  const scheduleBox = await schedule.boundingBox();
+  expect(scheduleBox.y).toBeGreaterThanOrEqual(headingBox.y + headingBox.height - 1);
+  expect(scheduleBox.x).toBeLessThan(headingBox.x + headingBox.width);
+  fixture.assertClean();
+});
+
 test("Home GraphQL rejection preserves the native schedule without a TypeError", async ({ page }) => {
   const fixture = await homeFixture(page, { body: { errors: [{ message: "Synthetic authentication rejection" }] } });
   await injectHome(page);

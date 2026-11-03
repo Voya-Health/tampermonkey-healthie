@@ -9,7 +9,7 @@ npm test
 ```
 
 `npm test` runs 49 Node tests for Datadog diagnostics and GraphQL request handling,
-then 10 native Chromium telemetry tests and 35 Playwright tests for Home, patient Overview
+then 10 native Chromium telemetry tests and 36 Playwright tests for Home, patient Overview
 appointments and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's
 `Userscript tests` job and SonarCloud result before completing a PR.
@@ -64,9 +64,11 @@ keeps Healthie's native schedule visible and usable. The shared lookup has a ten
 deadline; Home makes at most three attempts per mounted section/session, with thirty
 seconds between failed attempts. A successful response creates one Misha schedule
 for the signed-in provider. The script hides the native content with CSS and retains
-its header and React-owned nodes. Session changes remove the old replacement.
+its header and React-owned nodes. The schedule is inserted inside that section, and the
+section stacks downward. A schedule placed after the section sits in Healthie's horizontal
+row. Session changes remove the old replacement and restore the section's own layout.
 
-Sixteen Home browser regressions cover production and staging URLs, GraphQL errors,
+Seventeen Home browser regressions cover production and staging URLs, GraphQL errors,
 partial and missing responses, missing sessions, patient accounts, malformed and
 oversized IDs, pending and repeated injection, bounded retries and recovery, account
 switching and logout, late replies after navigation/unmount, and React refresh/restore.
