@@ -100,10 +100,12 @@ function Sidebar() {
     h("button", { "data-testid": "tab-goals", onClick: nativeClientPress }, "Goals"));
 }
 
-// Healthie's client list: each row's Book session button is React-owned.
+// Healthie's client list: each row's Book session button is React-owned. The name is rendered
+// conditionally so a refresh deletes a React child in the same row the userscript clones into.
 function BookingList() {
   return h("div", { className: "client-list" }, ["11", "22"].map((id) =>
     h("div", { key: id, "data-testid": `client-row-${id}` },
+      loaded ? h("span", { "data-testid": `client-name-${id}`, key: "name" }, `Client ${id}`) : null,
       h("button", { onClick: nativeClientPress }, "Book session"))));
 }
 

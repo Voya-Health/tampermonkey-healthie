@@ -8,9 +8,9 @@ npm ci --ignore-scripts
 npm test
 ```
 
-`npm test` runs 49 Node tests for Datadog diagnostics and GraphQL request handling,
-then 10 native Chromium telemetry tests and 41 Playwright tests for Home, patient Overview
-appointments, the patient sidebar, the client list and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
+`npm test` runs 56 Node tests for Datadog diagnostics, GraphQL request handling and React node
+ownership, then 10 native Chromium telemetry tests and 47 Playwright tests for Home, patient
+Overview appointments, the patient sidebar, the client list and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's
 `Userscript tests` job and SonarCloud result before completing a PR.
 
@@ -106,18 +106,37 @@ userscript-owned copy next to it, and returns nothing when that copy already exi
 polling cannot rebuild the same control. The only nodes the script removes are ones it created:
 its own iframes, overlays, cloned calendar and pediatric banner.
 
-Five browser regressions cover the patient sidebar and the client list. They check that the basic
-information section keeps its React children while hiding them, that a React refresh which deletes
-a child still succeeds after injection, that repeated injection leaves one iframe, that the goals
-tab is hidden rather than removed, and that the client list clones Book session once instead of
-re-cloning it on every poll. All five fail against `aa73246`, where the sidebar reported two
-`removeChild` failures. Reproduce with:
+Three layers protect that contract.
+
+`tests/browser/react-ownership.spec.cjs` holds five regressions for the surfaces where the crash
+was found. They check that the basic information section keeps its React children while hiding
+them, that a React refresh which deletes a child still succeeds after injection, that repeated
+injection leaves one iframe, that the goals tab is hidden rather than removed, and that the client
+list clones Book session once instead of re-cloning it on every poll.
+
+`tests/browser/react-reconciliation.spec.cjs` is the general sweep. A detached node does not throw
+until React next reconciles that subtree, so assertions taken right after injection cannot see the
+problem. The sweep drives every surface the harness models through the renders that do expose it:
+a second injection, a delete, a restore, patient navigation where the route has one, and a full
+unmount. It is table driven, so a new surface gets this coverage by adding a row with its URL,
+inject button, the node the userscript adds and the node Healthie renders.
+
+`tests/react-ownership.test.cjs` reads `careplan.js` and covers the rest of the file, which the
+fixture does not model. It fails on any `.empty()`, `.replaceWith()`, `.detach()`, `removeChild`
+or `replaceChild`, since those detach whatever they are called on. It also requires every
+`.remove()`, `.innerHTML` assignment and `.html()` call to name a node the script owns, listed in
+`ownedTargets`. This is a source scan, not a reconciliation test, so it complements the browser
+suites rather than replacing them.
+
+All three fail against `aa73246`, where the sidebar reported two `removeChild` failures. Reproduce
+with:
 
 ```sh
 mkdir -p .test-fixtures
 git show aa73246:careplan.js > .test-fixtures/before-react-ownership.js
-HEALTHIE_TEST_SOURCE="$PWD/.test-fixtures/before-react-ownership.js" \
-  ./node_modules/.bin/playwright test react-ownership
+export HEALTHIE_TEST_SOURCE="$PWD/.test-fixtures/before-react-ownership.js"
+node --test tests/react-ownership.test.cjs
+./node_modules/.bin/playwright test react-ownership react-reconciliation
 ```
 
 The fixture's sidebar and client list are synthetic. They reproduce the node ownership contract,
