@@ -1132,6 +1132,28 @@ function generateIframe(routeURL, options = {}) {
   }
 }
 
+// Healthie's React keeps references to the nodes it rendered. Detaching one makes its next
+// render fail on that node, so hide Healthie's markup instead of removing or replacing it.
+function hideNativeNode(node) {
+  const element = node instanceof Element ? node : node?.[0];
+  element?.style?.setProperty("display", "none", "important");
+  return element;
+}
+
+// Hide a native control and put a userscript-owned copy beside it. Returns null when the copy
+// is already present so repeated polling cannot keep rebuilding the same control.
+function cloneNativeControl($, nativeControl, testId, onClick) {
+  const native = $(nativeControl);
+  if (!native.length || native.attr("data-testid") === testId || native.next(`[data-testid="${testId}"]`).length) {
+    return null;
+  }
+  const clone = native.clone().removeAttr("id").attr("data-testid", testId).show();
+  clone.on("click", onClick);
+  hideNativeNode(native);
+  native.after(clone);
+  return clone;
+}
+
 function clearHomeAppointments() {
   if (!homeAppointmentsState) return;
   const { area, replacement, watcher } = homeAppointmentsState;
@@ -1237,29 +1259,6 @@ function waitAppointmentsHome(attempt = 0) {
     retryHomeAppointments(state);
     reportHealthieRequestError(error);
   });
-}
-
-function initBookAppointmentButton() {
-  let bookAppointmentBtn = $("[data-testid='add-appointment-button']")[0];
-
-  if (bookAppointmentBtn) {
-    let patientNumber = location.href.split("/")[4];
-    let clonedSec = $(bookAppointmentBtn).parent().clone();
-    let appointmentSec = $(bookAppointmentBtn).parent().parent();
-    $(bookAppointmentBtn).remove();
-    debugLog(`tampermonkey parent element is `, $(appointmentSec).children()[0]);
-    clonedSec.insertAfter($(appointmentSec).children()[0]);
-    let newBookAppointmentBtn = $("[data-testid='add-appointment-button']")[0];
-    let clonedBtn = $(newBookAppointmentBtn).clone();
-    $(newBookAppointmentBtn).replaceWith(clonedBtn);
-    clonedBtn.on("click", function (e) {
-      e.stopPropagation();
-      showOverlay(`${routeURLs.schedule}/${patientNumber}`, styles.scheduleOverlay);
-    });
-  } else {
-    debugLog(`tampermonkey waiting for book appointment button`);
-    createTimeout(initBookAppointmentButton, 200);
-  }
 }
 
 function findAddClientButton($) {
@@ -1998,9 +1997,7 @@ function initAddButton() {
 
       if (addAppointmentBtn) {
         debugLog(`tampermonkey show overlay on +Add appointment btn`);
-        let clonedBtn = $(addAppointmentBtn).clone();
-        $(addAppointmentBtn).replaceWith(clonedBtn);
-        clonedBtn.on("click", function (e) {
+        cloneNativeControl($, addAppointmentBtn, "misha-calendar-add-appointment-button", function (e) {
           e.stopPropagation();
           //https://qa.misha.vori.health/schedule/
           showOverlay(`${routeURLs.schedule}`, styles.scheduleOverlay);
@@ -2042,20 +2039,16 @@ function initCalendarHeaderBtns() {
         debugLog(`tampermonkey calendar dropdown is located`);
         // Removing cloned calendar on dropdown change
         const dropDownText = dayWeekMonthDropdown[0].innerText;
-        if (dropDownText === "Day") {
-          debugLog(`tampermonkey - clicked on day. Removing cloned calendar...`);
+        // Only the userscript's own clone may be removed; the matching native view is React's.
+        if (dropDownText === "Day" || dropDownText === "Week") {
+          debugLog(`tampermonkey - clicked on ${dropDownText.toLowerCase()}. Removing cloned calendar...`);
           setTimeout(() => {
-            $(".rbc-month-view").remove();
-          }, 1000);
-        } else if (dropDownText === "Week") {
-          debugLog(`tampermonkey - clicked on week. Removing cloned calendar...`);
-          setTimeout(() => {
-            $(".rbc-month-view").remove();
+            $(".rbc-month-view.cloned-calendar").remove();
           }, 1000);
         } else if (dropDownText === "Month") {
           debugLog(`tampermonkey - clicked on month. Removing cloned calendar...`);
           setTimeout(() => {
-            $(".rbc-time-content").remove();
+            $(".rbc-time-content.cloned-calendar").remove();
           }, 1000);
         }
       } else {
@@ -2114,7 +2107,7 @@ function waitGoalTab(attempt = 0) {
   const goals_tab = document.querySelector('[data-testid="tab-goals"]');
   if (goals_tab) {
     debugLog(`tampermonkey found goals tab`);
-    goals_tab.remove();
+    hideNativeNode(goals_tab);
     return;
   }
   scheduleRetryOrStop(
@@ -2306,7 +2299,7 @@ function removeCareplan() {
       to_remove = careplan_sec2;
     }
     if (to_remove) {
-      to_remove.remove();
+      hideNativeNode(to_remove);
       parent.append(iframe);
       carePlanLoopLock = carePlanLoopLock + 1;
     } else {
@@ -2840,13 +2833,12 @@ function waitAppointmentSidebar() {
   let appointmentWindow = document.querySelector('[data-testid="cp-section-appointments"]');
   let goalsTab = document.querySelector('[data-testid="tab-goals"]');
   debugLog(`tampermonkey goals tab `, goalsTab);
-  goalsTab && goalsTab.remove();
+  hideNativeNode(goalsTab);
   let actionLinks = Array.from(document.getElementsByClassName("healthie-action-link"));
   if (appointmentWindow && actionLinks[0]) {
-    goalsTab && goalsTab.remove();
     actionLinks.forEach((element) => {
       debugLog("tampermonkey action link found", element);
-      element.remove();
+      hideNativeNode(element);
     });
   } else {
     //wait for content load
@@ -2864,14 +2856,11 @@ function waitClientList() {
     Array.from(bookLinks).forEach((element) => {
       debugLog("tampermonkey book link found", element);
       let ID = element.parentElement.getAttribute("data-testid").split("-").at(-1);
-      let bookButton = $(element);
-      let clonedButton = bookButton.clone(true);
-      clonedButton.on("click", function (e) {
+      cloneNativeControl($, element, "misha-book-session-button", function (e) {
         e.stopPropagation();
         //schedule/patientid
         showOverlay(`${routeURLs.schedule}/${ID}`, styles.scheduleOverlay);
       });
-      bookButton.replaceWith(clonedButton);
     });
     createTimeout(waitClientList, 500);
   } else {
@@ -3138,10 +3127,7 @@ function observeDOMChanges(mutations, observer) {
         let goalsTab = document.querySelector('[data-testid="goals-tab-btn"]');
         debugLog(`tampermonkey goals tab `, goalsTab);
         if (goalsTab) {
-          let parentDiv = goalsTab.closest("div");
-          if (parentDiv) {
-            parentDiv.remove();
-          }
+          hideNativeNode(goalsTab.closest("div"));
         }
         waitCarePlan();
       }
@@ -3248,13 +3234,8 @@ function hideChartingNotesAppointment(attempt = 0) {
 }
 
 function validateIframeReplacement(basicInfoSection) {
-  // Check if iframe exists and is the first child (full replacement mode)
-  const existingIframe = basicInfoSection.find(".misha-iframe-container");
-  if (existingIframe.length > 0) {
-    const firstChild = basicInfoSection.children().first();
-    return firstChild.hasClass("misha-iframe-container");
-  }
-  return false;
+  // The iframe is a direct child we own; Healthie's own markup stays in place but hidden.
+  return basicInfoSection.children(".misha-iframe-container").length > 0;
 }
 
 function cleanupExistingBasicInfoIframes(basicInfoSection) {
@@ -3292,6 +3273,15 @@ function replaceBasicInformationSection(retryCount = 0) {
   const patientNumber = location.href.split("/")[4];
   debugLog(`tampermonkey patient number for basic info replacement`, patientNumber);
 
+  // addMembershipAndOnboarding inserts the same patient status iframe deeper in this section.
+  // Both are userscript-owned, so drop the nested copy and keep the one this function appends.
+  const nestedIframes = basicInfoSection.find(".misha-iframe-container")
+    .not(basicInfoSection.children(".misha-iframe-container"));
+  if (nestedIframes.length > 0) {
+    debugLog(`tampermonkey removing ${nestedIframes.length} nested patient status iframe(s)`);
+    nestedIframes.remove();
+  }
+
   // Check if iframe already exists and is valid
   if (validateIframeReplacement(basicInfoSection)) {
     debugLog(`tampermonkey basic info iframe already exists and is valid`);
@@ -3301,9 +3291,11 @@ function replaceBasicInformationSection(retryCount = 0) {
   // Clean up any existing iframes before replacing
   cleanupExistingBasicInfoIframes(basicInfoSection);
 
-  // Full replacement mode - replace entire section with iframe
-  debugLog(`tampermonkey using full replacement mode`);
-  basicInfoSection.empty();
+  // React must retain its original tree so later renders can update or remove it.
+  debugLog(`tampermonkey hiding native basic information content`);
+  basicInfoSection.children().not(".misha-iframe-container").each(function () {
+    hideNativeNode(this);
+  });
 
   const iframe = generateIframe(`${routeURLs.patientStatus}/${patientNumber}`, {
     height: "520px",

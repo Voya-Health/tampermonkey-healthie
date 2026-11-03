@@ -23,11 +23,13 @@ function userscriptUnderTest() {
   const source = fs.readFileSync(sourcePath, "utf8");
   const functions = ["debugLog", "createTimeout", "initJQuery", "convertToCSSProperty",
     "generateIframe", "hideOverlay", "showOverlay", "waitAppointmentsProfile", "handleAppointmentsProfileRoute",
-    "createPatientDialogIframe", "waitForAddPatientButton", "waitAppointmentsHome", "healthieGQL", "reportHealthieRequestError"];
+    "createPatientDialogIframe", "waitForAddPatientButton", "waitAppointmentsHome", "healthieGQL", "reportHealthieRequestError",
+    "scheduleRetryOrStop", "addMembershipAndOnboarding", "replaceBasicInformationSection",
+    "validateIframeReplacement", "cleanupExistingBasicInfoIframes", "waitGoalTab", "waitClientList"];
   const declarations = functions.map((name) =>
     extract(source, new RegExp(String.raw`^function ${name}\([^]*?^}`, "m"), name));
   // Earlier revisions lack these helpers; source overrides must still reproduce their failure.
-  for (const name of ["findAddClientButton", "handleAddClientClick", "clearHomeAppointments", "renderHomeAppointments", "retryHomeAppointments", "setupHomeAppointments"]) {
+  for (const name of ["findAddClientButton", "handleAddClientClick", "clearHomeAppointments", "renderHomeAppointments", "retryHomeAppointments", "setupHomeAppointments", "hideNativeNode", "cloneNativeControl"]) {
     const match = source.match(new RegExp(String.raw`^function ${name}\([^]*?^}`, "m"));
     if (match) declarations.push(match[0]);
   }
@@ -45,7 +47,7 @@ function userscriptUnderTest() {
     : "";
   const setup = (telemetry ? "\nsetupHealthieDatadogLogs();" : "") +
     (source.includes("function setupHomeAppointments(") ? "\nsetupHomeAppointments();" : "");
-  return `let debug = false; let timeoutIds = []; let homeAppointmentsState = null; const maxWaitAttempts = 25; let auth = "Basic synthetic-api-key";\n${telemetry}\n${declarations.join("\n")}${setup}`;
+  return `let debug = false; let timeoutIds = []; let homeAppointmentsState = null; const maxWaitAttempts = 25; let auth = "Basic synthetic-api-key"; let patientNumber = "";\n${telemetry}\n${declarations.join("\n")}${setup}`;
 }
 
 const server = http.createServer((request, response) => {

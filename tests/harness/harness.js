@@ -2,6 +2,8 @@ const h = React.createElement;
 const params = new URLSearchParams(location.search);
 const layout = params.get("layout") || "modern";
 const clients = params.has("clients");
+const sidebar = params.has("sidebar");
+const booking = params.has("booking");
 const home = ["/", "/overview"].includes(location.pathname);
 const root = ReactDOM.createRoot(document.getElementById("overview"));
 let patientId = "123";
@@ -85,9 +87,31 @@ function Home() {
         : h("p", { "data-testid": "home-refreshed", key: "refreshed" }, "Appointments refreshed")));
 }
 
+// Healthie's patient sidebar: a React-owned section plus the goals tab the userscript hides.
+function Sidebar() {
+  return h("div", { className: "cp-sidebar" },
+    h("section", {
+      className: "cp-sidebar-expandable-section",
+      "data-testid": "cp-section-basic-information",
+    },
+      h("div", { className: "BasicInfo_basicInfo", key: "info" },
+        h("div", null, h("div", null, "Phone"), h("div", null, "Email"))),
+      loaded ? h("div", { "data-testid": "sidebar-details", key: "details" }, "More details") : null),
+    h("button", { "data-testid": "tab-goals", onClick: nativeClientPress }, "Goals"));
+}
+
+// Healthie's client list: each row's Book session button is React-owned.
+function BookingList() {
+  return h("div", { className: "client-list" }, ["11", "22"].map((id) =>
+    h("div", { key: id, "data-testid": `client-row-${id}` },
+      h("button", { onClick: nativeClientPress }, "Book session"))));
+}
+
 function renderOverview() {
   revision += 1;
   let component = clients ? Clients : Overview;
+  if (sidebar) component = Sidebar;
+  if (booking) component = BookingList;
   if (home) component = Home;
   ReactDOM.flushSync(() => root.render(mounted ? h(component, { key: patientId }) : null));
 }
@@ -101,6 +125,14 @@ function bindAction(id, action) {
 
 if (clients) document.getElementById("inject").textContent = "Inject Add client";
 let injectAction = clients ? waitForAddPatientButton : handleAppointmentsProfileRoute;
+if (sidebar) {
+  injectAction = () => {
+    addMembershipAndOnboarding();
+    replaceBasicInformationSection();
+    waitGoalTab();
+  };
+}
+if (booking) injectAction = waitClientList;
 if (home) injectAction = waitAppointmentsHome;
 bindAction("inject", injectAction);
 bindAction("refresh", () => { loaded = false; renderOverview(); });

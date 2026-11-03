@@ -9,8 +9,8 @@ npm test
 ```
 
 `npm test` runs 49 Node tests for Datadog diagnostics and GraphQL request handling,
-then 10 native Chromium telemetry tests and 36 Playwright tests for Home, patient Overview
-appointments and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
+then 10 native Chromium telemetry tests and 41 Playwright tests for Home, patient Overview
+appointments, the patient sidebar, the client list and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's
 `Userscript tests` job and SonarCloud result before completing a PR.
 
@@ -93,6 +93,35 @@ passed all 94 tests; port 4175 was occupied by a separate Misha preview. Set
 browser traces are retained locally in `.test-fixtures/home-before.log` and
 `.test-fixtures/home-before-results/`. These fixtures use synthetic Healthie and
 Misha responses; they do not establish live Home integration or installed-script behavior.
+
+## React node ownership
+
+Healthie keeps references to the nodes it rendered. Detaching one makes its next render fail on
+that node with `Failed to execute 'removeChild' on 'Node'`, which surfaces to clinicians as
+Healthie's own error page. The userscript therefore hides Healthie's markup and adds its own
+nodes beside it, rather than removing, emptying or replacing anything Healthie rendered.
+
+`hideNativeNode` hides a single node. `cloneNativeControl` hides a native control, inserts a
+userscript-owned copy next to it, and returns nothing when that copy already exists, so repeated
+polling cannot rebuild the same control. The only nodes the script removes are ones it created:
+its own iframes, overlays, cloned calendar and pediatric banner.
+
+Five browser regressions cover the patient sidebar and the client list. They check that the basic
+information section keeps its React children while hiding them, that a React refresh which deletes
+a child still succeeds after injection, that repeated injection leaves one iframe, that the goals
+tab is hidden rather than removed, and that the client list clones Book session once instead of
+re-cloning it on every poll. All five fail against `aa73246`, where the sidebar reported two
+`removeChild` failures. Reproduce with:
+
+```sh
+mkdir -p .test-fixtures
+git show aa73246:careplan.js > .test-fixtures/before-react-ownership.js
+HEALTHIE_TEST_SOURCE="$PWD/.test-fixtures/before-react-ownership.js" \
+  ./node_modules/.bin/playwright test react-ownership
+```
+
+The fixture's sidebar and client list are synthetic. They reproduce the node ownership contract,
+not Healthie's real components, so they do not establish live behavior on a patient profile.
 
 ## Datadog Content
 
