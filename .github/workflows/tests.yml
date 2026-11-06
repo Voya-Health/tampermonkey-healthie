@@ -20,6 +20,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: ./node_modules/.bin/playwright install --with-deps chromium
+      - run: node --check careplan.js
       - run: npm test
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
