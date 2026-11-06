@@ -146,6 +146,28 @@ test("charting click and error observers retain native handlers and record error
   assert.ok(logs.some((log) => log.tm_version));
 });
 
+test("ResizeObserver loop notices do not become Datadog window errors", async (t) => {
+  const page = await browserHarness(t);
+  await page.waitForFunction(() => ddClinician?.id === "42");
+  await page.evaluate(() => {
+    window.dispatchEvent(new ErrorEvent("error", {
+      message: "ResizeObserver loop completed with undelivered notifications.",
+      error: new Error("ResizeObserver loop completed with undelivered notifications."),
+      filename: "https://vorihealth.gethealthie.com/users/1/private_notes/edit/2",
+    }));
+    window.dispatchEvent(new ErrorEvent("error", {
+      message: "Healthie failed",
+      error: new TypeError("Healthie failed"),
+    }));
+    window.dispatchEvent(new Event("pagehide"));
+  });
+  const logs = await page.evaluate(() => window.__logs);
+  assert.equal(logs.filter((entry) => String(entry.tm_detail || "").includes("ResizeObserver")).length, 0);
+  const failures = logs.filter((entry) => entry.tm_kind === "window");
+  assert.equal(failures.length, 1);
+  assert.match(failures[0].tm_detail, /Healthie failed/);
+});
+
 test("Datadog content identifies the clinician on every click and keeps failures on their original patient page", async (t) => {
   const page = await browserHarness(t);
   const nextPath = "/users/999/private_notes/edit/" + "long-path-segment/".repeat(50) + "789";
@@ -166,16 +188,16 @@ test("Datadog content identifies the clinician on every click and keeps failures
   const logs = await page.evaluate(() => window.__logs);
   const clicks = logs.filter((entry) => entry.tm_kind === "chart-note");
   assert.equal(clicks.length, 3, "repeat clicks must remain separate events");
-  assert.equal(clicks[0].message, "[INFO] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [chart-note] clicked lock | path=/users/123/private_notes/edit/456");
+  assert.equal(clicks[0].message, "[INFO] [TM v2.7] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [chart-note] clicked lock | path=/users/123/private_notes/edit/456");
   assert.ok(clicks[2].message.endsWith("path=" + nextPath), "click Content includes the full long path");
   const failures = logs.filter((entry) => entry.tm_kind === "window");
   assert.equal(failures.length, 2, "each patient page needs its own failure");
-  assert.equal(failures[0].message, "[ERROR] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] window_error name=TypeError Healthie failed | path=/users/123/private_notes/edit/456 | repeats=2");
+  assert.equal(failures[0].message, "[ERROR] [TM v2.7] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] window_error name=TypeError Healthie failed | path=/users/123/private_notes/edit/456 | repeats=2");
   assert.ok(failures[1].message.endsWith("path=" + nextPath), "error Content includes the full long path");
   const startup = logs.find((entry) => entry.tm_kind === "lifecycle");
   assert.match(startup.message, /Ada Lovelace/);
   for (const log of [...clicks, ...failures]) {
-    assert.equal(log.tm_version, "2.6");
+    assert.equal(log.tm_version, "2.7");
     assert.equal(log.clinician_id, "42");
     assert.equal(log.clinician_identity_source, "healthie_browser_session");
     assert.ok(Number.isFinite(log.timestamp));
