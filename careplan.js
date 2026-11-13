@@ -735,7 +735,9 @@ function windowErrorDetail(event, fallbackMessage) {
 // ResizeObserver. "Script error." is the cross-origin placeholder with no useful detail.
 function isIgnoredBrowserNoise(message) {
   const text = String(message || "");
-  return text === "Script error." || text.includes("ResizeObserver loop");
+  return text === "Script error." ||
+    text === "ResizeObserver loop completed with undelivered notifications." ||
+    text === "ResizeObserver loop limit exceeded";
 }
 
 function watchWindowErrors(targetWindow) {

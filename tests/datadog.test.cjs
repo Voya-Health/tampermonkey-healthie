@@ -661,6 +661,18 @@ test("Chrome ResizeObserver loop notices are not sent to Datadog", () => {
   assert.match(real[0].tm_detail, /Healthie failed/);
 });
 
+test("ResizeObserver wording inside an actionable error stays in Datadog", () => {
+  const h = harness();
+  const message = "Could not save the chart note after ResizeObserver loop limit exceeded";
+  h.page.console.error(message);
+  for (const listener of h.listeners.error || []) {
+    listener({ message, error: new Error(message) });
+  }
+  const errors = h.logs().filter((log) => log.tm_kind === "console" || log.tm_kind === "window");
+  assert.deepEqual(errors.map((log) => log.tm_kind), ["console", "window"]);
+  for (const error of errors) assert.ok(error.tm_detail.includes(message));
+});
+
 test("userscript update version and emitted telemetry version stay aligned", () => {
   const version = source.match(/^\/\/ @version\s+(\S+)/m)?.[1];
   assert.ok(version, "userscript update header must be present");

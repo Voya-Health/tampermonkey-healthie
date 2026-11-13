@@ -159,13 +159,19 @@ test("ResizeObserver loop notices do not become Datadog window errors", async (t
       message: "Healthie failed",
       error: new TypeError("Healthie failed"),
     }));
+    const actionableMessage = "Could not save the chart note after ResizeObserver loop limit exceeded";
+    window.dispatchEvent(new ErrorEvent("error", {
+      message: actionableMessage,
+      error: new Error(actionableMessage),
+    }));
     window.dispatchEvent(new Event("pagehide"));
   });
   const logs = await page.evaluate(() => window.__logs);
-  assert.equal(logs.filter((entry) => String(entry.tm_detail || "").includes("ResizeObserver")).length, 0);
+  assert.ok(logs.every((entry) => !String(entry.tm_detail || "").includes("undelivered notifications")));
   const failures = logs.filter((entry) => entry.tm_kind === "window");
-  assert.equal(failures.length, 1);
+  assert.equal(failures.length, 2);
   assert.match(failures[0].tm_detail, /Healthie failed/);
+  assert.match(failures[1].tm_detail, /Could not save the chart note after ResizeObserver loop limit exceeded/);
 });
 
 test("Datadog content identifies the clinician on every click and keeps failures on their original patient page", async (t) => {
