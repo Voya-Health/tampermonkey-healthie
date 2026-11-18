@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Healthie Care Plan Integration
 // @namespace    http://tampermonkey.net/
-// @version      2.7
+// @version      2.8
 // @description  Injecting care plan components into Healthie
 // @author       Don, Tonye, Alejandro
 // @match        https://*.gethealthie.com/*
@@ -66,7 +66,7 @@ function debugLog(...messages) {
 
 // Same public browser logs token as DATADOG_LOGS_CLIENT_TOKEN in
 // voya-cust web-misha/core-lib/config/envs.ts. Not the server API key.
-const TM_VERSION = "2.7";
+const TM_VERSION = "2.8";
 const DD_LOGS_CLIENT_TOKEN = "pubdf55240f49807c01cd3ed2168506ced8";
 const DD_INTAKE_URL =
   "https://browser-intake-datadoghq.com/api/v2/logs?ddsource=browser&dd-evp-origin=browser&dd-api-key=" +
@@ -710,7 +710,7 @@ function hookPageConsoleError(targetWindow) {
   targetWindow.console.error = function () {
     try {
       const text = consoleErrorText(arguments);
-      if (text && !isIgnoredBrowserNoise(text)) {
+      if (text) {
         enqueueDatadogLog("error", "console", datadogErrorDetail("console", { message: text }));
       }
     } catch (e) {
@@ -730,23 +730,13 @@ function windowErrorDetail(event, fallbackMessage) {
   return detail;
 }
 
-// Chrome reports these when a page's ResizeObserver callback itself resizes the
-// observed node. They are not uncaught exceptions, and the script does not use
-// ResizeObserver. "Script error." is the cross-origin placeholder with no useful detail.
-function isIgnoredBrowserNoise(message) {
-  const text = String(message || "");
-  return text === "Script error." ||
-    text === "ResizeObserver loop completed with undelivered notifications." ||
-    text === "ResizeObserver loop limit exceeded";
-}
-
 function watchWindowErrors(targetWindow) {
   targetWindow.addEventListener("error", function (event) {
     if (event.target && event.target !== targetWindow) {
       return;
     }
     const message = event?.message ? event.message : "error";
-    if (isIgnoredBrowserNoise(message)) {
+    if (message === "Script error.") {
       return;
     }
     enqueueDatadogLog("error", "window", windowErrorDetail(event, message));
