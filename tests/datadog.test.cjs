@@ -509,7 +509,7 @@ test("content shows clinician, version, severity, action, original path, and rep
   h.context.location.pathname = "/users/999/Overview";
   h.run(`rememberClinician({id:42,email:'ada@vorihealth.com',full_name:'Ada Lovelace'})`);
   const log = h.logs().find((entry) => entry.tm_kind === "window");
-  assert.equal(log.message, "[ERROR] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] TypeError: Cannot read id | path=/users/123/private_notes/edit/456 | repeats=2");
+  assert.equal(log.message, "[ERROR] [TM v2.7] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] TypeError: Cannot read id | path=/users/123/private_notes/edit/456 | repeats=2");
   assert.equal(log.clinician_identity_source, "healthie_browser_session");
   assert.equal(log.tm_detail, "TypeError: Cannot read id");
   assert.ok(log.last_seen_at >= log.timestamp);
@@ -527,7 +527,7 @@ test("each sign and lock click is retained, including after navigation", () => {
   click();
   const logs = h.logs().filter((entry) => entry.tm_kind === "chart-note");
   assert.equal(logs.length, 4);
-  assert.equal(logs[0].message, "[INFO] [TM v2.6] Ada Lovelace (Healthie ID: 42) | [chart-note] clicked sign and lock | path=/users/123/private_notes/edit/456");
+  assert.equal(logs[0].message, "[INFO] [TM v2.7] Ada Lovelace (Healthie ID: 42) | [chart-note] clicked sign and lock | path=/users/123/private_notes/edit/456");
   assert.equal(logs[3].healthie_path, "/users/999/private_notes/edit/789");
   for (const log of logs) assert.equal(log.repeat_count, 1);
 });
@@ -614,7 +614,7 @@ test("oversized detail cannot truncate identity or the path out of content", () 
   const h = harness();
   h.run(`rememberClinician({id:42,email:'ada@vorihealth.com',full_name:'Ada Lovelace'}); enqueueDatadogLog('error','console','x'.repeat(10000))`);
   const log = h.logs().find((entry) => entry.tm_kind === "console");
-  assert.match(log.message, /^\[ERROR\] \[TM v2.6\] Ada Lovelace/);
+  assert.match(log.message, /^\[ERROR\] \[TM v2.7\] Ada Lovelace/);
   assert.match(log.message, /path=\/users\/123\/private_notes\/edit\/456$/);
   assert.equal(log.tm_detail.length, 500);
 });
@@ -627,12 +627,50 @@ test("Content retains the full path beyond 500 characters alongside clinician, a
   const logs = h.logs().filter((entry) => entry.tm_kind === "chart-note" || entry.tm_kind === "window");
   assert.equal(logs.length, 2);
   for (const log of logs) {
-    assert.ok(log.message.includes("[TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42)"));
+    assert.ok(log.message.includes("[TM v2.7] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42)"));
     assert.ok(log.message.endsWith(" | path=" + path), "Content must contain the complete path");
     assert.equal(log.healthie_path, path);
   }
   assert.ok(logs[0].message.includes("[chart-note] clicked sign and lock"));
   assert.ok(logs[1].message.includes("[window] TypeError: Cannot read id"));
+});
+
+test("Chrome ResizeObserver loop notices are not sent to Datadog", () => {
+  const h = harness();
+  const noise = [
+    "ResizeObserver loop completed with undelivered notifications.",
+    "ResizeObserver loop limit exceeded",
+    "Script error.",
+  ];
+  for (const listener of h.listeners.error || []) {
+    for (const message of noise) {
+      listener({ message, error: new Error(message), filename: "https://vorihealth.gethealthie.com/users/1/private_notes/edit/2" });
+    }
+  }
+  h.page.console.error("ResizeObserver loop completed with undelivered notifications.");
+  const ignored = h.logs().filter((log) => log.tm_kind === "window" || String(log.tm_detail || "").includes("ResizeObserver"));
+  assert.equal(ignored.length, 0);
+  for (const listener of h.listeners.error || []) {
+    listener({
+      message: "Healthie failed",
+      error: Object.assign(new Error("Healthie failed"), { name: "TypeError" }),
+    });
+  }
+  const real = h.logs().filter((log) => log.tm_kind === "window");
+  assert.equal(real.length, 1);
+  assert.match(real[0].tm_detail, /Healthie failed/);
+});
+
+test("ResizeObserver wording inside an actionable error stays in Datadog", () => {
+  const h = harness();
+  const message = "Could not save the chart note after ResizeObserver loop limit exceeded";
+  h.page.console.error(message);
+  for (const listener of h.listeners.error || []) {
+    listener({ message, error: new Error(message) });
+  }
+  const errors = h.logs().filter((log) => log.tm_kind === "console" || log.tm_kind === "window");
+  assert.deepEqual(errors.map((log) => log.tm_kind), ["console", "window"]);
+  for (const error of errors) assert.ok(error.tm_detail.includes(message));
 });
 
 test("userscript update version and emitted telemetry version stay aligned", () => {

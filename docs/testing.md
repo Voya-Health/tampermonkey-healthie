@@ -8,8 +8,8 @@ npm ci --ignore-scripts
 npm test
 ```
 
-`npm test` runs 56 Node tests for Datadog diagnostics, GraphQL request handling and React node
-ownership, then 10 native Chromium telemetry tests and 47 Playwright tests for Home, patient
+`npm test` runs 57 Node tests for Datadog diagnostics, GraphQL request handling and React node
+ownership, then 11 native Chromium telemetry tests and 47 Playwright tests for Home, patient
 Overview appointments, the patient sidebar, the client list and Add client. GitHub Actions runs all suites on each PR and saves Playwright reports, traces, and failure
 screenshots as the `playwright-results` artifact. Check the latest commit's
 `Userscript tests` job and SonarCloud result before completing a PR.
@@ -148,8 +148,8 @@ Each event's `message` includes severity, script version, clinician identity,
 event detail, and the path at the time of the event. For example, with synthetic data:
 
 ```text
-[INFO] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [chart-note] clicked sign and lock | path=/users/123/private_notes/edit/456
-[ERROR] [TM v2.6] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] TypeError: Cannot read id | path=/users/123/private_notes/edit/456 | repeats=4
+[INFO] [TM v2.7] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [chart-note] clicked sign and lock | path=/users/123/private_notes/edit/456
+[ERROR] [TM v2.7] Ada Lovelace <ada@vorihealth.com> (Healthie ID: 42) | [window] TypeError: Cannot read id | path=/users/123/private_notes/edit/456 | repeats=4
 ```
 
 Identity comes from Healthie's authenticated browser session through `currentUser`.
@@ -200,7 +200,9 @@ message, path, and clinician context. They send after two quiet seconds or after
 30 seconds of continuous repeats, with `repeat_count` and a visible `repeats=N`
 suffix. Later copies of that failure in the same context are suppressed for the
 page session. The warning and error limits remain 20 each per minute. External
-401s are still dropped; Healthie 401s remain.
+401s are still dropped; Healthie 401s remain. Chrome's
+`ResizeObserver loop completed with undelivered notifications.` notice, the older
+`ResizeObserver loop limit exceeded` wording, and `Script error.` are not sent.
 
 To reproduce the Content and repeat-click regressions against PR #133's earlier
 implementation, keep the current tests and run:
